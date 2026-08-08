@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+; Enable Windows Long Path Support (> 260 characters)
+; Required for React Native / Expo builds with deeply nested paths.
+; Run this file as Administrator (right-click > "Merge") then REBOOT.
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem]
+"LongPathsEnabled"=dword:00000001
