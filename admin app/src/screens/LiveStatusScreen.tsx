@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
-import { db, Trip, Expense, ActivityLog } from '../db/database';
+import { db, Trip, Expense, ActivityLog, normalizeImageUrl } from '../db/database';
 
 export default function LiveStatusScreen() {
   const [searchId, setSearchId] = useState('5566'); // Default to Senthil Rajesh
@@ -242,7 +242,72 @@ export default function LiveStatusScreen() {
               )}
             </View>
 
-            {/* 4. Live Updates Feed for this Driver */}
+            {/* 4. Proof of Delivery (POD) Section */}
+            {(driverTrip.podSubmitted || driverTrip.podPhotoUri || driverTrip.podSignature || driverTrip.podNotes) ? (
+              <View style={styles.infoCard}>
+                <Text style={styles.cardSectionTitle}>Proof of Delivery (POD)</Text>
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 'bold' }}>POD STATUS:</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: COLORS.success }}>POD UPLOADED ✓</Text>
+                  </View>
+
+                  {driverTrip.podPhotoUri ? (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 6 }}>📸 Delivery Photo:</Text>
+                      <Image
+                        source={{ uri: driverTrip.podPhotoUri }}
+                        style={{ width: '100%', height: 180, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
+                        resizeMode="contain"
+                      />
+                      <TouchableOpacity
+                        style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        onPress={() => {
+                          if (Platform.OS === 'web') {
+                            window.open(driverTrip.podPhotoUri, '_blank');
+                          } else {
+                            Linking.openURL(driverTrip.podPhotoUri!).catch(() => {});
+                          }
+                        }}
+                      >
+                        <MaterialIcons name="open-in-new" size={14} color={COLORS.secondary} />
+                        <Text style={{ color: COLORS.secondary, fontSize: 11, fontWeight: 'bold' }}>VIEW FULL POD IMAGE ↗</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  {driverTrip.podSignature ? (
+                    (driverTrip.podSignature.startsWith('data:image/') ||
+                     driverTrip.podSignature.startsWith('http://') ||
+                     driverTrip.podSignature.startsWith('https://') ||
+                     driverTrip.podSignature.startsWith('blob:') ||
+                     driverTrip.podSignature.startsWith('file://') ||
+                     driverTrip.podSignature.startsWith('/uploads/')) ? (
+                      <View style={{ marginTop: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 4 }}>✍️ Driver / Receiver Signature:</Text>
+                        <Image
+                          source={{ uri: normalizeImageUrl(driverTrip.podSignature) || driverTrip.podSignature }}
+                          style={{ width: 220, height: 75, borderRadius: 6, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#ffffff' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 12, color: COLORS.textDark }}>
+                        <Text style={{ fontWeight: 'bold' }}>Signature:</Text> {driverTrip.podSignature}
+                      </Text>
+                    )
+                  ) : null}
+
+                  {driverTrip.podNotes ? (
+                    <Text style={{ fontSize: 12, color: COLORS.textDark }}>
+                      <Text style={{ fontWeight: 'bold' }}>Delivery Notes:</Text> {driverTrip.podNotes}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            {/* 5. Live Updates Feed for this Driver */}
             <View style={styles.infoCard}>
               <Text style={styles.cardSectionTitle}>Driver Timeline Activity</Text>
               {allLogs.length === 0 ? (

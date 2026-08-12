@@ -30,9 +30,8 @@ export default function MapScreen({
   onArrivedPress,
 }: MapScreenProps) {
   const [location, setLocation] = useState<GPSLocation | null>(trip.currentGPS || null);
-  const [distanceRemaining, setDistanceRemaining] = useState<number>(350);
-  const [distanceText, setDistanceText] = useState<string>('350 km');
-  const [durationText, setDurationText] = useState<string>('5 hrs');
+  const [distanceText, setDistanceText] = useState<string>(trip.distanceKm ? `${trip.distanceKm} km` : '-- km');
+  const [durationText, setDurationText] = useState<string>(trip.estimatedTravelTime || '--');
   const [eta, setEta] = useState('');
   const [currentTurn, setCurrentTurn] = useState('Continue on route toward ' + trip.destination);
   const [turnIcon, setTurnIcon] = useState('navigation');
@@ -43,10 +42,8 @@ export default function MapScreen({
     const fetchDirections = async () => {
       const route = await getLiveRouteDetails(trip.startingPoint, trip.destination);
       if (route) {
-        setDistanceRemaining(route.distanceKm);
         setDistanceText(route.distanceText);
         setDurationText(route.durationText);
-        
         const etaDate = new Date();
         etaDate.setMinutes(etaDate.getMinutes() + route.durationMinutes);
         setEta(etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -73,15 +70,10 @@ export default function MapScreen({
         async (loc) => {
           const lat = loc.coords.latitude;
           const lng = loc.coords.longitude;
-
-          // Generate static map URL
           setMapTileUrl(getStaticMapPreviewUrl(lat, lng));
-
-          // Try Google Maps reverse geocoding first
           const googleGeo = await reverseGeocodeLocation(lat, lng);
-          const city = googleGeo?.city || location?.city || 'In Transit';
+          const city = googleGeo?.city || 'In Transit';
           const address = googleGeo?.formattedAddress || `Lat: ${lat.toFixed(4)}, Long: ${lng.toFixed(4)}`;
-
           const newGps: GPSLocation = {
             latitude: lat,
             longitude: lng,
@@ -89,7 +81,6 @@ export default function MapScreen({
             address,
             lastUpdated: new Date().toLocaleTimeString(),
           };
-
           setLocation(newGps);
           await db.updateGPS(trip.id, newGps);
         }
@@ -98,36 +89,8 @@ export default function MapScreen({
 
     startLocationTracking();
 
-    // Simulating GPS distance decrement over time
-    const interval = setInterval(() => {
-      setDistanceRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        // decrement distance randomly
-        const nextDist = prev - Math.floor(Math.random() * 5 + 1);
-        
-        // Update turn guidance based on distance remaining
-        if (nextDist < 50) {
-          setCurrentTurn('Take the exit toward Electronic City');
-          setTurnIcon('trending-right');
-        } else if (nextDist < 10) {
-          setCurrentTurn('Arriving at destination, Bangalore FC is on your left');
-          setTurnIcon('place');
-        } else {
-          setCurrentTurn('Stay on NH44 highway');
-          setTurnIcon('navigation');
-        }
-        return nextDist;
-      });
-    }, 6000); // speed up simulation
-
     return () => {
-      if (subscription) {
-        subscription.remove();
-      }
-      clearInterval(interval);
+      if (subscription) subscription.remove();
     };
   }, [trip.id]);
 
@@ -216,12 +179,12 @@ export default function MapScreen({
           <View style={styles.routeStatsRow}>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>REMAINING</Text>
-              <Text style={styles.statValue}>{distanceRemaining} km</Text>
+              <Text style={styles.statValue}>{distanceText}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>EST. TIME</Text>
-              <Text style={styles.statValue}>{Math.ceil(distanceRemaining / 60)} hrs</Text>
+              <Text style={styles.statValue}>{durationText}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>

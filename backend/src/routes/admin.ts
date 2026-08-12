@@ -3,6 +3,7 @@ import argon2 from 'argon2';
 import { sql } from '../db/client';
 import { CreateTripSchema } from '../middleware/validate';
 
+
 /**
  * Admin routes — all require admin JWT role.
  */
@@ -20,10 +21,22 @@ export async function adminRoutes(app: FastifyInstance) {
         t.driver_pin,
         t.vehicle_number,
         t.vehicle_type,
+        t.starting_point,
+        t.destination,
         t.status,
+        t.agreed_freight,
+        t.distance_km,
+        t.estimated_travel_time,
+        t.tolls_count,
+        t.estimated_toll_cost,
         t.odometer_start,
         t.odometer_end,
         t.odometer_start_url,
+        t.odometer_end_url,
+        t.diesel_start,
+        t.diesel_end,
+        t.start_date,
+        t.end_date,
         t.pod_photo_url,
         t.pod_signature,
         t.pod_notes,
@@ -169,6 +182,12 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     if (body.driver_pin !== undefined) {
       await sql`UPDATE trips SET driver_pin = ${String(body.driver_pin)}, updated_at = now() WHERE id = ${id}`;
+    }
+    if (body.odometer_start !== undefined) {
+      await sql`UPDATE trips SET odometer_start = ${body.odometer_start === null ? null : Number(body.odometer_start)}, updated_at = now() WHERE id = ${id}`;
+    }
+    if (body.odometer_end !== undefined) {
+      await sql`UPDATE trips SET odometer_end = ${body.odometer_end === null ? null : Number(body.odometer_end)}, updated_at = now() WHERE id = ${id}`;
     }
 
     return reply.code(200).send({ updated: true });
@@ -412,5 +431,28 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/activity-logs', adminHook, async (_req: FastifyRequest, reply: FastifyReply) => {
     const rows = await sql`SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 100`;
     return reply.code(200).send(rows);
+  });
+
+  // POST /api/admin/reset — wipe ALL dynamic data from the shared database
+  app.post('/reset', adminHook, async (_req: FastifyRequest, reply: FastifyReply) => {
+    const results: string[] = [];
+    const del = async (label: string, query: () => Promise<any>) => {
+      try { await query(); results.push(`✓ ${label}`); } catch { results.push(`- ${label} (skipped)`); }
+    };
+    await del('expenses',                    () => sql`DELETE FROM expenses`);
+    await del('gps_updates',                 () => sql`DELETE FROM gps_updates`);
+    await del('vehicle_documents',           () => sql`DELETE FROM vehicle_documents`);
+    await del('sync_log',                    () => sql`DELETE FROM sync_log`);
+    await del('activity_logs',               () => sql`DELETE FROM activity_logs`);
+    await del('gc_notes',                    () => sql`DELETE FROM gc_notes`);
+    await del('memos',                       () => sql`DELETE FROM memos`);
+    await del('lorry_booking_entries',       () => sql`DELETE FROM lorry_booking_entries`);
+    await del('lorry_booking_daily_profits', () => sql`DELETE FROM lorry_booking_daily_profits`);
+    await del('trips',                       () => sql`DELETE FROM trips`);
+    await del('fleet_vehicles',              () => sql`DELETE FROM fleet_vehicles`);
+    await del('managed_vehicles',            () => sql`DELETE FROM managed_vehicles`);
+    await del('drivers',                     () => sql`DELETE FROM drivers`);
+    app.log.info('[Admin] Database wiped: ' + results.join(', '));
+    return reply.code(200).send({ success: true, message: 'All data deleted successfully.', details: results });
   });
 }

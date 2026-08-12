@@ -667,14 +667,28 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
     const loadVehicles = async () => {
       const available = await db.getAvailableManagedVehicles();
       setVehicles(available);
-      if (available.length > 0) {
-        const first = available[0];
+      const match = available.find(v => v.vehicleType === wheelType || v.wheelType === wheelType);
+      const first = match || available[0];
+      if (first) {
         setSelectedVehicleId(first.vehicle_id);
         setVehicleNumber(first.vehicleNumber);
       }
     };
     loadVehicles();
   }, []);
+
+  // ── When wheel type changes, auto-select first matching vehicle ────────────
+  useEffect(() => {
+    if (vehicles.length === 0) return;
+    const match = vehicles.find(v => v.vehicleType === wheelType || v.wheelType === wheelType);
+    if (match) {
+      setSelectedVehicleId(match.vehicle_id);
+      setVehicleNumber(match.vehicleNumber);
+    } else {
+      setSelectedVehicleId('');
+      setVehicleNumber('');
+    }
+  }, [wheelType, vehicles]);
 
   // ── Fetch real route once both locations are confirmed ─────────────────────
   useEffect(() => {
@@ -852,9 +866,14 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
     setRouteSummary('');
     setRouteLoaded(false);
     setWheelType('12 Wheel');
-    if (vehicles.length > 0) {
-      setSelectedVehicleId(vehicles[0].vehicle_id);
-      setVehicleNumber(vehicles[0].vehicleNumber);
+    const match = vehicles.find(v => v.vehicleType === '12 Wheel' || v.wheelType === '12 Wheel');
+    const first = match || vehicles[0];
+    if (first) {
+      setSelectedVehicleId(first.vehicle_id);
+      setVehicleNumber(first.vehicleNumber);
+    } else {
+      setSelectedVehicleId('');
+      setVehicleNumber('');
     }
     setAgreedFreight('');
     setCreatedTrip(null);
@@ -1233,24 +1252,33 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
           <FieldLabel>SELECT VEHICLE</FieldLabel>
           {vehicles.length === 0 ? (
             <Text style={styles.routeWaitingText}>No available vehicles are currently registered. Add vehicles in Vehicle Management first.</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {vehicles.map((v) => (
-                <TouchableOpacity
-                  key={v.vehicle_id}
-                  style={[styles.vehicleChip, vehicleNumber === v.vehicleNumber && styles.vehicleChipActive]}
-                  onPress={() => {
-                    setSelectedVehicleId(v.vehicle_id);
-                    setVehicleNumber(v.vehicleNumber);
-                  }}
-                >
-                  <Text style={[styles.vehicleChipText, vehicleNumber === v.vehicleNumber && styles.vehicleChipActiveText]}>
-                    🚛 {v.vehicleNumber}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+          ) : (() => {
+            const filtered = vehicles.filter(v => v.vehicleType === wheelType || v.wheelType === wheelType);
+            return filtered.length === 0 ? (
+              <View style={{ backgroundColor: '#fef3c7', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#fde68a' }}>
+                <Text style={{ fontSize: 12, color: '#92400e', fontWeight: '700' }}>
+                  ⚠️ No {wheelType} vehicles registered. Change wheel type or add a vehicle in Vehicle Management.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {filtered.map((v) => (
+                  <TouchableOpacity
+                    key={v.vehicle_id}
+                    style={[styles.vehicleChip, vehicleNumber === v.vehicleNumber && styles.vehicleChipActive]}
+                    onPress={() => {
+                      setSelectedVehicleId(v.vehicle_id);
+                      setVehicleNumber(v.vehicleNumber);
+                    }}
+                  >
+                    <Text style={[styles.vehicleChipText, vehicleNumber === v.vehicleNumber && styles.vehicleChipActiveText]}>
+                      🚛 {v.vehicleNumber}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            );
+          })()}
 
           {vehicleNumber ? (
             <TouchableOpacity

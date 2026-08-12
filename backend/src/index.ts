@@ -15,6 +15,7 @@ import { adminRoutes } from './routes/admin';
 import { docsRoutes } from './routes/docs';
 import { mapsRoutes } from './routes/maps';
 import { uploadRoutes } from './routes/upload';
+import { lorryBookingRoutes } from './routes/lorryBooking';
 import { authenticate, requireAdmin } from './middleware/auth';
 
 // ── Type augmentation for Fastify ────────────────────────────────────────────
@@ -77,11 +78,49 @@ async function bootstrap() {
     await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS driver_pin TEXT`;
     // Auto-migrate: odometer start url
     await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS odometer_start_url TEXT`;
+    // Auto-migrate: odometer end url
+    await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS odometer_end_url TEXT`;
+    // Auto-migrate: pod photo url
+    await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS pod_photo_url TEXT`;
+    // Auto-migrate: pod signature and notes
+    await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS pod_signature TEXT`;
+    await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS pod_notes TEXT`;
     // Auto-migrate: trip is_pinned
     await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS lorry_booking_daily_profits (
+        profit_date DATE PRIMARY KEY,
+        total_profit NUMERIC(12,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS lorry_booking_entries (
+        id TEXT PRIMARY KEY,
+        profit_date DATE NOT NULL,
+        from_point TEXT NOT NULL DEFAULT '',
+        destination_point TEXT NOT NULL DEFAULT '',
+        load_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+        lorry_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+        gross_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+        coolie NUMERIC(12,2) NOT NULL DEFAULT 0,
+        commission_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+        total_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+        expenses NUMERIC(12,2) NOT NULL DEFAULT 0,
+        profit NUMERIC(12,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_lorry_booking_entries_date ON lorry_booking_entries(profit_date)`;
     // Auto-migrate: fix vehicle_documents rows where is_active is null (set to true)
     await sql`UPDATE vehicle_documents SET is_active = true WHERE is_active IS NULL`;
-    app.log.info('  ✓ DB auto-migrations applied (expenses + trips financial columns + driver pin + odometer_start_url + is_pinned + vehicle_documents is_active fix)');
+    // Auto-migrate: fix empty string pod fields to null
+    await sql`UPDATE trips SET pod_signature = NULL WHERE pod_signature = ''`;
+    await sql`UPDATE trips SET pod_notes = NULL WHERE pod_notes = ''`;
+    await sql`UPDATE trips SET pod_photo_url = NULL WHERE pod_photo_url = ''`;
+    app.log.info('  ✓ DB auto-migrations applied (expenses + trips financial columns + driver pin + odometer_start_url + is_pinned + lorry booking tables + vehicle_documents is_active fix)');
   } catch (err) {
     app.log.warn(`Database connection or auto-migration failed: ${err}`);
   }
@@ -195,6 +234,9 @@ async function bootstrap() {
   });
   // ── Upload route ──────────────────────────────────────────────────────────
   app.register(uploadRoutes, { prefix: '/api/upload' });
+
+  // ── Lorry Booking Agency routes ─────────────────────────────────────────
+  app.register(lorryBookingRoutes, { prefix: '/api/lorry-booking' });
 
   // ── Health check ──────────────────────────────────────────────────────────
   app.get('/health', async (_req, reply) => {

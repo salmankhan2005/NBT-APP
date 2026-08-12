@@ -30,7 +30,7 @@ export const LoginSchema = z.object({
 export const StartTripSchema = z.object({
   driverName: z.string().min(1).max(100).trim(),
   odometer: z.number().nonnegative(),
-  odometerPhotoUrl: z.string().url().max(2000),
+  odometerPhotoUrl: z.string().max(2000).trim(),
   dieselLevel: z.enum(['EMPTY', '1/4', '1/2', '3/4', 'FULL']),
   gps: z.object({
     latitude: z.number().min(-90).max(90),
@@ -52,7 +52,7 @@ export const ExpenseSchema = z.object({
   amount: z.number().positive().max(999999),
   reason: z.string().max(500).trim().optional(),
   liters: z.number().positive().optional(),
-  receiptUrl: z.string().url().max(2000).optional(),
+  receiptUrl: z.string().max(2000).trim().optional(),
   location: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
@@ -62,14 +62,15 @@ export const ExpenseSchema = z.object({
 });
 
 export const PodSchema = z.object({
-  podPhotoUrl: z.string().max(2000).trim(),
-  podSignature: z.string().max(100000).trim(), // base64 SVG
-  podNotes: z.string().max(2000).trim().optional(),
-  gps: GpsSchema,
+  podPhotoUrl: z.string().max(500000).trim().optional().default(''),
+  podSignature: z.string().max(500000).trim().optional().default('Signed'),
+  podNotes: z.string().max(5000).trim().optional(),
+  gps: GpsSchema.optional(),
 });
 
 export const CompleteTripSchema = z.object({
   odometerEnd: z.number().nonnegative(),
+  odometerEndPhotoUrl: z.string().max(2000).optional(),
   dieselEnd: z.enum(['EMPTY', '1/4', '1/2', '3/4', 'FULL']),
 });
 

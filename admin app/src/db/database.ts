@@ -6,6 +6,10 @@ const getApiHost = (): string => {
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3001';
   }
+  // Web build: use EXPO_PUBLIC_API_URL env var if set, else localhost
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
   return 'http://localhost:3001';
 };
 const API_HOST = getApiHost();
@@ -14,9 +18,24 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
   if (!url || typeof url !== 'string' || !url.trim()) return undefined;
   let cleaned = url.trim();
 
-  // Filter out fake/dummy URLs from seed data
-  if (cleaned.includes('storage.nbt-ars.com') || cleaned.includes('dummy.pdf') || cleaned === 'mock-pod-uri') {
+  // Filter out fake/dummy placeholders that are not real images
+  if (
+    cleaned === 'mock-pod-uri' ||
+    cleaned.includes('dummy.pdf') ||
+    cleaned.includes('storage.nbt-ars.com')
+  ) {
     return undefined;
+  }
+
+  // Preserve valid base64 data URIs, blob URIs, file:// and content:// URIs directly
+  if (
+    cleaned.startsWith('data:image/') ||
+    cleaned.startsWith('data:application/') ||
+    cleaned.startsWith('blob:') ||
+    cleaned.startsWith('file://') ||
+    cleaned.startsWith('content://')
+  ) {
+    return cleaned;
   }
 
   // If relative path like /uploads/xyz or uploads/xyz, prepend API_HOST (http://localhost:3001)
@@ -118,6 +137,7 @@ export interface Trip {
   odometerStart?: number;
   odometerEnd?: number;
   odometerStartPhotoUri?: string;
+  odometerEndPhotoUri?: string;
   dieselStart?: 'EMPTY' | '1/4' | '1/2' | '3/4' | 'FULL';
   dieselEnd?: 'EMPTY' | '1/4' | '1/2' | '3/4' | 'FULL';
   startDate?: string;
@@ -131,6 +151,7 @@ export interface Trip {
   podPhotoUri?: string;
   podSignature?: string;
   podNotes?: string;
+  podSubmitted?: boolean;
   driverPayment?: number;
   profitOrLoss?: number;
   linkedGpsDeviceId?: string;
@@ -397,21 +418,25 @@ class AdminDatabase {
 
   async loadSession() {
     try {
-      this.token = await SecureStore.getItemAsync('admin_session_token');
-      this.currentUsername = await SecureStore.getItemAsync('admin_username');
-      
-      const savedVehicles = await AsyncStorage.getItem('nbt_managed_vehicles');
-      if (savedVehicles) {
-        this.managedVehicles = JSON.parse(savedVehicles);
-      }
-      const savedDocs = await AsyncStorage.getItem('nbt_vehicle_documents');
-      if (savedDocs) {
-        this.vehicleDocuments = JSON.parse(savedDocs);
-      }
+      const token = await SecureStore.getItemAsync('admin_session_token');
+      const username = await SecureStore.getItemAsync('admin_username');
+      this.token = token;
+      this.currentUsername = username;
     } catch (e) {
-      console.warn('SecureStore unavailable, loading session in-memory');
-      this.token = 'local-fallback-token';
+      // SecureStore unavailable (web) — fall back to AsyncStorage
+      try {
+        this.token = await AsyncStorage.getItem('admin_session_token_web');
+        this.currentUsername = await AsyncStorage.getItem('admin_username_web');
+      } catch {
+        this.token = null;
+      }
     }
+    try {
+      const savedVehicles = await AsyncStorage.getItem('nbt_managed_vehicles');
+      if (savedVehicles) this.managedVehicles = JSON.parse(savedVehicles);
+      const savedDocs = await AsyncStorage.getItem('nbt_vehicle_documents');
+      if (savedDocs) this.vehicleDocuments = JSON.parse(savedDocs);
+    } catch {}
   }
 
   private async saveVehicles() {
@@ -457,7 +482,11 @@ class AdminDatabase {
           try {
             await SecureStore.setItemAsync('admin_session_token', this.token!);
             await SecureStore.setItemAsync('admin_username', this.currentUsername!);
-          } catch (e) {}
+          } catch {
+            // Web fallback
+            await AsyncStorage.setItem('admin_session_token_web', this.token!);
+            await AsyncStorage.setItem('admin_username_web', this.currentUsername!);
+          }
           this.notify();
           return true;
         }
@@ -485,12 +514,21 @@ class AdminDatabase {
     try {
       await SecureStore.deleteItemAsync('admin_session_token');
       await SecureStore.deleteItemAsync('admin_username');
-    } catch (e) {}
+    } catch {}
+    try {
+      await AsyncStorage.removeItem('admin_session_token_web');
+      await AsyncStorage.removeItem('admin_username_web');
+    } catch {}
+    // Do NOT wipe mockTrips or other caches — data lives on backend and reloads after re-login
     this.notify();
   }
 
   isAuthenticated(): boolean {
     return this.token !== null;
+  }
+
+  getToken(): string | null {
+    return this.token;
   }
 
   getUsername(): string | null {
@@ -529,13 +567,13 @@ class AdminDatabase {
         driverName: bt.driver_name || 'Assigned Driver',
         trackingId: bt.tracking_id || bt.id,
         status: (() => {
-          const s = String(bt.status || '').toUpperCase();
-          if (s === 'IN_TRANSIT' || s === 'IN TRANSIT') return 'STARTED';
-          if (s === 'REACHED_DESTINATION') return 'REACHED_DESTINATION';
-          if (s === 'ON_THE_WAY') return 'ON_THE_WAY';
+          const s = String(bt.status || '').toUpperCase().replace(/ /g, '_');
+          if (s === 'IN_TRANSIT') return 'STARTED';
           if (s === 'STARTED') return 'STARTED';
-          if (s === 'ASSIGNED') return 'ASSIGNED';
+          if (s === 'ON_THE_WAY') return 'ON_THE_WAY';
+          if (s === 'REACHED_DESTINATION') return 'REACHED_DESTINATION';
           if (s === 'COMPLETED') return 'COMPLETED';
+          if (s === 'ASSIGNED') return 'ASSIGNED';
           return 'NOT STARTED';
         })(),
         customerCompany: 'NBT Client',
@@ -553,19 +591,20 @@ class AdminDatabase {
         destinationLng: 77.5946,
         destinationPlaceId: 'DEST-001',
         destinationMapsUrl: `https://maps.google.com/?q=${bt.destination}`,
-        distanceKm: Number(bt.distance_km || 214),
-        estimatedTravelTime: bt.estimated_travel_time || '4 Hours',
+        distanceKm: Number(bt.distance_km || 0),
+        estimatedTravelTime: bt.estimated_travel_time || '',
         recommendedRoute: bt.recommended_route || 'via NH44',
         tollsCount: Number(bt.tolls_count || 0),
         estimatedTollCost: Number(bt.estimated_toll_cost || 0),
         tollPlazas: bt.toll_plazas || [],
         vehicleNumber: bt.vehicle_number || 'TN 38 AB 1234',
         vehicleType: bt.vehicle_type || '12 Wheel',
-        agreedFreight: Number(bt.agreed_freight || 25000),
+        agreedFreight: bt.agreed_freight != null ? Number(bt.agreed_freight) : 0,
         isPinned: Boolean(bt.is_pinned),
         odometerStart: bt.odometer_start ? Number(bt.odometer_start) : undefined,
         odometerEnd: bt.odometer_end ? Number(bt.odometer_end) : undefined,
         odometerStartPhotoUri: normalizeImageUrl(bt.odometer_start_url),
+        odometerEndPhotoUri: normalizeImageUrl(bt.odometer_end_url),
         dieselStart: bt.diesel_start || undefined,
         dieselEnd: bt.diesel_end || undefined,
         startDate: bt.start_date ? new Date(bt.start_date).toLocaleDateString() : '',
@@ -573,8 +612,14 @@ class AdminDatabase {
         endDate: bt.end_date ? new Date(bt.end_date).toLocaleDateString() : '',
         endTime: bt.end_date ? new Date(bt.end_date).toLocaleTimeString() : '',
         podPhotoUri: normalizeImageUrl(bt.pod_photo_url),
-        podSignature: bt.pod_signature || undefined,
-        podNotes: bt.pod_notes || undefined,
+        podSignature: bt.pod_signature && bt.pod_signature.trim() ? bt.pod_signature.trim() : undefined,
+        podNotes: bt.pod_notes && bt.pod_notes.trim() ? bt.pod_notes.trim() : undefined,
+        podSubmitted: !!(
+          (bt.pod_photo_url && bt.pod_photo_url.trim() && bt.pod_photo_url.trim() !== 'mock-pod-uri') ||
+          (bt.pod_signature && bt.pod_signature.trim()) ||
+          (bt.pod_notes && bt.pod_notes.trim()) ||
+          ['REACHED_DESTINATION', 'COMPLETED'].includes(String(bt.status).toUpperCase())
+        ),
         driverPayment: bt.driver_payment ? Number(bt.driver_payment) : undefined,
         profitOrLoss: bt.profit_or_loss ? Number(bt.profit_or_loss) : undefined,
         lastUpdatedDate: bt.updated_at ? new Date(bt.updated_at).toLocaleDateString() : '',
@@ -588,14 +633,8 @@ class AdminDatabase {
         createdAt: bt.created_at || new Date().toISOString(),
       }));
 
-      for (const bt of mappedBackendTrips) {
-        const existingIdx = this.mockTrips.findIndex(t => t.id === bt.id || t.trackingId === bt.trackingId);
-        if (existingIdx !== -1) {
-          this.mockTrips[existingIdx] = { ...this.mockTrips[existingIdx], ...bt };
-        } else {
-          this.mockTrips.push(bt);
-        }
-      }
+      // Replace cache with backend data (don't merge — deleted items must disappear)
+      this.mockTrips = mappedBackendTrips;
     } catch (err) {
       console.warn('[AdminDB] Live getTrips sync error, falling back to cached state:', err);
     }
@@ -693,8 +732,8 @@ class AdminDatabase {
       destinationMapsUrl: tripInput.destinationMapsUrl || `https://maps.google.com/?q=${tripInput.destinationLat || 12.9716},${tripInput.destinationLng || 77.5946}`,
 
       // Route & Distance
-      distanceKm: tripInput.distanceKm || 214,
-      estimatedTravelTime: tripInput.estimatedTravelTime || '4 Hours 15 Mins',
+      distanceKm: tripInput.distanceKm || 0,
+      estimatedTravelTime: tripInput.estimatedTravelTime || '',
       recommendedRoute: tripInput.recommendedRoute || 'via NH44 & NH544',
 
       // Toll Details
@@ -849,6 +888,31 @@ class AdminDatabase {
     return trip !== undefined;
   }
 
+  async updateTripOdometer(tripId: string, odometerStart?: number, odometerEnd?: number): Promise<boolean> {
+    const trip = this.mockTrips.find(t => t.id === tripId);
+    if (!trip) return false;
+    if (odometerStart !== undefined) trip.odometerStart = odometerStart;
+    if (odometerEnd !== undefined) trip.odometerEnd = odometerEnd;
+
+    try {
+      const authToken = this.token || (await this.loadSession(), this.token);
+      if (authToken) {
+        const body: Record<string, any> = {};
+        if (odometerStart !== undefined) body.odometer_start = odometerStart;
+        if (odometerEnd !== undefined) body.odometer_end = odometerEnd;
+        await fetch(`${API_HOST}/api/admin/trips/${tripId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify(body),
+        });
+      }
+    } catch (e) {
+      console.warn('[AdminDB] updateTripOdometer API sync failed:', e);
+    }
+    this.notify();
+    return true;
+  }
+
   async deleteTrip(tripId: string): Promise<boolean> {
     this.mockTrips = this.mockTrips.filter(t => t.id !== tripId);
     try {
@@ -982,14 +1046,8 @@ class AdminDatabase {
               createdAt: v.created_at || new Date().toISOString(),
               updatedAt: v.updated_at || new Date().toISOString(),
             }));
-            for (const mv of mapped) {
-              const idx = this.managedVehicles.findIndex(v => v.vehicle_id === mv.vehicle_id || v.vehicleNumber === mv.vehicleNumber);
-              if (idx !== -1) {
-                this.managedVehicles[idx] = { ...this.managedVehicles[idx], ...mv };
-              } else {
-                this.managedVehicles.push(mv);
-              }
-            }
+            // Replace cache with backend data
+            this.managedVehicles = mapped;
             await this.saveVehicles();
           }
         }
@@ -1982,6 +2040,84 @@ class AdminDatabase {
         break;
     }
 
+    this.notify();
+    return true;
+  }
+
+  async resetData(): Promise<boolean> {
+    console.log('[AdminDB] resetData() called');
+
+    // Always reload session first — constructor loadSession() is not awaited
+    await this.loadSession();
+
+    // Clear local storage
+    try {
+      await AsyncStorage.removeItem('nbt_managed_vehicles');
+      await AsyncStorage.removeItem('nbt_vehicle_documents');
+      await AsyncStorage.removeItem(this.gcStorageKey);
+      await AsyncStorage.removeItem(this.memoStorageKey);
+    } catch (err) {
+      console.warn('[AdminDB] Error clearing local AsyncStorage keys:', err);
+    }
+
+    // Reset in-memory cache
+    this.managedVehicles = [];
+    this.vehicleDocuments = [];
+    this.mockGcNotes = [];
+    this.mockMemoDocuments = [];
+    this.mockTrips = [];
+    this.mockDrivers = [];
+    this.mockFleetVehicles = [];
+    this.mockActivityLogs = [];
+
+    let authToken = this.token;
+
+    // If no valid JWT, get a fresh one
+    if (!authToken || authToken === 'local-fallback-token') {
+      console.log('[AdminDB] No valid JWT — logging in to get one for reset...');
+      try {
+        const loginRes = await fetch(`${API_HOST}/api/auth/admin/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackingId: 'admin', pin: '9999' }),
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json();
+          if (loginData.token) {
+            authToken = loginData.token;
+            this.token = loginData.token;
+            try { await SecureStore.setItemAsync('admin_session_token', loginData.token); } catch {
+              await AsyncStorage.setItem('admin_session_token_web', loginData.token);
+            }
+            console.log('[AdminDB] Got fresh JWT for reset');
+          }
+        } else {
+          const errText = await loginRes.text();
+          throw new Error(`Login for reset failed (${loginRes.status}): ${errText}`);
+        }
+      } catch (loginErr: any) {
+        throw new Error('Cannot reach backend to reset: ' + (loginErr?.message || loginErr));
+      }
+    }
+
+    console.log('[AdminDB] Sending POST /api/admin/reset...');
+    const res = await fetch(`${API_HOST}/api/admin/reset`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('[AdminDB] Reset response not OK:', res.status, errorText);
+      throw new Error(`Server reset failed (${res.status}): ${errorText}`);
+    }
+
+    const result = await res.json();
+    console.log('[AdminDB] Reset success:', result);
     this.notify();
     return true;
   }

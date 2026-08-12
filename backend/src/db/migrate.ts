@@ -267,6 +267,44 @@ async function migrate() {
   `;
   console.log('  ✓ sync_log');
 
+  // ── Lorry Booking Agency daily profit summaries ────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS lorry_booking_daily_profits (
+      profit_date DATE PRIMARY KEY,
+      total_profit NUMERIC(12,2) NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS lorry_booking_entries (
+      id TEXT PRIMARY KEY,
+      profit_date DATE NOT NULL,
+      from_point TEXT NOT NULL DEFAULT '',
+      destination_point TEXT NOT NULL DEFAULT '',
+      load_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+      lorry_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+      gross_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+      coolie NUMERIC(12,2) NOT NULL DEFAULT 0,
+      commission_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+      total_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
+      expenses NUMERIC(12,2) NOT NULL DEFAULT 0,
+      profit NUMERIC(12,2) NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_lorry_booking_entries_date ON lorry_booking_entries(profit_date)`;
+  console.log('  ✓ lorry booking tables');
+
+  // ── Add missing columns (idempotent ALTER TABLE statements) ────────────────
+  await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS odometer_end_url TEXT`;
+  await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS latitude NUMERIC(10,7)`;
+  await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS longitude NUMERIC(10,7)`;
+  await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS city TEXT`;
+  await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS address TEXT`;
+  console.log('  ✓ column patches (odometer_end_url, expense location columns)');
+
   // ── Updated-at trigger function ───────────────────────────────────────────
   await sql`
     CREATE OR REPLACE FUNCTION set_updated_at()

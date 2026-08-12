@@ -30,17 +30,11 @@ export const SPACING = {
 
 export const SHADOWS = {
   light: {
-    shadowColor: '#0b1d33',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+    boxShadow: '0px 2px 6px rgba(11, 29, 51, 0.05)',
     elevation: 2,
   },
   medium: {
-    shadowColor: '#0b1d33',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
+    boxShadow: '0px 6px 16px rgba(11, 29, 51, 0.10)',
     elevation: 6,
   },
 };

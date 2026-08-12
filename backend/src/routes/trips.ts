@@ -134,7 +134,7 @@ export async function tripRoutes(app: FastifyInstance) {
         odometer_start     = ${odometer},
         odometer_start_url = ${odometerPhotoUrl},
         diesel_start       = ${dieselLevel},
-        status             = 'in_transit',
+        status             = 'STARTED',
         start_date         = now()
       WHERE id = ${id}
         AND driver_id = ${user.driverId}
@@ -170,9 +170,9 @@ export async function tripRoutes(app: FastifyInstance) {
       VALUES (${id}, ${latitude}, ${longitude}, ${city}, ${address})
     `;
 
-    // If trip is still 'acknowledged' advance it to 'in_transit'
+    // If trip is still 'acknowledged' advance it to 'STARTED'
     await sql`
-      UPDATE trips SET status = 'in_transit'
+      UPDATE trips SET status = 'STARTED'
       WHERE id = ${id}
         AND driver_id = ${user.driverId}
         AND status = 'acknowledged'
@@ -227,69 +227,123 @@ export async function tripRoutes(app: FastifyInstance) {
 
   // ── POST /api/trips/:id/pod ───────────────────────────────────────────────
   app.post('/:id/pod', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
-    const { id } = req.params as { id: string };
-    const user = req.user as JWTUser;
-    const check = await sql`SELECT id FROM trips WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId}) LIMIT 1`;
-    if (check.length === 0) {
-      return reply.code(403).send({ error: 'Access denied.' });
+    try {
+      const { id } = req.params as { id: string };
+      const user = req.user as JWTUser;
+
+      const check = await sql`
+        SELECT id FROM trips
+        WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})
+        LIMIT 1
+      `;
+      if (check.length === 0) {
+        return reply.code(403).send({ error: 'Access denied.' });
+      }
+
+      const parsed = PodSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Validation failed', details: parsed.error.errors });
+      }
+
+      const { podPhotoUrl, podSignature, podNotes, gps } = parsed.data;
+
+      const finalPhotoUrl = podPhotoUrl && podPhotoUrl.trim() ? podPhotoUrl.trim() : null;
+      const finalSignature = podSignature && podSignature.trim() ? podSignature.trim() : null;
+      const finalNotes = podNotes && podNotes.trim() ? podNotes.trim() : null;
+
+      await sql`
+        UPDATE trips
+        SET
+          pod_photo_url = COALESCE(${finalPhotoUrl}, pod_photo_url),
+          pod_signature = COALESCE(${finalSignature}, pod_signature),
+          pod_notes     = COALESCE(${finalNotes}, pod_notes),
+          status        = 'REACHED_DESTINATION'
+        WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})
+      `;
+
+      if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
+        await sql`
+          INSERT INTO gps_updates (trip_id, latitude, longitude, city, address)
+          VALUES (${id}, ${gps.latitude}, ${gps.longitude}, ${gps.city || 'Destination'}, ${gps.address || 'Destination'})
+        `;
+      }
+
+      const trip = await buildTripResponse(id);
+      return reply.code(200).send(trip);
+    } catch (err: any) {
+      console.error('[Backend API Error] POST /api/trips/:id/pod failed:', err);
+      return reply.code(500).send({ error: 'Internal Server Error', message: err?.message || String(err) });
     }
+  });
 
-    const parsed = PodSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: parsed.error.errors });
+  // ── PATCH /api/trips/:id/arrived ─────────────────────────────────────────
+  app.patch('/:id/arrived', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = req.params as { id: string };
+      const user = req.user as JWTUser;
+
+      const check = await sql`
+        SELECT id FROM trips
+        WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})
+        LIMIT 1
+      `;
+      if (check.length === 0) {
+        return reply.code(403).send({ error: 'Access denied.' });
+      }
+
+      await sql`
+        UPDATE trips
+        SET status = 'REACHED_DESTINATION'
+        WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})
+      `;
+
+      const trip = await buildTripResponse(id);
+      return reply.code(200).send(trip);
+    } catch (err: any) {
+      console.error('[Backend API Error] PATCH /api/trips/:id/arrived failed:', err);
+      return reply.code(500).send({ error: 'Internal Server Error', message: err?.message || String(err) });
     }
-
-    const { podPhotoUrl, podSignature, podNotes, gps } = parsed.data;
-
-    await sql`
-      UPDATE trips
-      SET
-        pod_photo_url  = ${podPhotoUrl},
-        pod_signature  = ${podSignature},
-        pod_notes      = ${podNotes ?? null},
-        status         = 'completed'
-      WHERE id = ${id}
-        AND driver_id = ${user.driverId}
-    `;
-
-    await sql`
-      INSERT INTO gps_updates (trip_id, latitude, longitude, city, address)
-      VALUES (${id}, ${gps.latitude}, ${gps.longitude}, ${gps.city}, ${gps.address})
-    `;
-
-    const trip = await buildTripResponse(id);
-    return reply.code(200).send(trip);
   });
 
   // ── PATCH /api/trips/:id/complete ─────────────────────────────────────────
   app.patch('/:id/complete', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
-    const { id } = req.params as { id: string };
-    const user = req.user as JWTUser;
-    const check = await sql`SELECT id FROM trips WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId}) LIMIT 1`;
-    if (check.length === 0) {
-      return reply.code(403).send({ error: 'Access denied.' });
+    try {
+      const { id } = req.params as { id: string };
+      const user = req.user as JWTUser;
+
+      const check = await sql`
+        SELECT id FROM trips
+        WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})
+        LIMIT 1
+      `;
+      if (check.length === 0) {
+        return reply.code(403).send({ error: 'Access denied.' });
+      }
+
+      const parsed = CompleteTripSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Validation failed', details: parsed.error.errors });
+      }
+
+      const { odometerEnd, odometerEndPhotoUrl, dieselEnd } = parsed.data;
+
+      await sql`
+        UPDATE trips
+        SET
+          odometer_end     = ${odometerEnd},
+          odometer_end_url = ${odometerEndPhotoUrl ?? null},
+          diesel_end       = ${dieselEnd},
+          status           = 'COMPLETED',
+          end_date         = now()
+        WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})
+      `;
+
+      const trip = await buildTripResponse(id);
+      return reply.code(200).send(trip);
+    } catch (err: any) {
+      console.error('[Backend API Error] PATCH /api/trips/:id/complete failed:', err);
+      return reply.code(500).send({ error: 'Internal Server Error', message: err?.message || String(err) });
     }
-
-    const parsed = CompleteTripSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: parsed.error.errors });
-    }
-
-    const { odometerEnd, dieselEnd } = parsed.data;
-
-    await sql`
-      UPDATE trips
-      SET
-        odometer_end = ${odometerEnd},
-        diesel_end   = ${dieselEnd},
-        status       = 'completed',
-        end_date     = now()
-      WHERE id = ${id}
-        AND driver_id = ${user.driverId}
-    `;
-
-    const trip = await buildTripResponse(id);
-    return reply.code(200).send(trip);
   });
 
   // ── POST /api/trips/sync — bulk reconcile offline queue ───────────────────
@@ -353,7 +407,7 @@ export async function tripRoutes(app: FastifyInstance) {
           case 'COMPLETE_TRIP': {
             const p = action.payload as { odometerEnd: number; dieselEnd: string };
             await sql`
-              UPDATE trips SET odometer_end=${p.odometerEnd}, diesel_end=${p.dieselEnd}, status='completed', end_date=now()
+              UPDATE trips SET odometer_end=${p.odometerEnd}, diesel_end=${p.dieselEnd}, status='COMPLETED', end_date=now()
               WHERE id=${user.tripId} AND driver_id=${user.driverId}
             `;
             break;

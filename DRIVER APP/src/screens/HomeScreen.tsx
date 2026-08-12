@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   StatusBar,
   Animated,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
@@ -20,6 +21,7 @@ interface HomeScreenProps {
   onNavigatePress: () => void;
   onAddExpensePress: () => void;
   onUploadPodPress: () => void;
+  onArrivedPress: () => void;
   onSwitchToMap: () => void;
   onLogout: () => void;
 }
@@ -31,6 +33,7 @@ export default function HomeScreen({
   onNavigatePress,
   onAddExpensePress,
   onUploadPodPress,
+  onArrivedPress,
   onSwitchToMap,
   onLogout,
 }: HomeScreenProps) {
@@ -140,6 +143,26 @@ export default function HomeScreen({
               </View>
             </View>
 
+            {/* Odometer Documents */}
+            {(activeTrip.odometerStartPhotoUri || activeTrip.odometerEndPhotoUri) && (
+              <View style={styles.odoDocsRow}>
+                {activeTrip.odometerStartPhotoUri && (
+                  <View style={styles.odoDocItem}>
+                    <Text style={styles.odoDocLabel}>📷 START ODO</Text>
+                    <Image source={{ uri: activeTrip.odometerStartPhotoUri }} style={styles.odoDocImage} resizeMode="cover" />
+                    <Text style={styles.odoDocValue}>{activeTrip.odometerStart} KM</Text>
+                  </View>
+                )}
+                {activeTrip.odometerEndPhotoUri && (
+                  <View style={styles.odoDocItem}>
+                    <Text style={styles.odoDocLabel}>📷 END ODO</Text>
+                    <Image source={{ uri: activeTrip.odometerEndPhotoUri }} style={styles.odoDocImage} resizeMode="cover" />
+                    <Text style={styles.odoDocValue}>{activeTrip.odometerEnd} KM</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Toll Estimates Panel */}
             <View style={styles.tollPanel}>
               <View style={styles.tollItem}>
@@ -178,7 +201,7 @@ export default function HomeScreen({
                         <MaterialIcons name="add-card" size={24} color={COLORS.primary} />
                         <Text style={styles.expenseActionText}>Add Expense</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.arrivalActionBtn} onPress={onUploadPodPress}>
+                      <TouchableOpacity style={styles.arrivalActionBtn} onPress={onArrivedPress}>
                         <MaterialIcons name="place" size={24} color={COLORS.onPrimary} />
                         <Text style={styles.arrivalActionText}>Arrived Depot</Text>
                       </TouchableOpacity>
@@ -453,10 +476,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: COLORS.orangeAccent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(249, 115, 22, 0.25)',
     elevation: 4,
   },
   startBtnText: {
@@ -604,5 +624,37 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.outlineVariant,
     marginBottom: 16,
     marginHorizontal: -8,
+  },
+  odoDocsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: SPACING.gutter * 1.5,
+  },
+  odoDocItem: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: 8,
+    alignItems: 'center',
+  },
+  odoDocLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.textMuted,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  odoDocImage: {
+    width: '100%',
+    height: 90,
+    borderRadius: 6,
+  },
+  odoDocValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginTop: 6,
   },
 });

@@ -19,6 +19,9 @@ import * as Speech from 'expo-speech';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, GPSLocation } from '../db/database';
+import { Platform } from 'react-native';
+
+const API_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:3001' : 'http://localhost:3001';
 
 interface PodScreenProps {
   trip: Trip;
@@ -36,8 +39,11 @@ export default function PodScreen({
   const [isSigned, setIsSigned] = useState(!!trip.podSignature);
   const [notes, setNotes] = useState(trip.podNotes || '');
   const [odometerEnd, setOdometerEnd] = useState('');
+  const [odometerEndPhotoUri, setOdometerEndPhotoUri] = useState<string | null>(null);
   const [dieselEnd, setDieselEnd] = useState<Trip['dieselEnd']>(undefined);
   const [loading, setLoading] = useState(false);
+  const [podUploadStatus, setPodUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'failed'>('idle');
+  const [podHostedUrl, setPodHostedUrl] = useState<string | null>(null);
 
   const [showSummaryDocket, setShowSummaryDocket] = useState(false);
 
@@ -182,6 +188,21 @@ export default function PodScreen({
     })
   ).current;
 
+  const handleCaptureEndOdometerPhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera access is required to take photo.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setOdometerEndPhotoUri(result.assets[0].uri);
+    }
+  };
+
   const handlePickPodPhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -196,7 +217,38 @@ export default function PodScreen({
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setPodPhoto(result.assets[0].uri);
+      const localUri = result.assets[0].uri;
+      setPodPhoto(localUri);
+      setPodUploadStatus('uploading');
+      setPodHostedUrl(null);
+      try {
+        const filename = `pod_${Date.now()}.jpg`;
+        const formData = new FormData();
+        if (Platform.OS === 'web') {
+          const res = await fetch(localUri);
+          const blob = await res.blob();
+          formData.append('file', blob, filename);
+        } else {
+          formData.append('file', { uri: localUri, name: filename, type: 'image/jpeg' } as any);
+        }
+        const res = await fetch(`${API_HOST}/api/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.url && (json.url.startsWith('http://') || json.url.startsWith('https://'))) {
+            setPodHostedUrl(json.url);
+            setPodUploadStatus('success');
+          } else {
+            setPodUploadStatus('failed');
+          }
+        } else {
+          setPodUploadStatus('failed');
+        }
+      } catch {
+        setPodUploadStatus('failed');
+      }
     }
   };
 
@@ -234,8 +286,8 @@ export default function PodScreen({
           }
         }
 
-        // Upload POD detail
-        await db.uploadPOD(trip.id, podPhoto || 'mock-pod-uri', isSigned ? 'Receiver Signature Captured' : 'Signed', notes, gps);
+        // Upload POD detail — use already-hosted URL if available, else local URI
+        await db.uploadPOD(trip.id, podHostedUrl || podPhoto || 'mock-pod-uri', isSigned ? 'Receiver Signature Captured' : 'Signed', notes, gps);
       } catch (err) {
         Alert.alert('Error', 'Failed to update destination status.');
         setLoading(false);
@@ -273,7 +325,40 @@ export default function PodScreen({
 
     setLoading(true);
     try {
-      await db.completeTrip(trip.id, odoEndVal, dieselEnd);
+      // Re-send POD data in case Stage 1 was skipped or photo was updated
+      if (podPhoto) {
+        let gps: GPSLocation = {
+          latitude: 12.9716, longitude: 77.5946,
+          city: 'Destination', address: 'Destination',
+          lastUpdated: new Date().toLocaleTimeString(),
+        };
+        try {
+          const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+          if (locStatus === 'granted') {
+            const loc = await Promise.race([
+              Location.getCurrentPositionAsync({}),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
+            ]);
+            if (loc) {
+              gps = {
+                latitude: loc.coords.latitude, longitude: loc.coords.longitude,
+                city: 'Destination reached',
+                address: `Lat: ${loc.coords.latitude.toFixed(4)}, Long: ${loc.coords.longitude.toFixed(4)}`,
+                lastUpdated: new Date().toLocaleTimeString(),
+              };
+            }
+          }
+        } catch {}
+        await db.uploadPOD(
+          trip.id,
+          podHostedUrl || podPhoto,
+          isSigned ? 'Receiver Signature Captured' : 'Signed',
+          notes,
+          gps
+        );
+      }
+
+      await db.completeTrip(trip.id, odoEndVal, dieselEnd, odometerEndPhotoUri || undefined);
       
       // Voice guidance announcement
       try {
@@ -342,11 +427,31 @@ export default function PodScreen({
 
                 {podPhoto ? (
                   <View style={styles.photoContainer}>
-                    <Image source={{ uri: podPhoto }} style={styles.podPhotoPreview} />
-                    <View style={styles.podCheckBadge}>
-                      <MaterialIcons name="check-circle" size={20} color={COLORS.success} />
-                      <Text style={styles.podCheckText}>POD PHOTO UPLOADED</Text>
-                    </View>
+                    <Image source={{ uri: podPhoto }} style={styles.podPhotoPreview} resizeMode="cover" />
+                    {podUploadStatus === 'uploading' && (
+                      <View style={styles.uploadStatusBadge}>
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                        <Text style={[styles.uploadStatusText, { color: COLORS.primary }]}>UPLOADING TO SERVER...</Text>
+                      </View>
+                    )}
+                    {podUploadStatus === 'success' && (
+                      <View style={[styles.uploadStatusBadge, styles.uploadSuccess]}>
+                        <MaterialIcons name="cloud-done" size={16} color={COLORS.success} />
+                        <Text style={[styles.uploadStatusText, { color: COLORS.success }]}>UPLOADED ✓</Text>
+                      </View>
+                    )}
+                    {podUploadStatus === 'failed' && (
+                      <View style={[styles.uploadStatusBadge, styles.uploadFailed]}>
+                        <MaterialIcons name="cloud-off" size={16} color={COLORS.error} />
+                        <Text style={[styles.uploadStatusText, { color: COLORS.error }]}>UPLOAD FAILED — saved locally</Text>
+                      </View>
+                    )}
+                    {podUploadStatus === 'idle' && (
+                      <View style={styles.podCheckBadge}>
+                        <MaterialIcons name="check-circle" size={20} color={COLORS.success} />
+                        <Text style={styles.podCheckText}>POD PHOTO CAPTURED</Text>
+                      </View>
+                    )}
                   </View>
                 ) : (
                   <Text style={styles.requiredWarning}>* Required to complete trip</Text>
@@ -396,7 +501,7 @@ export default function PodScreen({
                 />
               </View>
 
-              {/* Odometer End Input */}
+              {/* Odometer End Input + Photo */}
               <View style={styles.fieldCard}>
                 <Text style={styles.fieldLabel}>🏁 ENDING ODOMETER READING (KM) *</Text>
                 <TextInput
@@ -407,6 +512,15 @@ export default function PodScreen({
                   onChangeText={setOdometerEnd}
                 />
                 <Text style={styles.startOdoText}>Starting Odometer: {trip.odometerStart} KM</Text>
+                <TouchableOpacity style={[styles.cameraBtn, { marginTop: 10 }]} onPress={handleCaptureEndOdometerPhoto}>
+                  <MaterialIcons name="camera-alt" size={22} color={COLORS.primary} />
+                  <Text style={styles.cameraBtnText}>
+                    {odometerEndPhotoUri ? 'Retake End Odometer Photo' : 'Take End Odometer Photo'}
+                  </Text>
+                </TouchableOpacity>
+                {odometerEndPhotoUri && (
+                  <Image source={{ uri: odometerEndPhotoUri }} style={[styles.podPhotoPreview, { marginTop: 10 }]} resizeMode="cover" />
+                )}
               </View>
 
               {/* Diesel Level End Selector */}
@@ -526,10 +640,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     width: '100%',
-    shadowColor: COLORS.orangeAccent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(249, 115, 22, 0.20)',
     elevation: 4,
   },
   confirmArrivalBtnText: {
@@ -584,7 +695,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 180,
     borderRadius: 8,
-    resizeMode: 'cover',
   },
   podCheckBadge: {
     flexDirection: 'row',
@@ -600,6 +710,29 @@ const styles = StyleSheet.create({
   podCheckText: {
     fontSize: 12,
     color: COLORS.success,
+    fontWeight: 'bold',
+  },
+  uploadStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  uploadSuccess: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  uploadFailed: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  uploadStatusText: {
+    fontSize: 12,
     fontWeight: 'bold',
   },
   requiredWarning: {
@@ -719,10 +852,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: COLORS.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(21, 128, 61, 0.20)',
     elevation: 4,
     marginTop: SPACING.gutter,
   },
@@ -745,10 +875,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.10)',
     elevation: 5,
     marginBottom: 40,
   },

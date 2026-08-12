@@ -120,7 +120,23 @@ export default function App() {
     };
   }, []);
 
-  // Inactivity / Background Auto-Lock logic
+  // Poll backend every 30 seconds, but skip if keyboard is open or driver is on an input-heavy tab
+  useEffect(() => {
+    if (!authenticatedDriverId) return;
+    const interval = setInterval(async () => {
+      if (isKeyboardVisible || driverTab === 'EXPENSE' || driverTab === 'DELIVERY' || driverTab === 'PROFILE') return;
+      try {
+        const freshTrips = await db.getTrips();
+        setTrips(freshTrips);
+        const active = freshTrips.find(
+          (t) => (t.driverId === authenticatedDriverId || t.id === authenticatedDriverId)
+            && t.status.toUpperCase() !== 'COMPLETED'
+        );
+        setActiveTrip(active ? { ...active, expenses: [...active.expenses] } : null);
+      } catch {}
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [authenticatedDriverId, isKeyboardVisible, driverTab]);
   useEffect(() => {
     let backgroundTime = 0;
     const subscription = AppState.addEventListener('change', (nextAppState) => {
@@ -145,13 +161,25 @@ export default function App() {
     };
   }, [authenticatedDriverId]);
 
-  const handleLoginSuccess = (driverId: string) => {
+  const handleLoginSuccess = async (driverId: string) => {
     setAuthenticatedDriverId(driverId);
     setDriverTab('HOME');
-    
-    // Find active trip
-    const active = trips.find(t => (t.driverId === driverId || t.id === driverId) && t.status.toUpperCase() !== 'COMPLETED');
-    setActiveTrip(active ? { ...active, expenses: [...active.expenses] } : null);
+
+    // Fetch fresh trip data from backend immediately after login
+    try {
+      const freshTrips = await db.getTrips();
+      const active = freshTrips.find(
+        (t) => (t.driverId === driverId || t.id === driverId) && t.status.toUpperCase() !== 'COMPLETED'
+      );
+      setTrips(freshTrips);
+      setActiveTrip(active ? { ...active, expenses: [...active.expenses] } : null);
+    } catch {
+      // fallback to whatever is in local state
+      const active = trips.find(
+        (t) => (t.driverId === driverId || t.id === driverId) && t.status.toUpperCase() !== 'COMPLETED'
+      );
+      setActiveTrip(active ? { ...active, expenses: [...active.expenses] } : null);
+    }
   };
 
   const handleLogout = async () => {
@@ -198,6 +226,9 @@ export default function App() {
               onNavigatePress={() => setDriverTab('MAP')}
               onAddExpensePress={() => setDriverTab('EXPENSE')}
               onUploadPodPress={() => setDriverTab('DELIVERY')}
+              onArrivedPress={async () => {
+                if (activeTrip) await db.markArrived(activeTrip.id);
+              }}
               onSwitchToMap={() => setDriverTab('MAP')}
               onLogout={handleLogout}
             />
@@ -303,7 +334,7 @@ export default function App() {
       default:
         return (
           <FadeInView key="default">
-            <HomeScreen driverId={authenticatedDriverId} activeTrip={activeTrip} onStartTripPress={() => {}} onNavigatePress={() => {}} onAddExpensePress={() => {}} onUploadPodPress={() => {}} onSwitchToMap={() => {}} onLogout={handleLogout} />
+            <HomeScreen driverId={authenticatedDriverId} activeTrip={activeTrip} onStartTripPress={() => {}} onNavigatePress={() => {}} onAddExpensePress={() => {}} onUploadPodPress={() => {}} onArrivedPress={() => {}} onSwitchToMap={() => {}} onLogout={handleLogout} />
           </FadeInView>
         );
     }

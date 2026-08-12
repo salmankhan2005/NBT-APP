@@ -88,6 +88,8 @@ export interface Trip {
   vehicleType: '6 Wheel' | '10 Wheel' | '12 Wheel' | '16 Wheel';
   startingPoint: string;
   destination: string;
+  distanceKm?: number;
+  estimatedTravelTime?: string;
   tollsCount: number;
   estimatedTollCost: number;
   status:
@@ -97,6 +99,8 @@ export interface Trip {
     | 'in_transit' | 'completed';
   odometerStart?: number;
   odometerEnd?: number;
+  odometerStartPhotoUri?: string;
+  odometerEndPhotoUri?: string;
   dieselStart?: 'EMPTY' | '1/4' | '1/2' | '3/4' | 'FULL';
   dieselEnd?: 'EMPTY' | '1/4' | '1/2' | '3/4' | 'FULL';
   startDate?: string;
@@ -302,6 +306,8 @@ class DatabaseService {
                     vehicleType: fetchedTrip.vehicle_type || '12 Wheel',
                     startingPoint: fetchedTrip.starting_point || 'Depot',
                     destination: fetchedTrip.destination || 'Destination',
+                    distanceKm: fetchedTrip.distance_km ? Number(fetchedTrip.distance_km) : undefined,
+                    estimatedTravelTime: fetchedTrip.estimated_travel_time || undefined,
                     tollsCount: Number(fetchedTrip.tolls_count || 0),
                     estimatedTollCost: Number(fetchedTrip.estimated_toll_cost || 0),
                     status: fetchedTrip.status || 'ASSIGNED',
@@ -441,6 +447,8 @@ class DatabaseService {
                 vehicleType: fetchedTrip.vehicle_type || '12 Wheel',
                 startingPoint: fetchedTrip.starting_point || 'Depot',
                 destination: fetchedTrip.destination || 'Destination',
+                distanceKm: fetchedTrip.distance_km ? Number(fetchedTrip.distance_km) : undefined,
+                estimatedTravelTime: fetchedTrip.estimated_travel_time || undefined,
                 tollsCount: Number(fetchedTrip.tolls_count || 0),
                 estimatedTollCost: Number(fetchedTrip.estimated_toll_cost || 0),
                 status: fetchedTrip.status || 'ASSIGNED',
@@ -589,7 +597,8 @@ class DatabaseService {
     if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
 
     // Upload odometer photo
-    const hostedPhotoUrl = await this.uploadLocalImage(odometerPhotoUri);
+    const _rawPhotoUrl = await this.uploadLocalImage(odometerPhotoUri);
+    const hostedPhotoUrl = (_rawPhotoUrl.startsWith('http://') || _rawPhotoUrl.startsWith('https://')) ? _rawPhotoUrl : '';
 
     trip.driverName    = sanitizeInput(driverName);
     trip.odometerStart = odometer;
@@ -618,7 +627,7 @@ class DatabaseService {
           body: JSON.stringify({
             driverName: trip.driverName,
             odometer,
-            odometerPhotoUrl: hostedPhotoUrl,
+            odometerPhotoUrl: hostedPhotoUrl || undefined,
             dieselLevel,
             gps: {
               latitude: gps.latitude,
@@ -780,7 +789,7 @@ class DatabaseService {
             reason: expense.reason ? sanitizeInput(expense.reason) : undefined,
             liters: expense.liters,
             location: expense.location,
-            receipt_url: hostedReceiptUrl || undefined,
+            receiptUrl: hostedReceiptUrl || undefined,
           })
         });
       } catch (err) {
@@ -804,12 +813,13 @@ class DatabaseService {
     if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
 
     // Upload POD photo to backend first to get a hosted URL
-    const hostedPodUrl = await this.uploadLocalImage(podPhotoUri);
+    const hostedPodUrl = podPhotoUri && !podPhotoUri.startsWith('mock') ? await this.uploadLocalImage(podPhotoUri) : '';
+    const finalPhotoUrl = hostedPodUrl || podPhotoUri || '';
 
-    trip.podPhotoUri  = sanitizeInput(hostedPodUrl);
+    trip.podPhotoUri  = finalPhotoUrl ? sanitizeInput(finalPhotoUrl) : undefined;
     trip.podSignature = sanitizeInput(signature);
     trip.podNotes     = sanitizeInput(notes);
-    trip.status       = 'completed';
+    trip.status       = 'REACHED_DESTINATION';
     trip.currentGPS   = {
       latitude:    gps.latitude,
       longitude:   gps.longitude,
@@ -828,8 +838,8 @@ class DatabaseService {
             Authorization: `Bearer ${this.currentToken}`
           },
           body: JSON.stringify({
-            podPhotoUrl: sanitizeInput(hostedPodUrl),
-            podSignature: sanitizeInput(signature),
+            podPhotoUrl: finalPhotoUrl,
+            podSignature: sanitizeInput(signature) || 'Signed',
             podNotes: sanitizeInput(notes),
             gps: {
               latitude: gps.latitude,
@@ -839,8 +849,31 @@ class DatabaseService {
             }
           })
         });
+        console.log('[DriverDB] uploadPOD synced to backend successfully');
       } catch (err) {
         console.warn('[DriverDB] uploadPOD API sync error:', err);
+      }
+    }
+
+    await this.notify();
+    return true;
+  }
+
+  async markArrived(tripId: string): Promise<boolean> {
+    await this.init();
+    const trip = this.cache.find(t => t.id === tripId);
+    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
+
+    trip.status = 'REACHED_DESTINATION';
+
+    if (this.currentToken) {
+      try {
+        await fetch(`${API_HOST}/api/trips/${tripId}/arrived`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${this.currentToken}` },
+        });
+      } catch (err) {
+        console.warn('[DriverDB] markArrived API sync error:', err);
       }
     }
 
@@ -851,15 +884,24 @@ class DatabaseService {
   async completeTrip(
     tripId: string,
     odometerEnd: number,
-    dieselEnd: Trip['dieselEnd']
+    dieselEnd: Trip['dieselEnd'],
+    odometerEndPhotoUri?: string
   ): Promise<boolean> {
     await this.init();
     const trip = this.cache.find(t => t.id === tripId);
     if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
 
-    trip.status      = 'completed';
-    trip.odometerEnd = odometerEnd;
-    trip.dieselEnd   = dieselEnd;
+    // Upload end odometer photo if provided
+    let hostedEndPhotoUrl: string | undefined;
+    if (odometerEndPhotoUri) {
+      const raw = await this.uploadLocalImage(odometerEndPhotoUri);
+      hostedEndPhotoUrl = (raw.startsWith('http://') || raw.startsWith('https://')) ? raw : undefined;
+    }
+
+    trip.status              = 'completed';
+    trip.odometerEnd         = odometerEnd;
+    trip.odometerEndPhotoUri = hostedEndPhotoUrl;
+    trip.dieselEnd           = dieselEnd;
     const now = new Date();
     trip.endDate = now.toLocaleDateString();
     trip.endTime = now.toLocaleTimeString();
@@ -878,6 +920,7 @@ class DatabaseService {
           },
           body: JSON.stringify({
             odometerEnd,
+            odometerEndPhotoUrl: hostedEndPhotoUrl?.startsWith('http') ? hostedEndPhotoUrl : undefined,
             dieselEnd
           })
         });

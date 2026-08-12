@@ -27,6 +27,7 @@ SplashScreen.preventAutoHideAsync();
 // Import Screens
 import LandingPage from './src/screens/LandingPage';
 import NbtSplashScreen from './src/screens/SplashScreen';
+import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import TripsScreen from './src/screens/TripsScreen';
 import CreateTripScreen from './src/screens/CreateTripScreen';
@@ -36,6 +37,7 @@ import MemoScreen from './src/screens/MemoScreen';
 import VehiclesScreen from './src/screens/VehiclesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import GpsVehicleScreen from './src/screens/GpsVehicleScreen';
+import LorryBookingScreen from './src/screens/LorryBookingScreen';
 
 export type AdminTab =
   | 'DASHBOARD'
@@ -47,7 +49,8 @@ export type AdminTab =
   | 'MENU'
   | 'VEHICLES'
   | 'SETTINGS'
-  | 'GPS_VEHICLES';
+  | 'GPS_VEHICLES'
+  | 'LORRY_BOOKING';
 
 interface NavigationItem {
   id: AdminTab;
@@ -62,6 +65,7 @@ const NAV_ITEMS: NavigationItem[] = [
   { id: 'CREATE_TRIP', label: 'Trip Creation', icon: 'add-circle', badge: 'NEW', category: 'Main' },
   { id: 'VEHICLES', label: 'Vehicle Management', icon: 'directions-bus', category: 'Main' },
   { id: 'TRIPS', label: 'Trips Registry', icon: 'local-shipping', category: 'Main' },
+  { id: 'LORRY_BOOKING', label: 'Lorry Booking Agency', icon: 'account-balance-wallet', category: 'Main' },
   { id: 'LIVE', label: 'Live GPS Status', icon: 'my-location', category: 'Fleet' },
   { id: 'GC', label: 'GC Notes', icon: 'description', category: 'Fleet' },
   { id: 'MEMO', label: 'Memo', icon: 'sticky-note-2', category: 'Fleet' },
@@ -78,7 +82,7 @@ function AppContent() {
   const isPhone = windowWidth < 600;
   const isCompact = windowWidth < 720;
 
-  const [appStage, setAppStage] = useState<'LANDING' | 'SPLASH' | 'MAIN'>('LANDING');
+  const [appStage, setAppStage] = useState<'LANDING' | 'SPLASH' | 'LOGIN' | 'MAIN'>('LANDING');
 
   const [adminTab, _setAdminTab] = useState<AdminTab>('DASHBOARD');
   const setAdminTab = (tab: AdminTab) => {
@@ -101,6 +105,10 @@ function AppContent() {
         const savedTab = await AsyncStorage.getItem('admin_active_tab');
         if (savedTab) {
           _setAdminTab(savedTab as AdminTab);
+        }
+        // If a valid session exists, skip landing page and go straight to main
+        if (db.isAuthenticated()) {
+          setAppStage('MAIN');
         }
       } catch (e) {
         console.warn('Session init error:', e);
@@ -132,7 +140,7 @@ function AppContent() {
       console.warn('Logout error:', e);
     }
     setMobileDrawerOpen(false);
-    setAppStage('LANDING');
+    setAppStage('LOGIN');
   };
 
   if (appStage === 'LANDING') {
@@ -140,7 +148,11 @@ function AppContent() {
   }
 
   if (appStage === 'SPLASH') {
-    return <NbtSplashScreen onComplete={() => setAppStage('MAIN')} />;
+    return <NbtSplashScreen onComplete={() => setAppStage('LOGIN')} />;
+  }
+
+  if (appStage === 'LOGIN') {
+    return <LoginScreen onLoginSuccess={() => setAppStage('MAIN')} />;
   }
 
   const renderScreen = () => {
@@ -154,6 +166,8 @@ function AppContent() {
         );
       case 'TRIPS':
         return <TripsScreen />;
+      case 'LORRY_BOOKING':
+        return <LorryBookingScreen />;
       case 'CREATE_TRIP':
         return <CreateTripScreen onTripCreated={() => setAdminTab('TRIPS')} />;
       case 'LIVE':

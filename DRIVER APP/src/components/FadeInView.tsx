@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, StyleSheet, Platform } from 'react-native';
 
 interface FadeInViewProps {
   children: React.ReactNode;
@@ -25,12 +25,12 @@ export default function FadeInView({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: duration,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: duration,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [children]); // triggers on child component changes

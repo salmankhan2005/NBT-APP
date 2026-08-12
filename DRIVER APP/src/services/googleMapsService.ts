@@ -144,14 +144,7 @@ export async function getLiveRouteDetails(origin: string, destination: string): 
 
   // 2. Direct fetch fallback (Skipped on Web to avoid CORS error)
   if (isWeb) {
-    return {
-      distanceKm: 45,
-      distanceText: '45 km (Est.)',
-      durationText: '1 hr 15 mins',
-      durationMinutes: 75,
-      startAddress: origin,
-      endAddress: destination,
-    };
+    return null; // Fall back to trip.distanceKm / trip.estimatedTravelTime from DB
   }
   try {
     const params = new URLSearchParams({

@@ -6,13 +6,29 @@ import 'dotenv/config';
  * Seeds default admin, drivers, trips, vehicles, and fleet devices into Neon Postgres.
  * Run via: npm run db:seed
  */
-async function seed() {
+export async function seedDatabase(): Promise<void> {
   console.log('▶  Seeding NBT-ARS database…');
 
   // Hash PINs & Passwords with Argon2id
   const adminPassHash = await argon2.hash('9999', { type: argon2.argon2id });
   const pin1Hash = await argon2.hash('123456', { type: argon2.argon2id });
   const pin2Hash = await argon2.hash('654321', { type: argon2.argon2id });
+
+  // ── Wipe all dynamic / user-created data in FK-safe order ────────────────
+  await sql`DELETE FROM expenses`;
+  await sql`DELETE FROM gps_updates`;
+  await sql`DELETE FROM vehicle_documents`;
+  await sql`DELETE FROM sync_log`;
+  await sql`DELETE FROM activity_logs`;
+  await sql`DELETE FROM gc_notes`;
+  await sql`DELETE FROM memos`;
+  await sql`DELETE FROM lorry_booking_entries`;
+  await sql`DELETE FROM lorry_booking_daily_profits`;
+  await sql`DELETE FROM trips`;
+  await sql`DELETE FROM fleet_vehicles`;
+  await sql`DELETE FROM managed_vehicles`;
+  await sql`DELETE FROM drivers`;
+  console.log('  ✓ dynamic data cleared');
 
   // ── Admin Users ───────────────────────────────────────────────────────────
   await sql`
@@ -102,14 +118,23 @@ async function seed() {
   console.log('  ✓ initial GPS positions seeded');
 
   console.log('\n✅  Seed complete.');
-  console.log('\n  Login credentials:');
-  console.log('  Driver 1 → Tracking ID: TRK-5566  |  PIN: 123456');
-  console.log('  Driver 2 → Tracking ID: TRK-4421  |  PIN: 654321');
-  console.log('  Admin    → Username: admin     |  PIN/Password: 9999');
-  process.exit(0);
 }
 
-seed().catch((err) => {
-  console.error('❌  Seed failed:', err);
-  process.exit(1);
-});
+// CLI entry point
+async function runCli() {
+  try {
+    await seedDatabase();
+    console.log('\n  Login credentials:');
+    console.log('  Driver 1 → Tracking ID: TRK-5566  |  PIN: 123456');
+    console.log('  Driver 2 → Tracking ID: TRK-4421  |  PIN: 654321');
+    console.log('  Admin    → Username: admin     |  PIN/Password: 9999');
+    process.exit(0);
+  } catch (err) {
+    console.error('❌  Seed failed:', err);
+    process.exit(1);
+  }
+}
+
+if (require.main === module || (process.argv[1] && process.argv[1].replace(/\\/g, '/').includes('src/db/seed'))) {
+  runCli();
+}
