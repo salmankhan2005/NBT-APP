@@ -19,6 +19,7 @@ import * as Speech from 'expo-speech';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, GPSLocation } from '../db/database';
+import { reverseGeocodeLocation } from '../services/openStreetMapService';
 
 interface StartTripScreenProps {
   trip: Trip;
@@ -53,7 +54,7 @@ export default function StartTripScreen({
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.7,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -147,14 +148,10 @@ export default function StartTripScreen({
           };
 
           try {
-            const geocode = await Location.reverseGeocodeAsync({
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
-            });
-            if (geocode && geocode.length > 0) {
-              const place = geocode[0];
-              gps.city = place.city || place.subregion || 'Current Location';
-              gps.address = `${place.name || ''}, ${place.street || ''}, ${place.city || ''}, ${place.postalCode || ''}`;
+            const geoRes = await reverseGeocodeLocation(loc.coords.latitude, loc.coords.longitude);
+            if (geoRes) {
+              gps.city = geoRes.city || 'Current Location';
+              gps.address = geoRes.formattedAddress || gps.address;
             }
           } catch (e) {
             console.log('Reverse geocoding error, using fallback coordinates');
@@ -584,10 +581,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    shadowColor: COLORS.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(21, 128, 61, 0.2)',
     elevation: 4,
   },
   startBtnText: {

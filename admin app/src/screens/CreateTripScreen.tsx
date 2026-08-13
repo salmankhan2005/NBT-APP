@@ -2,14 +2,14 @@
  * CreateTripScreen.tsx
  * ─────────────────────────────────────────────────────────────────────────────
  * NBT + ARS Fleet Transit — Admin App
- * Trip Creation Module with Unified Google Maps Location Search
+ * Trip Creation Module with Unified OpenStreetMap Location Search
  *
  * Each location field uses a SINGLE intelligent search bar that supports:
  *   • Place name / business name search (Places Autocomplete)
  *   • Full address search
  *   • Landmark search
  *   • Plus Code search
- *   • Google Maps URL paste (auto-resolves via Geocoding API)
+ *   • Maps URL paste (auto-resolves via Geocoding API)
  *
  * After selection stores: placeName, formattedAddress, lat, lng, placeId, mapsUrl
  * ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +37,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, ManagedVehicle, Trip, TollPlazaDetail } from '../db/database';
 import {
-  GOOGLE_MAPS_API_KEY,
   isApiKeyConfigured,
   searchPlacesAutocomplete,
   getPlaceDetails,
@@ -48,7 +47,7 @@ import {
   generateSessionToken,
   PlaceAutocompleteResult,
   PlaceDetails,
-} from '../services/googleMapsService';
+} from '../services/openStreetMapService';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -254,7 +253,7 @@ function UnifiedLocationSearch({
         if (!text.trim()) return;
 
         if (apiAvailable) {
-          // Real Google Places Autocomplete
+          // Nominatim Place Search
           setIsSearching(true);
           try {
             const results = await searchPlacesAutocomplete(text, sessionToken);
@@ -403,7 +402,7 @@ function UnifiedLocationSearch({
               />
               <View style={styles.staticMapOverlayBadge}>
                 <MaterialIcons name="location-on" size={12} color="#ffffff" />
-                <Text style={styles.staticMapOverlayText}>GOOGLE MAPS</Text>
+                <Text style={styles.staticMapOverlayText}>MAP PREVIEW</Text>
               </View>
             </View>
           ) : (
@@ -473,9 +472,8 @@ function UnifiedLocationSearch({
             <View style={styles.apiKeyNotice}>
               <MaterialIcons name="info-outline" size={14} color="#0369a1" />
               <Text style={styles.apiKeyNoticeText}>
-                Configure your Google Maps API key in{' '}
-                <Text style={{ fontWeight: '900' }}>src/services/googleMapsService.ts</Text> for
-                real-time Google Places search. Using offline database for now.
+                Location search is powered by OpenStreetMap (Nominatim).
+                Using offline database as fallback.
               </Text>
             </View>
           )}
@@ -514,7 +512,7 @@ function UnifiedLocationSearch({
           {/* Search Hint */}
           <Text style={styles.searchHint}>
             Search any place, company, address, or{' '}
-            <Text style={styles.searchHintAccent}>paste a Google Maps link</Text> to resolve the exact location.
+            <Text style={styles.searchHintAccent}>paste a Maps link</Text> to resolve the exact location.
           </Text>
 
           {/* URL Detected Banner */}
@@ -527,22 +525,18 @@ function UnifiedLocationSearch({
               )}
               <Text style={styles.urlDetectedText}>
                 {isResolvingUrl
-                  ? 'Resolving Google Maps URL...'
-                  : 'Google Maps URL detected — extracting exact location...'}
+                  ? 'Resolving Maps URL...'
+                  : 'Maps URL detected — extracting exact location...'}
               </Text>
             </View>
           )}
 
-          {/* Google Places Autocomplete Dropdown */}
+          {/* OpenStreetMap Places Autocomplete Dropdown */}
           {showDropdown && suggestions.length > 0 && (
             <View style={styles.suggestionsDropdown}>
               {/* Dropdown Header */}
               <View style={styles.dropdownHeader}>
-                <Image
-                  source={{ uri: 'https://maps.gstatic.com/mapfiles/api-3/images/powered-by-google-on-white3_hdpi.png' }}
-                  style={styles.poweredByGoogle}
-                  resizeMode="contain"
-                />
+                <Text style={{ fontSize: 10, color: '#64748b', fontWeight: '600' }}>© OpenStreetMap contributors</Text>
               </View>
 
               {suggestions.map((item, idx) => (
@@ -982,7 +976,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
       <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
         <View style={styles.pageHeader}>
           <Text style={styles.pageTitle}>REVIEW BEFORE CREATING</Text>
-          <Text style={styles.pageSubtitle}>Verify exact Google Maps locations and financials</Text>
+          <Text style={styles.pageSubtitle}>Verify exact map locations and financials</Text>
         </View>
 
         <View style={styles.summaryCard}>
@@ -1072,7 +1066,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
             <Text style={styles.pageTitle}>TRIP CREATION</Text>
           </View>
           <Text style={styles.pageSubtitle}>
-            Fill in all details and select exact Google Maps locations
+            Fill in all details and select exact map locations
           </Text>
         </View>
 
@@ -1120,7 +1114,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
           title="2. Starting Point"
           iconColor="#16a34a"
           pinColor="green"
-          placeholder="Search place, business, address — or paste a Google Maps link"
+          placeholder="Search place, business, address - or paste a Maps link"
           selectedLocation={startingLocation}
           onSelectLocation={setStartingLocation}
           onClearLocation={() => setStartingLocation(null)}
@@ -1132,7 +1126,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
           title="3. Destination Point"
           iconColor="#dc2626"
           pinColor="red"
-          placeholder="Search destination place, business, address — or paste a Google Maps link"
+          placeholder="Search destination place, business, address - or paste a Maps link"
           selectedLocation={destinationLocation}
           onSelectLocation={setDestinationLocation}
           onClearLocation={() => setDestinationLocation(null)}
@@ -1155,7 +1149,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
               <View style={styles.routeWaiting}>
                 <ActivityIndicator color="#0284c7" size="large" />
                 <Text style={styles.routeWaitingText}>
-                  Calculating route{isApiKeyConfigured() ? ' via Google Directions API' : ' (offline estimate)'}...
+                  Calculating route{isApiKeyConfigured() ? ' via OSRM' : ' (offline estimate)'}...
                 </Text>
               </View>
             ) : routeLoaded ? (
@@ -1210,14 +1204,14 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
                   <View style={styles.apiSourceBadge}>
                     <MaterialIcons name="check-circle" size={12} color="#16a34a" />
                     <Text style={styles.apiSourceText}>
-                      Calculated via Google Directions API using exact Place IDs
+                      Calculated via OSRM routing using exact locations
                     </Text>
                   </View>
                 ) : (
                   <View style={[styles.apiSourceBadge, { backgroundColor: '#fef3c7' }]}>
                     <MaterialIcons name="info" size={12} color="#d97706" />
                     <Text style={[styles.apiSourceText, { color: '#92400e' }]}>
-                      Estimated via Haversine formula (configure API key for real Google Directions)
+                      Estimated via Haversine formula (offline estimate)
                     </Text>
                   </View>
                 )}

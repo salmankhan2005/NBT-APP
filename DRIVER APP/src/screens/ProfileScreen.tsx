@@ -33,58 +33,85 @@ export default function ProfileScreen({
   const [currentTrackingId, setCurrentTrackingId] = useState(driverId);
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadStats = async () => {
-      const trips = await db.getTrips();
-      const pastTrips = await db.getCompletedTrips();
-      setCompletedTrips(pastTrips);
+      try {
+        const trips = await db.getTrips();
+        const pastTrips = await db.getCompletedTrips();
 
-      const profile = await db.getDriverProfile(driverId);
-      if (profile && profile.name) {
-        setDriverName(profile.name);
-      } else {
-        const driverTrips = trips.filter(t => t.driverId === driverId);
-        if (driverTrips.length > 0) {
-          const match = driverTrips.find(t => t.driverName);
-          if (match) {
-            setDriverName(match.driverName);
-          }
+        if (!isMounted) return;
+
+        setCompletedTrips(pastTrips);
+
+        const profile = await db.getDriverProfile(driverId);
+        if (profile && profile.name) {
+          setDriverName(profile.name);
         } else {
-          setDriverName('Driver');
+          const driverTrips = trips.filter(t => t.driverId === driverId);
+          if (driverTrips.length > 0) {
+            const match = driverTrips.find(t => t.driverName);
+            if (match) {
+              setDriverName(match.driverName);
+            }
+          } else {
+            setDriverName('Driver');
+          }
         }
-      }
 
-      const driverTrips = trips.filter(t => t.driverId === driverId || t.id === driverId);
-      const activeCompleted = driverTrips.filter(t => t.status.toUpperCase() === 'COMPLETED');
-      
-      if (driverTrips.length > 0) {
-        setCurrentTrackingId(driverTrips[0].trackingId || driverId);
-      }
+        const driverTrips = trips.filter(t => t.driverId === driverId || t.id === driverId);
+        const activeCompleted = driverTrips.filter(t => t.status.toUpperCase() === 'COMPLETED');
 
-      const finalCount = activeCompleted.length + pastTrips.length;
-      
-      let finalKm = 0;
-      [...pastTrips, ...activeCompleted].forEach(t => {
-        const kms = (t.odometerEnd || 0) - (t.odometerStart || 0);
-        if (kms > 0) finalKm += kms;
-      });
+        if (driverTrips.length > 0) {
+          setCurrentTrackingId(driverTrips[0].trackingId || driverId);
+        }
 
-      setCompletedTripsCount(finalCount);
-      setTotalKm(finalKm);
-      setRatings(finalCount > 0 ? '5.0 / 5.0' : '0.0 / 5.0');
+        const uniqueTrips = Array.from(
+          new Map([...pastTrips, ...activeCompleted].map(trip => [trip.id, trip])).values()
+        );
+        const finalCount = uniqueTrips.length;
 
-      // Calculate running expense totals from completed runs
-      let fuel = 0, toll = 0, other = 0;
-      [...pastTrips, ...activeCompleted].forEach(t => {
-        t.expenses?.forEach(e => {
-          if (e.category === 'FUEL') fuel += e.amount;
-          else if (e.category === 'TOLL') toll += e.amount;
-          else other += e.amount;
+        let finalKm = 0;
+        uniqueTrips.forEach(t => {
+          const kms = (t.odometerEnd || 0) - (t.odometerStart || 0);
+          if (kms > 0) finalKm += kms;
         });
-      });
 
-      setExpenseLedger({ fuel, toll, other });
+        setCompletedTripsCount(finalCount);
+        setTotalKm(finalKm);
+        setRatings(finalCount > 0 ? '5.0 / 5.0' : '0.0 / 5.0');
+
+        // Calculate running expense totals from completed runs without double-counting the same trip
+        let fuel = 0, toll = 0, other = 0;
+        uniqueTrips.forEach(t => {
+          t.expenses?.forEach(e => {
+            if (e.category === 'FUEL') fuel += e.amount;
+            else if (e.category === 'TOLL') toll += e.amount;
+            else other += e.amount;
+          });
+        });
+
+        setExpenseLedger({ fuel, toll, other });
+      } catch (error) {
+        console.warn('[ProfileScreen] failed to refresh trip stats:', error);
+      }
     };
+
     loadStats();
+
+    const unsubscribe = db.subscribe(() => {
+      void loadStats();
+    });
+
+    const refreshInterval = setInterval(() => {
+      void loadStats();
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      clearInterval(refreshInterval);
+    };
   }, [driverId]);
 
   const handleResetData = () => {

@@ -22,7 +22,7 @@ interface MapScreenProps {
   onArrivedPress: () => void;
 }
 
-import { reverseGeocodeLocation, getLiveRouteDetails, getStaticMapPreviewUrl } from '../services/googleMapsService';
+import { reverseGeocodeLocation, getLiveRouteDetails, getStaticMapPreviewUrl } from '../services/openStreetMapService';
 
 export default function MapScreen({
   trip,
@@ -38,7 +38,7 @@ export default function MapScreen({
   const [mapTileUrl, setMapTileUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Fetch live directions via Google Maps API
+    // 1. Fetch live directions via OpenStreetMap (OSRM)
     const fetchDirections = async () => {
       const route = await getLiveRouteDetails(trip.startingPoint, trip.destination);
       if (route) {
@@ -71,9 +71,9 @@ export default function MapScreen({
           const lat = loc.coords.latitude;
           const lng = loc.coords.longitude;
           setMapTileUrl(getStaticMapPreviewUrl(lat, lng));
-          const googleGeo = await reverseGeocodeLocation(lat, lng);
-          const city = googleGeo?.city || 'In Transit';
-          const address = googleGeo?.formattedAddress || `Lat: ${lat.toFixed(4)}, Long: ${lng.toFixed(4)}`;
+          const osmGeo = await reverseGeocodeLocation(lat, lng);
+          const city = osmGeo?.city || 'In Transit';
+          const address = osmGeo?.formattedAddress || `Lat: ${lat.toFixed(4)}, Long: ${lng.toFixed(4)}`;
           const newGps: GPSLocation = {
             latitude: lat,
             longitude: lng,

@@ -19,6 +19,7 @@ import * as Speech from 'expo-speech';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, Expense, GPSLocation } from '../db/database';
+import { reverseGeocodeLocation } from '../services/openStreetMapService';
 
 interface AddExpenseScreenProps {
   trip: Trip;
@@ -87,14 +88,10 @@ export default function AddExpenseScreen({
 
       if (loc) {
         try {
-          const geocode = await Location.reverseGeocodeAsync({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-          });
-          if (geocode && geocode.length > 0) {
-            const place = geocode[0];
-            gps.city = place.city || place.subregion || 'Current Location';
-            gps.address = `${place.name || ''}, ${place.street || ''}, ${place.city || ''}`;
+          const geoRes = await reverseGeocodeLocation(loc.coords.latitude, loc.coords.longitude);
+          if (geoRes) {
+            gps.city = geoRes.city || 'Current Location';
+            gps.address = geoRes.formattedAddress || gps.address;
           }
         } catch (err) {
           // ignore
