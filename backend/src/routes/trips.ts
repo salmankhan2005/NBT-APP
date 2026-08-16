@@ -49,7 +49,55 @@ async function buildTripResponse(tripId: string) {
         WHERE g.trip_id = t.id
         ORDER BY g.recorded_at DESC
         LIMIT 1
-      ) AS current_gps
+      ) AS current_gps,
+      (
+        SELECT json_build_object(
+          'vehicleId',           mv.vehicle_id,
+          'vehicleNumber',       mv.vehicle_number,
+          'vehicleType',         mv.vehicle_type,
+          'vehicleMake',         mv.vehicle_make,
+          'vehicleModel',        mv.vehicle_model,
+          'ownerName',           mv.owner_name,
+          'ownerPhone',          mv.owner_phone,
+          'rcNumber',            mv.rc_number,
+          'rcFrontUrl',          mv.rc_front_url,
+          'rcBackUrl',           mv.rc_back_url,
+          'insuranceUrl',        mv.insurance_url,
+          'insuranceExpiryDate', mv.insurance_expiry_date,
+          'pollutionUrl',        mv.pollution_url,
+          'pollutionExpiryDate', mv.pollution_expiry_date,
+          'permitUrl',           mv.permit_url,
+          'permitExpiryDate',    mv.permit_expiry_date,
+          'fcUrl',               mv.fc_url,
+          'fcExpiryDate',        mv.fc_expiry_date
+        )
+        FROM managed_vehicles mv
+        WHERE mv.vehicle_number = t.vehicle_number
+        LIMIT 1
+      ) AS vehicle_details,
+      (
+        SELECT COALESCE(
+          json_agg(
+            json_build_object(
+              'docId',        vd.doc_id,
+              'docType',      vd.doc_type,
+              'docLabel',     vd.doc_label,
+              'docNumber',    vd.doc_number,
+              'issueDate',    vd.issue_date,
+              'expiryDate',   vd.expiry_date,
+              'fileUri',      vd.file_uri,
+              'fileName',     vd.file_name,
+              'fileType',     vd.file_type,
+              'uploadedAt',   vd.uploaded_at,
+              'isActive',     vd.is_active
+            ) ORDER BY vd.uploaded_at DESC
+          ),
+          '[]'
+        )
+        FROM vehicle_documents vd
+        JOIN managed_vehicles mv ON mv.vehicle_id = vd.vehicle_id
+        WHERE mv.vehicle_number = t.vehicle_number AND vd.is_active = true
+      ) AS vehicle_documents
     FROM trips t
     LEFT JOIN expenses e ON e.trip_id = t.id
     WHERE t.id = ${tripId}
@@ -101,7 +149,55 @@ export async function tripRoutes(app: FastifyInstance) {
           WHERE g.trip_id = t.id
           ORDER BY g.recorded_at DESC
           LIMIT 1
-        ) AS current_gps
+        ) AS current_gps,
+        (
+          SELECT json_build_object(
+            'vehicleId',           mv.vehicle_id,
+            'vehicleNumber',       mv.vehicle_number,
+            'vehicleType',         mv.vehicle_type,
+            'vehicleMake',         mv.vehicle_make,
+            'vehicleModel',        mv.vehicle_model,
+            'ownerName',           mv.owner_name,
+            'ownerPhone',          mv.owner_phone,
+            'rcNumber',            mv.rc_number,
+            'rcFrontUrl',          mv.rc_front_url,
+            'rcBackUrl',           mv.rc_back_url,
+            'insuranceUrl',        mv.insurance_url,
+            'insuranceExpiryDate', mv.insurance_expiry_date,
+            'pollutionUrl',        mv.pollution_url,
+            'pollutionExpiryDate', mv.pollution_expiry_date,
+            'permitUrl',           mv.permit_url,
+            'permitExpiryDate',    mv.permit_expiry_date,
+            'fcUrl',               mv.fc_url,
+            'fcExpiryDate',        mv.fc_expiry_date
+          )
+          FROM managed_vehicles mv
+          WHERE mv.vehicle_number = t.vehicle_number
+          LIMIT 1
+        ) AS vehicle_details,
+        (
+          SELECT COALESCE(
+            json_agg(
+              json_build_object(
+                'docId',        vd.doc_id,
+                'docType',      vd.doc_type,
+                'docLabel',     vd.doc_label,
+                'docNumber',    vd.doc_number,
+                'issueDate',    vd.issue_date,
+                'expiryDate',   vd.expiry_date,
+                'fileUri',      vd.file_uri,
+                'fileName',     vd.file_name,
+                'fileType',     vd.file_type,
+                'uploadedAt',   vd.uploaded_at,
+                'isActive',     vd.is_active
+              ) ORDER BY vd.uploaded_at DESC
+            ),
+            '[]'
+          )
+          FROM vehicle_documents vd
+          JOIN managed_vehicles mv ON mv.vehicle_id = vd.vehicle_id
+          WHERE mv.vehicle_number = t.vehicle_number AND vd.is_active = true
+        ) AS vehicle_documents
       FROM trips t
       LEFT JOIN expenses e ON e.trip_id = t.id
       WHERE t.driver_id = ${user.driverId}

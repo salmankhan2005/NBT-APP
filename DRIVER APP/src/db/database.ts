@@ -79,6 +79,41 @@ export interface Expense {
   timestamp: string;
 }
 
+export interface VehicleDocumentItem {
+  docId: string;
+  docType: string;
+  docLabel: string;
+  docNumber: string;
+  issueDate?: string;
+  expiryDate?: string;
+  fileUri: string;
+  fileName: string;
+  fileType: string;
+  uploadedAt: string;
+  isActive: boolean;
+}
+
+export interface VehicleDetailsItem {
+  vehicleId: string;
+  vehicleNumber: string;
+  vehicleType: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  rcNumber?: string;
+  rcFrontUrl?: string;
+  rcBackUrl?: string;
+  insuranceUrl?: string;
+  insuranceExpiryDate?: string;
+  pollutionUrl?: string;
+  pollutionExpiryDate?: string;
+  permitUrl?: string;
+  permitExpiryDate?: string;
+  fcUrl?: string;
+  fcExpiryDate?: string;
+}
+
 export interface Trip {
   id: string;
   driverId: string;
@@ -113,7 +148,40 @@ export interface Trip {
   podSignature?: string;
   podNotes?: string;
   trackingId: string;
+  vehicleDetails?: VehicleDetailsItem;
+  vehicleDocuments?: VehicleDocumentItem[];
 }
+
+export const normalizeImageUrl = (url?: string | null): string | undefined => {
+  if (!url || typeof url !== 'string' || !url.trim()) return undefined;
+  let cleaned = url.trim();
+
+  if (
+    cleaned === 'mock-pod-uri' ||
+    cleaned.includes('dummy.pdf') ||
+    cleaned.includes('storage.nbt-ars.com')
+  ) {
+    return undefined;
+  }
+
+  if (
+    cleaned.startsWith('data:image/') ||
+    cleaned.startsWith('data:application/') ||
+    cleaned.startsWith('blob:') ||
+    cleaned.startsWith('file://') ||
+    cleaned.startsWith('content://')
+  ) {
+    return cleaned;
+  }
+
+  if (cleaned.startsWith('/uploads/')) {
+    cleaned = `${API_HOST}${cleaned}`;
+  } else if (cleaned.startsWith('uploads/')) {
+    cleaned = `${API_HOST}/${cleaned}`;
+  }
+
+  return cleaned;
+};
 
 // ── AsyncStorage keys ────────────────────────────────────────────────────────
 const STORAGE_KEY          = '@nbt_ars_trips_data';
@@ -142,6 +210,54 @@ const DEFAULT_TRIPS: Trip[] = [
       address: 'NH544, Salem, Tamil Nadu',
       lastUpdated: new Date().toLocaleTimeString(),
     },
+    vehicleDetails: {
+      vehicleId: 'VEH-101',
+      vehicleNumber: 'TN 38 AB 1234',
+      vehicleType: '12 Wheel',
+      vehicleMake: 'Ashok Leyland',
+      vehicleModel: 'Captain 3118',
+      ownerName: 'NBT Logistics',
+      ownerPhone: '+91 94433 51789',
+      rcNumber: 'TN38AB1234RC',
+    },
+    vehicleDocuments: [
+      {
+        docId: 'MOCK-DOC-RC',
+        docType: 'RC',
+        docLabel: 'Registration Certificate (RC)',
+        docNumber: 'TN-38-AB-1234',
+        expiryDate: '2032-12-31T00:00:00.000Z',
+        fileUri: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?q=80&w=1000',
+        fileName: 'rc_details.jpg',
+        fileType: 'image/jpeg',
+        uploadedAt: new Date().toISOString(),
+        isActive: true
+      },
+      {
+        docId: 'MOCK-DOC-INS',
+        docType: 'INSURANCE',
+        docLabel: 'Commercial Vehicle Insurance',
+        docNumber: 'INS-99887722',
+        expiryDate: '2027-12-31T00:00:00.000Z',
+        fileUri: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?q=80&w=1000',
+        fileName: 'insurance_policy.jpg',
+        fileType: 'image/jpeg',
+        uploadedAt: new Date().toISOString(),
+        isActive: true
+      },
+      {
+        docId: 'MOCK-DOC-POL',
+        docType: 'POLLUTION',
+        docLabel: 'Pollution Under Control (PUC)',
+        docNumber: 'PUC-8877112',
+        expiryDate: '2027-10-15T00:00:00.000Z',
+        fileUri: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?q=80&w=1000',
+        fileName: 'puc_certificate.jpg',
+        fileType: 'image/jpeg',
+        uploadedAt: new Date().toISOString(),
+        isActive: true
+      }
+    ]
   },
   {
     id: 'DRV-4421',
@@ -164,6 +280,42 @@ const DEFAULT_TRIPS: Trip[] = [
       address: 'Rajaji Salai, Chennai, Tamil Nadu',
       lastUpdated: new Date().toLocaleTimeString(),
     },
+    vehicleDetails: {
+      vehicleId: 'VEH-102',
+      vehicleNumber: 'TN 37 CB 5678',
+      vehicleType: '16 Wheel',
+      vehicleMake: 'Tata Motors',
+      vehicleModel: 'Signa 4825.TK',
+      ownerName: 'ARS Fleet',
+      ownerPhone: '+91 93622 51789',
+      rcNumber: 'TN37CB5678RC',
+    },
+    vehicleDocuments: [
+      {
+        docId: 'MOCK-DOC-RC2',
+        docType: 'RC',
+        docLabel: 'Registration Certificate (RC)',
+        docNumber: 'TN-37-CB-5678',
+        expiryDate: '2033-05-20T00:00:00.000Z',
+        fileUri: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?q=80&w=1000',
+        fileName: 'rc_details.jpg',
+        fileType: 'image/jpeg',
+        uploadedAt: new Date().toISOString(),
+        isActive: true
+      },
+      {
+        docId: 'MOCK-DOC-INS2',
+        docType: 'INSURANCE',
+        docLabel: 'Commercial Vehicle Insurance',
+        docNumber: 'INS-77665511',
+        expiryDate: '2027-11-20T00:00:00.000Z',
+        fileUri: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?q=80&w=1000',
+        fileName: 'insurance_policy.jpg',
+        fileType: 'image/jpeg',
+        uploadedAt: new Date().toISOString(),
+        isActive: true
+      }
+    ]
   },
 ];
 
@@ -330,7 +482,40 @@ class DatabaseService {
                       city: 'Depot',
                       address: fetchedTrip.starting_point || 'Depot',
                       lastUpdated: new Date().toLocaleTimeString()
-                    }
+                    },
+                    vehicleDetails: fetchedTrip.vehicle_details ? {
+                      vehicleId: fetchedTrip.vehicle_details.vehicleId,
+                      vehicleNumber: fetchedTrip.vehicle_details.vehicleNumber,
+                      vehicleType: fetchedTrip.vehicle_details.vehicleType,
+                      vehicleMake: fetchedTrip.vehicle_details.vehicleMake,
+                      vehicleModel: fetchedTrip.vehicle_details.vehicleModel,
+                      ownerName: fetchedTrip.vehicle_details.ownerName,
+                      ownerPhone: fetchedTrip.vehicle_details.ownerPhone,
+                      rcNumber: fetchedTrip.vehicle_details.rcNumber,
+                      rcFrontUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcFrontUrl),
+                      rcBackUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcBackUrl),
+                      insuranceUrl: normalizeImageUrl(fetchedTrip.vehicle_details.insuranceUrl),
+                      insuranceExpiryDate: fetchedTrip.vehicle_details.insuranceExpiryDate,
+                      pollutionUrl: normalizeImageUrl(fetchedTrip.vehicle_details.pollutionUrl),
+                      pollutionExpiryDate: fetchedTrip.vehicle_details.pollutionExpiryDate,
+                      permitUrl: normalizeImageUrl(fetchedTrip.vehicle_details.permitUrl),
+                      permitExpiryDate: fetchedTrip.vehicle_details.permitExpiryDate,
+                      fcUrl: normalizeImageUrl(fetchedTrip.vehicle_details.fcUrl),
+                      fcExpiryDate: fetchedTrip.vehicle_details.fcExpiryDate,
+                    } : undefined,
+                    vehicleDocuments: Array.isArray(fetchedTrip.vehicle_documents) ? fetchedTrip.vehicle_documents.map((d: any) => ({
+                      docId: d.docId,
+                      docType: d.docType,
+                      docLabel: d.docLabel,
+                      docNumber: d.docNumber || '',
+                      issueDate: d.issueDate,
+                      expiryDate: d.expiryDate,
+                      fileUri: normalizeImageUrl(d.fileUri) || d.fileUri || '',
+                      fileName: d.fileName || '',
+                      fileType: d.fileType || '',
+                      uploadedAt: d.uploadedAt || new Date().toISOString(),
+                      isActive: Boolean(d.isActive)
+                    })) : undefined
                   };
 
                   const existingIdx = this.cache.findIndex(t => t.id === formattedTrip.id || t.driverId === activeId);
@@ -471,7 +656,40 @@ class DatabaseService {
                   city: 'Depot',
                   address: fetchedTrip.starting_point || 'Depot',
                   lastUpdated: new Date().toLocaleTimeString()
-                }
+                },
+                vehicleDetails: fetchedTrip.vehicle_details ? {
+                  vehicleId: fetchedTrip.vehicle_details.vehicleId,
+                  vehicleNumber: fetchedTrip.vehicle_details.vehicleNumber,
+                  vehicleType: fetchedTrip.vehicle_details.vehicleType,
+                  vehicleMake: fetchedTrip.vehicle_details.vehicleMake,
+                  vehicleModel: fetchedTrip.vehicle_details.vehicleModel,
+                  ownerName: fetchedTrip.vehicle_details.ownerName,
+                  ownerPhone: fetchedTrip.vehicle_details.ownerPhone,
+                  rcNumber: fetchedTrip.vehicle_details.rcNumber,
+                  rcFrontUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcFrontUrl),
+                  rcBackUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcBackUrl),
+                  insuranceUrl: normalizeImageUrl(fetchedTrip.vehicle_details.insuranceUrl),
+                  insuranceExpiryDate: fetchedTrip.vehicle_details.insuranceExpiryDate,
+                  pollutionUrl: normalizeImageUrl(fetchedTrip.vehicle_details.pollutionUrl),
+                  pollutionExpiryDate: fetchedTrip.vehicle_details.pollutionExpiryDate,
+                  permitUrl: normalizeImageUrl(fetchedTrip.vehicle_details.permitUrl),
+                  permitExpiryDate: fetchedTrip.vehicle_details.permitExpiryDate,
+                  fcUrl: normalizeImageUrl(fetchedTrip.vehicle_details.fcUrl),
+                  fcExpiryDate: fetchedTrip.vehicle_details.fcExpiryDate,
+                } : undefined,
+                vehicleDocuments: Array.isArray(fetchedTrip.vehicle_documents) ? fetchedTrip.vehicle_documents.map((d: any) => ({
+                  docId: d.docId,
+                  docType: d.docType,
+                  docLabel: d.docLabel,
+                  docNumber: d.docNumber || '',
+                  issueDate: d.issueDate,
+                  expiryDate: d.expiryDate,
+                  fileUri: normalizeImageUrl(d.fileUri) || d.fileUri || '',
+                  fileName: d.fileName || '',
+                  fileType: d.fileType || '',
+                  uploadedAt: d.uploadedAt || new Date().toISOString(),
+                  isActive: Boolean(d.isActive)
+                })) : undefined
               };
               return formattedTrip;
             });

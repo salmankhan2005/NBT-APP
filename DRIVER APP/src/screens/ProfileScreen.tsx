@@ -12,6 +12,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip } from '../db/database';
+import VehicleDocumentsModal from '../components/VehicleDocumentsModal';
 
 interface ProfileScreenProps {
   driverId: string;
@@ -31,6 +32,8 @@ export default function ProfileScreen({
   const [completedTrips, setCompletedTrips] = useState<Trip[]>([]);
   const [expenseLedger, setExpenseLedger] = useState({ fuel: 0, toll: 0, other: 0 });
   const [currentTrackingId, setCurrentTrackingId] = useState(driverId);
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
+  const [docsModalVisible, setDocsModalVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -39,10 +42,12 @@ export default function ProfileScreen({
       try {
         const trips = await db.getTrips();
         const pastTrips = await db.getCompletedTrips();
+        const active = await db.getActiveTripForDriver(driverId);
 
         if (!isMounted) return;
 
         setCompletedTrips(pastTrips);
+        setActiveTrip(active);
 
         const profile = await db.getDriverProfile(driverId);
         if (profile && profile.name) {
@@ -290,6 +295,40 @@ export default function ProfileScreen({
               );
             })}
           </View>
+        )}
+
+        {/* Assigned Vehicle & Documents */}
+        {activeTrip && (
+          <>
+            <Text style={styles.sectionTitle}>Assigned Vehicle & Papers</Text>
+            <View style={styles.vehicleDocCard}>
+              <View style={styles.vehicleDocHeader}>
+                <View style={styles.vehicleDocIconContainer}>
+                  <MaterialIcons name="local-shipping" size={26} color={COLORS.primary} />
+                </View>
+                <View style={styles.vehicleDocMeta}>
+                  <Text style={styles.vehicleDocNum}>{activeTrip.vehicleNumber}</Text>
+                  <Text style={styles.vehicleDocType}>{activeTrip.vehicleType} • Active Transit Truck</Text>
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.viewDocsBtn}
+                onPress={() => setDocsModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="folder-shared" size={20} color="#ffffff" />
+                <Text style={styles.viewDocsBtnText}>VIEW VEHICLE DOCUMENTS</Text>
+              </TouchableOpacity>
+            </View>
+
+            <VehicleDocumentsModal
+              visible={docsModalVisible}
+              onClose={() => setDocsModalVisible(false)}
+              vehicleDetails={activeTrip.vehicleDetails}
+              documents={activeTrip.vehicleDocuments}
+            />
+          </>
         )}
 
         {/* Settings / Actions */}
@@ -661,5 +700,55 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: COLORS.outline,
     marginTop: 4,
+  },
+  vehicleDocCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: 16,
+    marginBottom: SPACING.stack,
+    ...SHADOWS.light,
+  },
+  vehicleDocHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  vehicleDocIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vehicleDocMeta: {
+    flex: 1,
+  },
+  vehicleDocNum: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textDark,
+  },
+  vehicleDocType: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  viewDocsBtn: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  viewDocsBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

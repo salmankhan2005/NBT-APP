@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -13,6 +13,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { Trip } from '../db/database';
+import VehicleDocumentsModal from '../components/VehicleDocumentsModal';
 
 interface HomeScreenProps {
   driverId: string;
@@ -38,6 +39,7 @@ export default function HomeScreen({
   onLogout,
 }: HomeScreenProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [docsModalVisible, setDocsModalVisible] = useState(false);
 
   useEffect(() => {
     Animated.loop(
@@ -162,6 +164,35 @@ export default function HomeScreen({
                 )}
               </View>
             )}
+
+            {/* Vehicle Documents & Truck Papers */}
+            <TouchableOpacity
+              style={styles.docsCardLink}
+              onPress={() => setDocsModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.docsCardLeft}>
+                <View style={styles.docsIconContainer}>
+                  <MaterialIcons name="folder-shared" size={24} color={COLORS.primary} />
+                </View>
+                <View style={styles.docsMetaContainer}>
+                  <Text style={styles.docsCardTitle}>Vehicle Documents & Permits</Text>
+                  <Text style={styles.docsCardDesc} numberOfLines={1}>
+                    {activeTrip.vehicleDocuments && activeTrip.vehicleDocuments.length > 0
+                      ? `✓ ${activeTrip.vehicleDocuments.length} Documents Available (RC, Insurance...)`
+                      : 'View RC, Insurance, Pollution, Permit & FC'}
+                  </Text>
+                </View>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color={COLORS.outline} />
+            </TouchableOpacity>
+
+            <VehicleDocumentsModal
+              visible={docsModalVisible}
+              onClose={() => setDocsModalVisible(false)}
+              vehicleDetails={activeTrip.vehicleDetails}
+              documents={activeTrip.vehicleDocuments}
+            />
 
             {/* Toll Estimates Panel */}
             <View style={styles.tollPanel}>
@@ -656,5 +687,44 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.primary,
     marginTop: 6,
+  },
+  docsCardLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderWidth: 1.5,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: SPACING.gutter * 1.5,
+    ...SHADOWS.light,
+  },
+  docsCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  docsIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  docsMetaContainer: {
+    flex: 1,
+  },
+  docsCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textDark,
+  },
+  docsCardDesc: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 3,
   },
 });
