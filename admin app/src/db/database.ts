@@ -922,20 +922,61 @@ class AdminDatabase {
     return this.currentUsername;
   }
 
+  async getValidToken(): Promise<string | null> {
+    if (this.token && this.token !== 'local-fallback-token') {
+      return this.token;
+    }
+    // Attempt automatic login to acquire a fresh JWT token
+    try {
+      const response = await fetch(`${API_HOST}/api/auth/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackingId: this.currentUsername || 'admin', pin: '9999' }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.token) {
+          this.token = data.token;
+          this.currentUsername = data.username || this.currentUsername || 'admin';
+          try {
+            await SecureStore.setItemAsync('admin_session_token', this.token!);
+            await SecureStore.setItemAsync('admin_username', this.currentUsername!);
+          } catch {
+            await AsyncStorage.setItem('admin_session_token_web', this.token!);
+            await AsyncStorage.setItem('admin_username_web', this.currentUsername!);
+          }
+          return this.token;
+        }
+      }
+    } catch {}
+    return this.token;
+  }
+
+  async authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    let token = await this.getValidToken();
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string> || {}),
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    let res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      // Clear stale token and re-login once
+      this.token = null;
+      const success = await this.login(this.currentUsername || 'admin', '9999');
+      if (success && this.token) {
+        headers['Authorization'] = `Bearer ${this.token}`;
+        res = await fetch(url, { ...options, headers });
+      }
+    }
+    return res;
+  }
+
   // Trips GET — Live Backend Fetch with Fallback
   async getTrips(): Promise<Trip[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-
-    if (!this.token) {
-      return Promise.resolve([...this.mockTrips]);
-    }
-
     try {
-      const res = await fetch(`${API_HOST}/api/admin/trips`, {
-        headers: { Authorization: `Bearer ${this.token}` },
-      });
+      const res = await this.authFetch(`${API_HOST}/api/admin/trips`);
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -1179,16 +1220,10 @@ class AdminDatabase {
         agreedFreight: newTrip.agreedFreight || 0,
       };
 
-      if (!this.token) {
-        await this.loadSession();
-      }
-      const authToken = this.token || 'local-fallback-token';
-
-      const res = await fetch(`${API_HOST}/api/admin/trips`, {
+      const res = await this.authFetch(`${API_HOST}/api/admin/trips`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify(apiBody),
       });
@@ -1247,27 +1282,23 @@ class AdminDatabase {
 
     // Persist to Neon Postgres via backend — survives app refresh/reload
     try {
-      const authToken = this.token || (await this.loadSession(), this.token);
-      if (authToken) {
-        const res = await fetch(`${API_HOST}/api/admin/trips/${tripId}/payment`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({ driverPayment }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          // Also update profitOrLoss in local cache from server response
-          if (trip && data.profitOrLoss !== undefined) {
-            trip.profitOrLoss = data.profitOrLoss;
-          }
-          this.notify();
-          return true;
-        } else {
-          console.warn('[AdminDB] Payment sync failed:', res.status);
+      const res = await this.authFetch(`${API_HOST}/api/admin/trips/${tripId}/payment`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ driverPayment }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Also update profitOrLoss in local cache from server response
+        if (trip && data.profitOrLoss !== undefined) {
+          trip.profitOrLoss = data.profitOrLoss;
         }
+        this.notify();
+        return true;
+      } else {
+        console.warn('[AdminDB] Payment sync failed:', res.status);
       }
     } catch (err) {
       console.warn('[AdminDB] Payment sync error (offline?):', err);
@@ -1284,17 +1315,14 @@ class AdminDatabase {
     if (odometerEnd !== undefined) trip.odometerEnd = odometerEnd;
 
     try {
-      const authToken = this.token || (await this.loadSession(), this.token);
-      if (authToken) {
-        const body: Record<string, any> = {};
-        if (odometerStart !== undefined) body.odometer_start = odometerStart;
-        if (odometerEnd !== undefined) body.odometer_end = odometerEnd;
-        await fetch(`${API_HOST}/api/admin/trips/${tripId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-          body: JSON.stringify(body),
-        });
-      }
+      const body: Record<string, any> = {};
+      if (odometerStart !== undefined) body.odometer_start = odometerStart;
+      if (odometerEnd !== undefined) body.odometer_end = odometerEnd;
+      await this.authFetch(`${API_HOST}/api/admin/trips/${tripId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
     } catch (e) {
       console.warn('[AdminDB] updateTripOdometer API sync failed:', e);
     }
@@ -1305,13 +1333,9 @@ class AdminDatabase {
   async deleteTrip(tripId: string): Promise<boolean> {
     this.mockTrips = this.mockTrips.filter(t => t.id !== tripId);
     try {
-      const authToken = this.token || (await this.loadSession(), this.token);
-      if (authToken) {
-        await fetch(`${API_HOST}/api/admin/trips/${tripId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
-      }
+      await this.authFetch(`${API_HOST}/api/admin/trips/${tripId}`, {
+        method: 'DELETE',
+      });
     } catch (e) {
       console.warn('[AdminDB] deleteTrip API sync failed:', e);
     }
@@ -1324,17 +1348,13 @@ class AdminDatabase {
     if (!trip) return false;
     trip.isPinned = !trip.isPinned;
     try {
-      const authToken = this.token || (await this.loadSession(), this.token);
-      if (authToken) {
-        await fetch(`${API_HOST}/api/admin/trips/${tripId}/pin`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({ isPinned: trip.isPinned }),
-        });
-      }
+      await this.authFetch(`${API_HOST}/api/admin/trips/${tripId}/pin`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isPinned: trip.isPinned }),
+      });
     } catch (e) {
       console.warn('[AdminDB] togglePinTrip API sync failed:', e);
     }
@@ -1348,25 +1368,25 @@ class AdminDatabase {
     Object.assign(trip, details);
 
     try {
-      const authToken = this.token || (await this.loadSession(), this.token);
-      if (authToken) {
-        await fetch(`${API_HOST}/api/admin/trips/${tripId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            status: details.status,
-            driver_name: details.driverName,
-            vehicle_number: details.vehicleNumber,
-            starting_point: details.startingPoint,
-            destination: details.destination,
-            agreed_freight: details.agreedFreight,
-            driver_pin: details.driverPin,
-          }),
-        });
-      }
+      await this.authFetch(`${API_HOST}/api/admin/trips/${tripId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: details.status,
+          odometer_start: details.odometerStart,
+          odometer_end: details.odometerEnd,
+          diesel_start: details.dieselStart,
+          diesel_end: details.dieselEnd,
+          driver_name: details.driverName,
+          vehicle_number: details.vehicleNumber,
+          starting_point: details.startingPoint,
+          destination: details.destination,
+          agreed_freight: details.agreedFreight,
+          driver_pin: details.driverPin,
+        }),
+      });
     } catch (e) {
       console.warn('[AdminDB] updateTripDetails API sync failed:', e);
     }
@@ -1399,50 +1419,43 @@ class AdminDatabase {
   // ─── MANAGED VEHICLES ────────────────────────────────────────────────────────
 
   async getManagedVehicles(): Promise<ManagedVehicle[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-    if (this.token) {
-      try {
-        const res = await fetch(`${API_HOST}/api/admin/vehicles`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        if (res.ok) {
-          const apiVehicles = await res.json();
-          if (Array.isArray(apiVehicles) && apiVehicles.length > 0) {
-            const mapped: ManagedVehicle[] = apiVehicles.map((v: any) => ({
-              vehicle_id: v.vehicle_id || v.id,
-              vehicleNumber: v.vehicle_number,
-              vehicleType: v.vehicle_type || '12 Wheel',
-              wheelType: v.wheel_type || '12 Wheel',
-              vehicleMake: v.vehicle_make || '',
-              vehicleModel: v.vehicle_model || '',
-              ownerName: v.owner_name || '',
-              ownerPhone: v.owner_phone || '',
-              rcNumber: v.rc_number || '',
-              engineNumber: v.engine_number || '',
-              chassisNumber: v.chassis_number || '',
-              yearOfManufacture: v.year_of_manufacture || '',
-              status: v.status || 'AVAILABLE',
-              insuranceExpiryDate: v.insurance_expiry_date || undefined,
-              pollutionExpiryDate: v.pollution_expiry_date || undefined,
-              permitExpiryDate: v.permit_expiry_date || undefined,
-              fcExpiryDate: v.fc_expiry_date || undefined,
-              insuranceUrl: v.insurance_url || undefined,
-              pollutionUrl: v.pollution_url || undefined,
-              permitUrl: v.permit_url || undefined,
-              fcUrl: v.fc_url || undefined,
-              createdAt: v.created_at || new Date().toISOString(),
-              updatedAt: v.updated_at || new Date().toISOString(),
-            }));
-            // Replace cache with backend data
-            this.managedVehicles = mapped;
-            await this.saveVehicles();
-          }
+    try {
+      const res = await this.authFetch(`${API_HOST}/api/admin/vehicles`);
+      if (res.ok) {
+        const apiVehicles = await res.json();
+        if (Array.isArray(apiVehicles) && apiVehicles.length > 0) {
+          const mapped: ManagedVehicle[] = apiVehicles.map((v: any) => ({
+            vehicle_id: v.vehicle_id || v.id,
+            vehicleNumber: v.vehicle_number,
+            vehicleType: v.vehicle_type || '12 Wheel',
+            wheelType: v.wheel_type || '12 Wheel',
+            vehicleMake: v.vehicle_make || '',
+            vehicleModel: v.vehicle_model || '',
+            ownerName: v.owner_name || '',
+            ownerPhone: v.owner_phone || '',
+            rcNumber: v.rc_number || '',
+            engineNumber: v.engine_number || '',
+            chassisNumber: v.chassis_number || '',
+            yearOfManufacture: v.year_of_manufacture || '',
+            status: v.status || 'AVAILABLE',
+            insuranceExpiryDate: v.insurance_expiry_date || undefined,
+            pollutionExpiryDate: v.pollution_expiry_date || undefined,
+            permitExpiryDate: v.permit_expiry_date || undefined,
+            fcExpiryDate: v.fc_expiry_date || undefined,
+            insuranceUrl: v.insurance_url || undefined,
+            pollutionUrl: v.pollution_url || undefined,
+            permitUrl: v.permit_url || undefined,
+            fcUrl: v.fc_url || undefined,
+            createdAt: v.created_at || new Date().toISOString(),
+            updatedAt: v.updated_at || new Date().toISOString(),
+          }));
+          // Replace cache with backend data
+          this.managedVehicles = mapped;
+          await this.saveVehicles();
         }
-      } catch (err) {
-        console.warn('[AdminDB] Error fetching managed vehicles from API:', err);
       }
+    } catch (err) {
+      console.warn('[AdminDB] Error fetching managed vehicles from API:', err);
     }
     return Promise.resolve([...this.managedVehicles]);
   }
@@ -1500,19 +1513,16 @@ class AdminDatabase {
     this.managedVehicles.unshift(vehicle);
     await this.saveVehicles();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/admin/vehicles`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`
-          },
-          body: JSON.stringify(vehicle)
-        });
-      } catch (err) {
-        console.warn('[AdminDB] createManagedVehicle API sync error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/admin/vehicles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(vehicle)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] createManagedVehicle API sync error:', err);
     }
 
     this.notify();
@@ -1525,19 +1535,16 @@ class AdminDatabase {
     this.managedVehicles[idx] = { ...this.managedVehicles[idx], ...data, updatedAt: new Date().toISOString() };
     await this.saveVehicles();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/admin/vehicles/${vehicle_id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`
-          },
-          body: JSON.stringify(data)
-        });
-      } catch (err) {
-        console.warn('[AdminDB] updateManagedVehicle API sync error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/admin/vehicles/${vehicle_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] updateManagedVehicle API sync error:', err);
     }
 
     this.notify();
@@ -1577,15 +1584,12 @@ class AdminDatabase {
     await this.saveVehicles();
     await this.saveDocuments();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/admin/vehicles/${vehicle_id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-      } catch (err) {
-        console.warn('[AdminDB] deleteManagedVehicle API error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/admin/vehicles/${vehicle_id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('[AdminDB] deleteManagedVehicle API error:', err);
     }
 
     this.notify();
@@ -1609,40 +1613,33 @@ class AdminDatabase {
   }
 
   async getAllVehicleDocuments(): Promise<VehicleDocument[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-    if (this.token) {
-      try {
-        const res = await fetch(`${API_HOST}/api/admin/vehicle-documents/all`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        if (res.ok) {
-          const apiDocs = await res.json();
-          if (Array.isArray(apiDocs)) {
-            const mapped: VehicleDocument[] = apiDocs.map((d: any) => ({
-              doc_id: d.doc_id,
-              vehicle_id: d.vehicle_id,
-              docType: d.doc_type,
-              docLabel: d.doc_label,
-              docNumber: d.doc_number || '',
-              issueDate: d.issue_date || '',
-              expiryDate: d.expiry_date || '',
-              fileUri: normalizeImageUrl(d.file_uri || '') || (d.file_uri || ''),
-              fileName: d.file_name || '',
-              fileType: d.file_type || '',
-              uploadedAt: d.uploaded_at || new Date().toISOString(),
-              uploadedBy: d.uploaded_by || 'admin',
-              isActive: Boolean(d.is_active),
-              history: []
-            }));
-            this.vehicleDocuments = mapped;
-            await this.saveDocuments();
-          }
+    try {
+      const res = await this.authFetch(`${API_HOST}/api/admin/vehicle-documents/all`);
+      if (res.ok) {
+        const apiDocs = await res.json();
+        if (Array.isArray(apiDocs)) {
+          const mapped: VehicleDocument[] = apiDocs.map((d: any) => ({
+            doc_id: d.doc_id,
+            vehicle_id: d.vehicle_id,
+            docType: d.doc_type,
+            docLabel: d.doc_label,
+            docNumber: d.doc_number || '',
+            issueDate: d.issue_date || '',
+            expiryDate: d.expiry_date || '',
+            fileUri: normalizeImageUrl(d.file_uri || '') || (d.file_uri || ''),
+            fileName: d.file_name || '',
+            fileType: d.file_type || '',
+            uploadedAt: d.uploaded_at || new Date().toISOString(),
+            uploadedBy: d.uploaded_by || 'admin',
+            isActive: Boolean(d.is_active),
+            history: []
+          }));
+          this.vehicleDocuments = mapped;
+          await this.saveDocuments();
         }
-      } catch (err) {
-        console.warn('[AdminDB] Error fetching vehicle documents from API:', err);
       }
+    } catch (err) {
+      console.warn('[AdminDB] Error fetching vehicle documents from API:', err);
     }
     return Promise.resolve([...this.vehicleDocuments.filter((doc) => doc.isActive)]);
   }
@@ -1669,18 +1666,8 @@ class AdminDatabase {
         } as any);
       }
 
-      if (!this.token) {
-        await this.loadSession();
-      }
-
-      const requestHeaders: Record<string, string> = {};
-      if (this.token) {
-        requestHeaders.Authorization = `Bearer ${this.token}`;
-      }
-
-      const response = await fetch(`${API_HOST}/api/upload`, {
+      const response = await this.authFetch(`${API_HOST}/api/upload`, {
         method: 'POST',
-        headers: requestHeaders,
         body: formData,
       });
 
@@ -1710,19 +1697,16 @@ class AdminDatabase {
     this.vehicleDocuments.push(doc);
     await this.saveDocuments();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/admin/vehicles/${data.vehicle_id}/documents`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`
-          },
-          body: JSON.stringify(doc)
-        });
-      } catch (err) {
-        console.warn('[AdminDB] addVehicleDocument API sync error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/admin/vehicles/${data.vehicle_id}/documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(doc)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] addVehicleDocument API sync error:', err);
     }
 
     this.notify();
@@ -1759,19 +1743,16 @@ class AdminDatabase {
     this.vehicleDocuments[idx] = updatedDoc;
     await this.saveDocuments();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/admin/vehicles/${current.vehicle_id}/documents/${doc_id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`,
-          },
-          body: JSON.stringify(updatedDoc),
-        });
-      } catch (err) {
-        console.warn('[AdminDB] replaceVehicleDocument API sync error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/admin/vehicles/${current.vehicle_id}/documents/${doc_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedDoc),
+      });
+    } catch (err) {
+      console.warn('[AdminDB] replaceVehicleDocument API sync error:', err);
     }
 
     this.notify();
@@ -1785,17 +1766,12 @@ class AdminDatabase {
     this.vehicleDocuments.splice(idx, 1);
     await this.saveDocuments();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/admin/vehicles/${doc.vehicle_id}/documents/${doc_id}`, {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
-        });
-      } catch (err) {
-        console.warn('[AdminDB] deleteVehicleDocument API sync error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/admin/vehicles/${doc.vehicle_id}/documents/${doc_id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('[AdminDB] deleteVehicleDocument API sync error:', err);
     }
 
     this.notify();
@@ -1875,88 +1851,74 @@ class AdminDatabase {
   }
 
   async getFleetVehicles(): Promise<FleetVehicle[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-    if (this.token) {
-      try {
-        const res = await fetch(`${API_HOST}/api/admin/fleet`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        if (res.ok) {
-          const apiRows = await res.json();
-          if (Array.isArray(apiRows) && apiRows.length > 0) {
-            const mapped: FleetVehicle[] = apiRows.map((f: any) => ({
-              id: f.id,
-              vehicleNumber: f.vehicle_number,
-              vehicleType: f.vehicle_type || '',
-              vehicleMake: f.vehicle_make || '',
-              vehicleModel: f.vehicle_model || '',
-              ownerName: f.owner_name || '',
-              gpsProvider: f.gps_provider || 'Jio GPS',
-              gpsDeviceBrand: f.gps_device_brand || '',
-              gpsDeviceModel: f.gps_device_model || '',
-              gpsDeviceId: f.gps_device_id || '',
-              imeiNumber: f.imei_number || '',
-              gpsDeviceStatus: f.gps_device_status || 'Connected',
-              vehicleStatus: f.vehicle_status || 'Active',
-              registrationDate: f.registration_date || '',
-              simNumber: f.sim_number || '',
-              externalGpsDeviceId: f.external_gps_device_id || '',
-              gpsInstallationDate: f.gps_installation_date || '',
-              lastKnownLatitude: f.last_known_lat ? Number(f.last_known_lat) : undefined,
-              lastKnownLongitude: f.last_known_lng ? Number(f.last_known_lng) : undefined,
-              lastKnownCity: f.last_known_city || undefined,
-              lastKnownAddress: f.last_known_address || undefined,
-              gpsHistory: [],
-              createdAt: f.created_at || new Date().toISOString(),
-              updatedAt: f.updated_at || new Date().toISOString(),
-            }));
-            this.mockFleetVehicles = mapped;
-          }
+    try {
+      const res = await this.authFetch(`${API_HOST}/api/admin/fleet`);
+      if (res.ok) {
+        const apiRows = await res.json();
+        if (Array.isArray(apiRows) && apiRows.length > 0) {
+          const mapped: FleetVehicle[] = apiRows.map((f: any) => ({
+            id: f.id,
+            vehicleNumber: f.vehicle_number,
+            vehicleType: f.vehicle_type || '',
+            vehicleMake: f.vehicle_make || '',
+            vehicleModel: f.vehicle_model || '',
+            ownerName: f.owner_name || '',
+            gpsProvider: f.gps_provider || 'Jio GPS',
+            gpsDeviceBrand: f.gps_device_brand || '',
+            gpsDeviceModel: f.gps_device_model || '',
+            gpsDeviceId: f.gps_device_id || '',
+            imeiNumber: f.imei_number || '',
+            gpsDeviceStatus: f.gps_device_status || 'Connected',
+            vehicleStatus: f.vehicle_status || 'Active',
+            registrationDate: f.registration_date || '',
+            simNumber: f.sim_number || '',
+            externalGpsDeviceId: f.external_gps_device_id || '',
+            gpsInstallationDate: f.gps_installation_date || '',
+            lastKnownLatitude: f.last_known_lat ? Number(f.last_known_lat) : undefined,
+            lastKnownLongitude: f.last_known_lng ? Number(f.last_known_lng) : undefined,
+            lastKnownCity: f.last_known_city || undefined,
+            lastKnownAddress: f.last_known_address || undefined,
+            gpsHistory: [],
+            createdAt: f.created_at || new Date().toISOString(),
+            updatedAt: f.updated_at || new Date().toISOString(),
+          }));
+          this.mockFleetVehicles = mapped;
         }
-      } catch (err) {
-        console.warn('[AdminDB] Error fetching fleet vehicles:', err);
       }
+    } catch (err) {
+      console.warn('[AdminDB] Error fetching fleet vehicles:', err);
     }
     return Promise.resolve([...this.mockFleetVehicles]);
   }
 
   async getActivityLogs(): Promise<ActivityLog[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-    if (this.token) {
-      try {
-        const res = await fetch(`${API_HOST}/api/admin/activity-logs`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        if (res.ok) {
-          const apiRows = await res.json();
-          if (Array.isArray(apiRows) && apiRows.length > 0) {
-            const mapped: ActivityLog[] = apiRows.map((a: any) => ({
-              id: a.id,
-              tripId: a.trip_id,
-              driverId: a.driver_id,
-              driverName: a.driver_name,
-              vehicleNumber: a.vehicle_number,
-              action: a.action,
-              timestamp: new Date(a.timestamp).toLocaleString('en-IN'),
-              date: new Date(a.timestamp).toLocaleDateString('en-IN'),
-              time: new Date(a.timestamp).toLocaleTimeString('en-IN'),
-              details: a.details,
-              startingPoint: a.starting_point || '',
-              destination: a.destination || '',
-              currentLocation: a.current_location || '',
-              statusLabel: a.status_label || '',
-              isGpsLocation: a.is_gps_location || false,
-            }));
-            this.mockActivityLogs = mapped;
-          }
+    try {
+      const res = await this.authFetch(`${API_HOST}/api/admin/activity-logs`);
+      if (res.ok) {
+        const apiRows = await res.json();
+        if (Array.isArray(apiRows) && apiRows.length > 0) {
+          const mapped: ActivityLog[] = apiRows.map((a: any) => ({
+            id: a.id,
+            tripId: a.trip_id,
+            driverId: a.driver_id,
+            driverName: a.driver_name,
+            vehicleNumber: a.vehicle_number,
+            action: a.action,
+            timestamp: new Date(a.timestamp).toLocaleString('en-IN'),
+            date: new Date(a.timestamp).toLocaleDateString('en-IN'),
+            time: new Date(a.timestamp).toLocaleTimeString('en-IN'),
+            details: a.details,
+            startingPoint: a.starting_point || '',
+            destination: a.destination || '',
+            currentLocation: a.current_location || '',
+            statusLabel: a.status_label || '',
+            isGpsLocation: a.is_gps_location || false,
+          }));
+          this.mockActivityLogs = mapped;
         }
-      } catch (err) {
-        console.warn('[AdminDB] Error fetching activity logs:', err);
       }
+    } catch (err) {
+      console.warn('[AdminDB] Error fetching activity logs:', err);
     }
     return Promise.resolve([...this.mockActivityLogs]);
   }
@@ -2079,34 +2041,27 @@ class AdminDatabase {
   }
 
   async getGcNotes(month?: string): Promise<GcNote[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-    if (this.token) {
-      try {
-        const res = await fetch(`${API_HOST}/api/gc`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        if (res.ok) {
-          const rows = await res.json();
-          if (Array.isArray(rows) && rows.length > 0) {
-            this.mockGcNotes = rows.map((r: any) => ({
-              ...(r.raw_data || {}),
-              id: r.id,
-              noteNumber: r.gc_number || r.id,
-              date: r.date,
-              freight: Number(r.freight_amount || 0),
-              total: Number(r.total_amount || 0),
-              lessAdvance: Number(r.advance_amount || 0),
-              balance: Number(r.balance_amount || 0),
-              createdAt: r.created_at
-            }));
-            await this.persistGcNotes();
-          }
+    try {
+      const res = await this.authFetch(`${API_HOST}/api/gc`);
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          this.mockGcNotes = rows.map((r: any) => ({
+            ...(r.raw_data || {}),
+            id: r.id,
+            noteNumber: r.gc_number || r.id,
+            date: r.date,
+            freight: Number(r.freight_amount || 0),
+            total: Number(r.total_amount || 0),
+            lessAdvance: Number(r.advance_amount || 0),
+            balance: Number(r.balance_amount || 0),
+            createdAt: r.created_at
+          }));
+          await this.persistGcNotes();
         }
-      } catch (err) {
-        console.warn('[AdminDB] getGcNotes API error:', err);
       }
+    } catch (err) {
+      console.warn('[AdminDB] getGcNotes API error:', err);
     }
     return Promise.resolve([...this.mockGcNotes]);
   }
@@ -2147,19 +2102,16 @@ class AdminDatabase {
 
     await this.persistGcNotes();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/gc`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`
-          },
-          body: JSON.stringify(newNote)
-        });
-      } catch (err) {
-        console.warn('[AdminDB] createGcNote API error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/gc`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newNote)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] createGcNote API error:', err);
     }
 
     this.notify();
@@ -2170,15 +2122,12 @@ class AdminDatabase {
     this.mockGcNotes = this.mockGcNotes.filter((n) => n.id !== id);
     await this.persistGcNotes();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/gc/${id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-      } catch (err) {
-        console.warn('[AdminDB] deleteGcNote API error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/gc/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('[AdminDB] deleteGcNote API error:', err);
     }
 
     this.notify();
@@ -2211,33 +2160,26 @@ class AdminDatabase {
   }
 
   async getMemoDocuments(): Promise<MemoDocument[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-    if (this.token) {
-      try {
-        const res = await fetch(`${API_HOST}/api/memos`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        if (res.ok) {
-          const rows = await res.json();
-          if (Array.isArray(rows) && rows.length > 0) {
-            this.mockMemoDocuments = rows.map((r: any) => ({
-              id: r.id,
-              memoId: r.id,
-              date: r.date,
-              contentHtml: r.content_html || '',
-              createdBy: r.created_by || 'Admin',
-              status: r.status || 'SAVED',
-              createdAt: r.created_at,
-              updatedAt: r.updated_at
-            }));
-            await this.persistMemoDocuments();
-          }
+    try {
+      const res = await this.authFetch(`${API_HOST}/api/memos`);
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          this.mockMemoDocuments = rows.map((r: any) => ({
+            id: r.id,
+            memoId: r.id,
+            date: r.date,
+            contentHtml: r.content_html || '',
+            createdBy: r.created_by || 'Admin',
+            status: r.status || 'SAVED',
+            createdAt: r.created_at,
+            updatedAt: r.updated_at
+          }));
+          await this.persistMemoDocuments();
         }
-      } catch (err) {
-        console.warn('[AdminDB] getMemoDocuments API error:', err);
       }
+    } catch (err) {
+      console.warn('[AdminDB] getMemoDocuments API error:', err);
     }
     return Promise.resolve([...this.mockMemoDocuments]);
   }
@@ -2265,19 +2207,16 @@ class AdminDatabase {
 
     await this.persistMemoDocuments();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/memos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`
-          },
-          body: JSON.stringify(memo)
-        });
-      } catch (err) {
-        console.warn('[AdminDB] saveMemoDocument API error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/memos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(memo)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] saveMemoDocument API error:', err);
     }
 
     this.notify();
@@ -2290,15 +2229,12 @@ class AdminDatabase {
     this.mockMemoDocuments.splice(index, 1);
     await this.persistMemoDocuments();
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/memos/${memoId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-      } catch (err) {
-        console.warn('[AdminDB] deleteMemoDocument API error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/memos/${memoId}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('[AdminDB] deleteMemoDocument API error:', err);
     }
 
     this.notify();
@@ -2329,19 +2265,16 @@ class AdminDatabase {
     };
     this.mockFleetVehicles.push(newVehicle);
 
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/admin/fleet`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`
-          },
-          body: JSON.stringify(newVehicle)
-        });
-      } catch (err) {
-        console.warn('[AdminDB] createFleetVehicle API error:', err);
-      }
+    try {
+      await this.authFetch(`${API_HOST}/api/admin/fleet`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newVehicle)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] createFleetVehicle API error:', err);
     }
 
     this.notify();
