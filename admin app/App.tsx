@@ -32,7 +32,6 @@ import TripsScreen from './src/screens/TripsScreen';
 import CreateTripScreen from './src/screens/CreateTripScreen';
 import LiveStatusScreen from './src/screens/LiveStatusScreen';
 import GcScreen from './src/screens/GcScreen';
-import MemoScreen from './src/screens/MemoScreen';
 import VehiclesScreen from './src/screens/VehiclesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import GpsVehicleScreen from './src/screens/GpsVehicleScreen';
@@ -43,7 +42,6 @@ export type AdminTab =
   | 'CREATE_TRIP'
   | 'LIVE'
   | 'GC'
-  | 'MEMO'
   | 'MENU'
   | 'VEHICLES'
   | 'SETTINGS'
@@ -64,7 +62,6 @@ const NAV_ITEMS: NavigationItem[] = [
   { id: 'TRIPS', label: 'Trips Registry', icon: 'local-shipping', category: 'Main' },
   { id: 'LIVE', label: 'Live GPS Status', icon: 'my-location', category: 'Fleet' },
   { id: 'GC', label: 'GC Notes', icon: 'description', category: 'Fleet' },
-  { id: 'MEMO', label: 'Memo', icon: 'sticky-note-2', category: 'Fleet' },
   { id: 'GPS_VEHICLES', label: 'GPS Management', icon: 'gps-fixed', category: 'Fleet' },
   { id: 'SETTINGS', label: 'System Settings', icon: 'settings', category: 'System' },
 ];
@@ -160,8 +157,6 @@ function AppContent() {
         return <LiveStatusScreen />;
       case 'GC':
         return <GcScreen />;
-      case 'MEMO':
-        return <MemoScreen />;
       case 'VEHICLES':
         return (
           <View style={{ flex: 1 }}>
@@ -547,7 +542,7 @@ function AppContent() {
                 <Text
                   style={[
                     styles.mobileNavText,
-                    ['MENU', 'DRIVERS', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC', 'MEMO'].includes(
+                    ['MENU', 'DRIVERS', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC'].includes(
                       adminTab,
                     ) && styles.mobileNavTextActive,
                   ]}

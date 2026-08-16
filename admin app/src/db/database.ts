@@ -282,18 +282,6 @@ export interface GcNote {
   isPinned?: boolean;
 }
 
-export interface MemoDocument {
-  id: string;
-  memoId: string;
-  date: string;
-  contentHtml: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  status: 'DRAFT' | 'SAVED';
-  isPinned?: boolean;
-}
-
 export interface ActivityLog {
   id: string;
   tripId: string;
@@ -383,16 +371,13 @@ class AdminDatabase {
   private mockTrips: Trip[] = [];
 
   private mockGcNotes: GcNote[] = [];
-  private mockMemoDocuments: MemoDocument[] = [];
   private readonly gcStorageKey = 'nbt_gc_notes';
-  private readonly memoStorageKey = 'nbt_memo_documents';
 
   private mockActivityLogs: ActivityLog[] = [];
 
   constructor() {
     this.loadSession();
     this.loadGcNotes();
-    this.loadMemoDocuments();
   }
 
   async loadSession() {
@@ -1014,15 +999,6 @@ class AdminDatabase {
     if (!note) return false;
     note.isPinned = !note.isPinned;
     await this.persistGcNotes();
-    this.notify();
-    return true;
-  }
-
-  async togglePinMemo(id: string): Promise<boolean> {
-    const memo = this.mockMemoDocuments.find(item => item.id === id);
-    if (!memo) return false;
-    memo.isPinned = !memo.isPinned;
-    await this.persistMemoDocuments();
     this.notify();
     return true;
   }
@@ -1732,121 +1708,6 @@ class AdminDatabase {
 
     this.notify();
     return Promise.resolve({ success: true });
-  }
-
-  async loadMemoDocuments() {
-    try {
-      const raw = await AsyncStorage.getItem(this.memoStorageKey);
-      if (raw) {
-        this.mockMemoDocuments = JSON.parse(raw);
-      }
-    } catch (e) {
-      console.warn('Failed to load memo documents:', e);
-      this.mockMemoDocuments = [];
-    }
-  }
-
-  private async persistMemoDocuments() {
-    try {
-      await AsyncStorage.setItem(this.memoStorageKey, JSON.stringify(this.mockMemoDocuments));
-    } catch (e) {
-      console.warn('Failed to persist memo documents:', e);
-    }
-  }
-
-  async getMemoDocuments(): Promise<MemoDocument[]> {
-    if (!this.token) {
-      await this.loadSession();
-    }
-    if (this.token) {
-      try {
-        const res = await fetch(`${API_HOST}/api/memos`, {
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-        if (res.ok) {
-          const rows = await res.json();
-          if (Array.isArray(rows) && rows.length > 0) {
-            this.mockMemoDocuments = rows.map((r: any) => ({
-              id: r.id,
-              memoId: r.id,
-              date: r.date,
-              contentHtml: r.content_html || '',
-              createdBy: r.created_by || 'Admin',
-              status: r.status || 'SAVED',
-              createdAt: r.created_at,
-              updatedAt: r.updated_at
-            }));
-            await this.persistMemoDocuments();
-          }
-        }
-      } catch (err) {
-        console.warn('[AdminDB] getMemoDocuments API error:', err);
-      }
-    }
-    return Promise.resolve([...this.mockMemoDocuments]);
-  }
-
-  async getMemoDocumentById(memoId: string): Promise<MemoDocument | null> {
-    const list = await this.getMemoDocuments();
-    const memo = list.find((doc) => doc.memoId === memoId);
-    return Promise.resolve(memo ? { ...memo } : null);
-  }
-
-  async saveMemoDocument(data: Omit<MemoDocument, 'createdAt' | 'updatedAt'>): Promise<MemoDocument> {
-    const now = new Date().toISOString();
-    const existingIndex = this.mockMemoDocuments.findIndex((doc) => doc.memoId === data.memoId);
-    const memo = {
-      ...data,
-      createdAt: existingIndex === -1 ? now : this.mockMemoDocuments[existingIndex].createdAt,
-      updatedAt: now,
-    };
-
-    if (existingIndex === -1) {
-      this.mockMemoDocuments.unshift(memo);
-    } else {
-      this.mockMemoDocuments[existingIndex] = memo;
-    }
-
-    await this.persistMemoDocuments();
-
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/memos`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.token}`
-          },
-          body: JSON.stringify(memo)
-        });
-      } catch (err) {
-        console.warn('[AdminDB] saveMemoDocument API error:', err);
-      }
-    }
-
-    this.notify();
-    return Promise.resolve(memo);
-  }
-
-  async deleteMemoDocument(memoId: string): Promise<boolean> {
-    const index = this.mockMemoDocuments.findIndex((doc) => doc.memoId === memoId);
-    if (index === -1) return Promise.resolve(false);
-    this.mockMemoDocuments.splice(index, 1);
-    await this.persistMemoDocuments();
-
-    if (this.token) {
-      try {
-        await fetch(`${API_HOST}/api/memos/${memoId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${this.token}` }
-        });
-      } catch (err) {
-        console.warn('[AdminDB] deleteMemoDocument API error:', err);
-      }
-    }
-
-    this.notify();
-    return Promise.resolve(true);
   }
 
   getTripPrintUrl(tripId: string): string {
