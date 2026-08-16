@@ -32,8 +32,8 @@ export interface PlaceAutocompleteResult {
 export interface PlaceDetails {
   placeName: string;
   formattedAddress: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   placeId: string;
   mapsUrl: string;
   plusCode?: string;

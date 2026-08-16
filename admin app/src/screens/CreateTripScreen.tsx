@@ -196,6 +196,9 @@ function UnifiedLocationSearch({
   const [showDropdown, setShowDropdown] = useState(false);
   const [lastResolvedLocation, setLastResolvedLocation] = useState<LocationDetails | null>(null);
   const [sessionToken, setSessionToken] = useState(generateSessionToken());
+  const [googleMapsInput, setGoogleMapsInput] = useState('');
+  const [showGoogleMapsInput, setShowGoogleMapsInput] = useState(false);
+  const [isApplyingGoogleMaps, setIsApplyingGoogleMaps] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const apiAvailable = isApiKeyConfigured();
 
@@ -203,6 +206,88 @@ function UnifiedLocationSearch({
   const detectUrl = (text: string) =>
     /maps\.google\.com|goo\.gl|maps\.app\.goo\.gl/i.test(text) ||
     (text.includes('http') && text.includes('maps'));
+
+  const openGoogleMaps = useCallback(() => {
+    const locationText = query.trim();
+    const finalQuery = locationText || 'India';
+    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(finalQuery)}`;
+    setGoogleMapsInput(locationText);
+    setShowGoogleMapsInput(true);
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.open(googleMapsUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    Linking.openURL(googleMapsUrl).catch(() => {
+      Alert.alert('Could not open Google Maps', 'Please check that you have a web browser available.');
+    });
+  }, [query]);
+
+  const applyGoogleMapsSelection = useCallback(async () => {
+    const pastedText = googleMapsInput.trim();
+    if (!pastedText) {
+      Alert.alert('Missing Google Maps Location', 'Paste a Google Maps link or exact location to continue.');
+      return;
+    }
+
+    setIsApplyingGoogleMaps(true);
+    try {
+      let resolvedLocation: LocationDetails | null = null;
+
+      if (detectUrl(pastedText)) {
+        resolvedLocation = await resolveGoogleMapsUrl(pastedText);
+      }
+
+      if (!resolvedLocation) {
+        const coordMatch = pastedText.match(/(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/);
+        if (coordMatch) {
+          const lat = parseFloat(coordMatch[1]);
+          const lng = parseFloat(coordMatch[2]);
+          if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+            resolvedLocation = {
+              placeName: 'Google Maps Coordinates',
+              formattedAddress: pastedText,
+              latitude: lat,
+              longitude: lng,
+              placeId: `gm-coords-${Date.now()}`,
+              mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pastedText)}`,
+            };
+          }
+        }
+      }
+
+      if (!resolvedLocation) {
+        const results = await searchPlacesAutocomplete(pastedText, sessionToken);
+        const firstMatch = results[0];
+        if (firstMatch) {
+          resolvedLocation = await getPlaceDetails(firstMatch.placeId, sessionToken);
+        }
+      }
+
+      if (!resolvedLocation) {
+        resolvedLocation = {
+          placeName: pastedText.split(',')[0]?.trim() || 'Google Maps Location',
+          formattedAddress: pastedText,
+          latitude: null,
+          longitude: null,
+          placeId: `gm-manual-${Date.now()}`,
+          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pastedText)}`,
+        };
+      }
+
+      onSelectLocation(resolvedLocation);
+      setQuery('');
+      setGoogleMapsInput('');
+      setShowGoogleMapsInput(false);
+      setSessionToken(generateSessionToken());
+    } catch (error) {
+      console.warn('[GM] Manual Google Maps selection failed:', error);
+      Alert.alert('Could Not Use This Location', 'Please paste a clearer Google Maps link or exact address and try again.');
+    } finally {
+      setIsApplyingGoogleMaps(false);
+    }
+  }, [googleMapsInput, onSelectLocation, sessionToken]);
 
   // ── Handle text input changes ────────────────────────────────────────────────
   const handleInputChange = useCallback(
@@ -352,21 +437,29 @@ function UnifiedLocationSearch({
   };
 
   const handleOpenInMaps = (loc: LocationDetails) => {
-    const uri = Platform.select({
-      ios: `maps:0,0?q=${loc.latitude},${loc.longitude}`,
-      android: `geo:0,0?q=${loc.latitude},${loc.longitude}(${encodeURIComponent(loc.placeName)})`,
-      default: loc.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
+    if (loc.latitude != null && loc.longitude != null) {
+      const uri = Platform.select({
+        ios: `maps:0,0?q=${loc.latitude},${loc.longitude}`,
+        android: `geo:0,0?q=${loc.latitude},${loc.longitude}(${encodeURIComponent(loc.placeName)})`,
+        default: loc.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
+      });
+      Linking.openURL(uri!).catch(() =>
+        Linking.openURL(
+          `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
+        ),
+      );
+      return;
+    }
+
+    Linking.openURL(loc.mapsUrl || 'https://www.google.com/maps').catch(() => {
+      Alert.alert('Location Link', 'This location is stored as a Google Maps link/address only. Please review it before continuing.');
     });
-    Linking.openURL(uri!).catch(() =>
-      Linking.openURL(
-        `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
-      ),
-    );
   };
 
   // Static map image URL
-  const staticMapUrl = selectedLocation
-    ? buildStaticMapUrl(selectedLocation.latitude, selectedLocation.longitude, pinColor, 14, 600, 220)
+  const selectedLocationHasCoordinates = selectedLocation && selectedLocation.latitude != null && selectedLocation.longitude != null;
+  const staticMapUrl = selectedLocationHasCoordinates
+    ? buildStaticMapUrl(selectedLocation.latitude as number, selectedLocation.longitude as number, pinColor, 14, 600, 220)
     : null;
 
   return (
@@ -410,7 +503,9 @@ function UnifiedLocationSearch({
               <MaterialIcons name="location-on" size={28} color={iconColor} />
               <Text style={styles.graphicMapPlaceName}>{selectedLocation.placeName}</Text>
               <Text style={styles.graphicMapCoords}>
-                {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
+                {selectedLocation.latitude != null && selectedLocation.longitude != null
+                  ? `${selectedLocation.latitude.toFixed(5)}, ${selectedLocation.longitude.toFixed(5)}`
+                  : 'Coordinates unavailable'}
               </Text>
             </View>
           )}
@@ -433,12 +528,19 @@ function UnifiedLocationSearch({
             <Text style={styles.selectedPlaceAddress}>{selectedLocation.formattedAddress}</Text>
 
             <View style={styles.selectedMetaGrid}>
-              <View style={styles.metaChip}>
-                <MaterialIcons name="gps-fixed" size={11} color="#64748b" />
-                <Text style={styles.metaChipText}>
-                  {selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)}
-                </Text>
-              </View>
+              {selectedLocation.latitude != null && selectedLocation.longitude != null ? (
+                <View style={styles.metaChip}>
+                  <MaterialIcons name="gps-fixed" size={11} color="#64748b" />
+                  <Text style={styles.metaChipText}>
+                    {selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.metaChip}>
+                  <MaterialIcons name="info-outline" size={11} color="#64748b" />
+                  <Text style={styles.metaChipText}>Coordinates unavailable</Text>
+                </View>
+              )}
               <View style={styles.metaChip}>
                 <MaterialIcons name="fingerprint" size={11} color="#64748b" />
                 <Text style={styles.metaChipText} numberOfLines={1}>
@@ -479,34 +581,42 @@ function UnifiedLocationSearch({
           )}
 
           {/* Single Unified Search Field */}
-          <View
-            style={[
-              styles.searchInputWrapper,
-              isSearching || isResolvingUrl ? styles.searchInputWrapperActive : null,
-            ]}
-          >
-            {isSearching || isResolvingUrl ? (
-              <ActivityIndicator size="small" color={iconColor} style={{ marginRight: 10 }} />
-            ) : (
-              <MaterialIcons name="search" size={20} color="#64748b" style={{ marginRight: 10 }} />
-            )}
+          <View style={styles.searchRow}>
+            <View
+              style={[
+                styles.searchInputWrapper,
+                { flex: 1 },
+                isSearching || isResolvingUrl ? styles.searchInputWrapperActive : null,
+              ]}
+            >
+              {isSearching || isResolvingUrl ? (
+                <ActivityIndicator size="small" color={iconColor} style={{ marginRight: 10 }} />
+              ) : (
+                <MaterialIcons name="search" size={20} color="#64748b" style={{ marginRight: 10 }} />
+              )}
 
-            <TextInput
-              style={styles.searchInput}
-              placeholder={placeholder}
-              placeholderTextColor="#94a3b8"
-              value={query}
-              onChangeText={handleInputChange}
-              autoCorrect={false}
-              autoCapitalize="words"
-              returnKeyType="search"
-            />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={placeholder}
+                placeholderTextColor="#94a3b8"
+                value={query}
+                onChangeText={handleInputChange}
+                autoCorrect={false}
+                autoCapitalize="words"
+                returnKeyType="search"
+              />
 
-            {query.length > 0 && (
-              <TouchableOpacity onPress={handleClearQuery} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <MaterialIcons name="cancel" size={18} color="#94a3b8" />
-              </TouchableOpacity>
-            )}
+              {query.length > 0 && (
+                <TouchableOpacity onPress={handleClearQuery} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <MaterialIcons name="cancel" size={18} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.googleMapsButton} onPress={openGoogleMaps} activeOpacity={0.8}>
+              <MaterialIcons name="map" size={14} color={iconColor} />
+              <Text style={[styles.googleMapsButtonText, { color: iconColor }]}>Google Maps</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Search Hint */}
@@ -514,6 +624,36 @@ function UnifiedLocationSearch({
             Search any place, company, address, or{' '}
             <Text style={styles.searchHintAccent}>paste a Maps link</Text> to resolve the exact location.
           </Text>
+
+          {showGoogleMapsInput && (
+            <View style={styles.googleMapsManualBox}>
+              <Text style={styles.googleMapsManualText}>
+                Find the exact location in Google Maps, then copy the location/address or Google Maps link and paste it below.
+              </Text>
+              <TextInput
+                style={styles.googleMapsInput}
+                placeholder="Paste Google Maps location/link"
+                placeholderTextColor="#94a3b8"
+                value={googleMapsInput}
+                onChangeText={setGoogleMapsInput}
+                autoCorrect={false}
+                autoCapitalize="sentences"
+                multiline
+              />
+              <TouchableOpacity
+                style={styles.googleMapsUseBtn}
+                onPress={applyGoogleMapsSelection}
+                disabled={isApplyingGoogleMaps}
+                activeOpacity={0.85}
+              >
+                {isApplyingGoogleMaps ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.googleMapsUseBtnText}>Use This Location</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* URL Detected Banner */}
           {urlDetected && (
@@ -694,6 +834,14 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
       return;
     }
 
+    if (startingLocation.latitude == null || startingLocation.longitude == null || destinationLocation.latitude == null || destinationLocation.longitude == null) {
+      setDistanceKm(null);
+      setDurationText('');
+      setRouteSummary('');
+      setRouteLoaded(false);
+      return;
+    }
+
     let cancelled = false;
 
     const fetchRoute = async () => {
@@ -752,6 +900,14 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
     origin: LocationDetails,
     dest: LocationDetails,
   ): { km: number; duration: string; summary: string } => {
+    if (origin.latitude == null || origin.longitude == null || dest.latitude == null || dest.longitude == null) {
+      return {
+        km: 0,
+        duration: 'N/A',
+        summary: 'Coordinates unavailable',
+      };
+    }
+
     const R = 6371;
     const dLat = ((dest.latitude - origin.latitude) * Math.PI) / 180;
     const dLon = ((dest.longitude - origin.longitude) * Math.PI) / 180;
@@ -790,6 +946,10 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
       Alert.alert('Missing Destination', 'Please search and select an exact Destination.');
       return;
     }
+    if (startingLocation.latitude == null || startingLocation.longitude == null || destinationLocation.latitude == null || destinationLocation.longitude == null) {
+      Alert.alert('Location Coordinates Needed', 'Please provide a Google Maps result with usable coordinates or choose an OpenStreetMap result before continuing.');
+      return;
+    }
     if (!agreedFreight.trim() || isNaN(parseFloat(agreedFreight)) || parseFloat(agreedFreight) <= 0) {
       Alert.alert('Invalid Freight', 'Please enter a valid Agreed Freight amount in ₹.');
       return;
@@ -800,6 +960,10 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
   // ── Create Trip ────────────────────────────────────────────────────────────
   const handleCreateTrip = async () => {
     if (!startingLocation || !destinationLocation) return;
+    if (startingLocation.latitude == null || startingLocation.longitude == null || destinationLocation.latitude == null || destinationLocation.longitude == null) {
+      Alert.alert('Location Coordinates Needed', 'Please provide a Google Maps result with usable coordinates or choose an OpenStreetMap result before creating the trip.');
+      return;
+    }
     setSaving(true);
     try {
       const trip = await db.createTrip({
@@ -875,10 +1039,10 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
   };
 
   // ── Static map for route preview ───────────────────────────────────────────
-  const startStaticMap = startingLocation
+  const startStaticMap = startingLocation && startingLocation.latitude != null && startingLocation.longitude != null
     ? buildStaticMapUrl(startingLocation.latitude, startingLocation.longitude, 'green', 13, 400, 160)
     : null;
-  const destStaticMap = destinationLocation
+  const destStaticMap = destinationLocation && destinationLocation.latitude != null && destinationLocation.longitude != null
     ? buildStaticMapUrl(destinationLocation.latitude, destinationLocation.longitude, 'red', 13, 400, 160)
     : null;
 
@@ -991,7 +1155,11 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
           <SummaryRow label="Address" value={startingLocation?.formattedAddress || ''} />
           <SummaryRow
             label="Coordinates"
-            value={`${startingLocation?.latitude.toFixed(5)}, ${startingLocation?.longitude.toFixed(5)}`}
+            value={
+              startingLocation && startingLocation.latitude != null && startingLocation.longitude != null
+                ? `${startingLocation.latitude.toFixed(5)}, ${startingLocation.longitude.toFixed(5)}`
+                : 'Not available — address/link only'
+            }
           />
           <SummaryRow label="Place ID" value={startingLocation?.placeId || ''} mono />
         </View>
@@ -1002,7 +1170,11 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
           <SummaryRow label="Address" value={destinationLocation?.formattedAddress || ''} />
           <SummaryRow
             label="Coordinates"
-            value={`${destinationLocation?.latitude.toFixed(5)}, ${destinationLocation?.longitude.toFixed(5)}`}
+            value={
+              destinationLocation && destinationLocation.latitude != null && destinationLocation.longitude != null
+                ? `${destinationLocation.latitude.toFixed(5)}, ${destinationLocation.longitude.toFixed(5)}`
+                : 'Not available — address/link only'
+            }
           />
           <SummaryRow label="Place ID" value={destinationLocation?.placeId || ''} mono />
         </View>
@@ -1424,7 +1596,9 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
                   <View style={styles.mapModalPlaceholder}>
                     <MaterialIcons name="location-on" size={32} color="#16a34a" />
                     <Text style={styles.mapModalPlaceholderText}>
-                      {startingLocation.latitude.toFixed(5)}, {startingLocation.longitude.toFixed(5)}
+                      {startingLocation.latitude != null && startingLocation.longitude != null
+                        ? `${startingLocation.latitude.toFixed(5)}, ${startingLocation.longitude.toFixed(5)}`
+                        : 'Coordinates unavailable'}
                     </Text>
                   </View>
                 )}
@@ -1450,7 +1624,9 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
                   <View style={styles.mapModalPlaceholder}>
                     <MaterialIcons name="flag" size={32} color="#dc2626" />
                     <Text style={styles.mapModalPlaceholderText}>
-                      {destinationLocation.latitude.toFixed(5)}, {destinationLocation.longitude.toFixed(5)}
+                      {destinationLocation.latitude != null && destinationLocation.longitude != null
+                        ? `${destinationLocation.latitude.toFixed(5)}, ${destinationLocation.longitude.toFixed(5)}`
+                        : 'Coordinates unavailable'}
                     </Text>
                   </View>
                 )}
@@ -1658,6 +1834,11 @@ const styles = StyleSheet.create({
   apiKeyNoticeText: { flex: 1, fontSize: 11, color: '#0369a1', lineHeight: 16 },
 
   // Search Input
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   searchInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1670,8 +1851,52 @@ const styles = StyleSheet.create({
   },
   searchInputWrapperActive: { borderColor: '#0284c7' },
   searchInput: { flex: 1, fontSize: 13, color: '#0f172a', paddingVertical: 8 },
+  googleMapsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minHeight: 48,
+  },
+  googleMapsButtonText: { fontSize: 11, fontWeight: '800' },
   searchHint: { fontSize: 10, color: '#94a3b8', marginTop: 5 },
   searchHintAccent: { color: '#0284c7', fontWeight: '700' },
+  googleMapsManualBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 10,
+    marginTop: 8,
+    gap: 8,
+  },
+  googleMapsManualText: { fontSize: 11, color: '#475569', lineHeight: 16 },
+  googleMapsInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minHeight: 44,
+    fontSize: 12,
+    color: '#0f172a',
+    textAlignVertical: 'top',
+  },
+  googleMapsUseBtn: {
+    backgroundColor: '#0284c7',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  googleMapsUseBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
 
   urlDetectedBanner: {
     flexDirection: 'row',
@@ -1732,7 +1957,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     position: 'relative',
   },
-  staticMapImage: { width: '100%', height: 160, backgroundColor: '#e2e8f0' },
+  staticMapImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#e2e8f0' },
   staticMapOverlayBadge: {
     position: 'absolute',
     bottom: 8,
@@ -2158,7 +2383,7 @@ const styles = StyleSheet.create({
   mapModalSectionLabel: { fontSize: 10, fontWeight: '900', color: '#64748b', letterSpacing: 0.8, marginBottom: 4 },
   mapModalPlaceName: { fontSize: 16, fontWeight: '900', color: '#0f172a', marginBottom: 2 },
   mapModalAddress: { fontSize: 12, color: '#64748b', marginBottom: 12 },
-  mapModalImage: { width: '100%', height: 200, borderRadius: 12, marginBottom: 16, backgroundColor: '#e2e8f0' },
+  mapModalImage: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 16, backgroundColor: '#e2e8f0' },
   mapModalPlaceholder: {
     backgroundColor: '#f1f5f9',
     borderRadius: 12,

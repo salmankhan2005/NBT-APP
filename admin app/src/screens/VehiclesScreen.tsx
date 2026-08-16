@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
+import { OCRResultModal, OCRResult } from '../components/OCRResultModal';
 import { db, ManagedVehicle, ManagedVehicleStatus, VehicleDocument, DocType, VehicleDocumentHistory, DocumentExpiryStatus, Trip } from '../db/database';
 
 type VehicleFilter = 'ALL' | 'AVAILABLE' | 'ON TRIP' | 'UNDER MAINTENANCE' | 'INACTIVE';
@@ -103,12 +104,162 @@ export default function VehiclesScreen() {
   const [documentExtractionState, setDocumentExtractionState] = useState<Record<string, { status: 'idle' | 'extracting' | 'done' | 'failed'; message: string }>>({});
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // OCR Processing States
+  const [ocrResultModalVisible, setOcrResultModalVisible] = useState(false);
+  const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrPendingDocType, setOcrPendingDocType] = useState<{ docType: DocType; vehicleId?: string } | null>(null);
+  const [ocrPendingFileUri, setOcrPendingFileUri] = useState<string | null>(null);
+
   const showFeedback = useCallback((text: string, type: 'success' | 'error' | 'info' = 'info') => {
     setFeedbackMessage({ text, type });
     if (typeof window !== 'undefined') {
       window.setTimeout(() => setFeedbackMessage(null), 2400);
     }
   }, []);
+
+  /**
+   * Process document with OCR to extract metadata
+   */
+  const processDocumentWithOCR = async (
+    fileUri: string,
+    docType: DocType,
+    vehicleId?: string,
+    expectedVehicleNumber?: string
+  ) => {
+    try {
+      setOcrLoading(true);
+      setOcrPendingDocType({ docType, vehicleId });
+      setOcrPendingFileUri(fileUri);
+
+      // Get API host
+      const apiHost = Platform.OS === 'android' ? 'http://10.0.2.2:3001' : 'http://localhost:3001';
+
+      // Read file and convert to base64
+      let imageBase64 = '';
+      
+      if (fileUri.startsWith('file://')) {
+        // File URI - read using fetch and convert to base64
+        try {
+          const response = await fetch(fileUri);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          
+          imageBase64 = await new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const result = reader.result as string;
+              // Extract base64 part (remove data:image/...;base64, prefix)
+              const base64 = result.split(',')[1] || result;
+              resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          console.warn('Could not read file URI as base64:', e);
+          throw new Error('Could not read image file');
+        }
+      } else if (fileUri.startsWith('data:')) {
+        // Already base64 encoded
+        imageBase64 = fileUri.split(',')[1] || fileUri;
+      } else {
+        // Assume it's a direct base64 string or URL
+        imageBase64 = fileUri;
+      }
+
+      if (!imageBase64) {
+        throw new Error('Could not encode image to base64');
+      }
+
+      // Send base64 image to backend for OCR processing
+      const ocrResponse = await fetch(`${apiHost}/api/vehicles/process-document`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64,
+          docType,
+          vehicleNumber: expectedVehicleNumber,
+        }),
+      });
+
+      if (!ocrResponse.ok) {
+        const errorData = await ocrResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || `OCR processing failed: ${ocrResponse.statusText}`);
+      }
+
+      const ocrData = (await ocrResponse.json()) as any;
+
+      // Display OCR result
+      setOcrResult({
+        documentType: ocrData.ocrResult?.documentType || 'UNKNOWN',
+        detectedDocumentTypeConfidence: ocrData.ocrResult?.detectedDocumentTypeConfidence || 0,
+        mismatchDetected: ocrData.ocrResult?.mismatchDetected || false,
+        expectedType: docType,
+        extractedData: ocrData.ocrResult?.extractedData || {},
+        warnings: ocrData.ocrResult?.warnings || [],
+        recommendations: ocrData.recommendations || [],
+      });
+
+      setOcrResultModalVisible(true);
+      setOcrLoading(false);
+    } catch (error: any) {
+      console.error('OCR processing error:', error);
+      showFeedback(`OCR processing failed: ${error.message || 'Please enter the details manually.'}`, 'error');
+      setOcrLoading(false);
+      setOcrResultModalVisible(false);
+    }
+  };
+
+  /**
+   * Handle OCR result confirmation
+   */
+  const handleOCRConfirm = async (expiryDate: string, extraData: Record<string, string>) => {
+    try {
+      if (!ocrPendingDocType) return;
+
+      const { docType, vehicleId } = ocrPendingDocType;
+
+      // If this is for adding a new document to existing vehicle
+      if (vehicleId) {
+        setDocMetaExpiryDate(expiryDate);
+        setDocMetaNumber(extraData.documentNumber || '');
+        setOcrResultModalVisible(false);
+        return;
+      }
+
+      // If this is for creating a new vehicle
+      setDocumentExpiryEdits((prev) => ({
+        ...prev,
+        [docType]: expiryDate,
+      }));
+
+      if (extraData.documentNumber) {
+        // Update in pending documents
+        setPendingDocuments((prev) => ({
+          ...prev,
+          [docType]: prev[docType]
+            ? {
+                ...prev[docType]!,
+                extractedDocNumber: extraData.documentNumber,
+                extractedExpiryDate: expiryDate,
+              }
+            : null,
+        }));
+      }
+
+      showFeedback('Document information extracted and saved.', 'success');
+      setOcrResultModalVisible(false);
+    } catch (error) {
+      console.error('OCR confirmation error:', error);
+      showFeedback('Failed to save document information.', 'error');
+    } finally {
+      setOcrLoading(false);
+      setOcrPendingDocType(null);
+      setOcrPendingFileUri(null);
+    }
+  };
 
   const fetchVehicles = useCallback(async (showIndicator = false) => {
     if (showIndicator) setLoading(true);
@@ -303,7 +454,7 @@ export default function VehiclesScreen() {
     try {
       setDocumentExtractionState((prev) => ({
         ...prev,
-        [docType]: { status: 'extracting', message: 'Reading document metadata...' },
+        [docType]: { status: 'extracting', message: 'Reading document...' },
       }));
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'],
@@ -327,6 +478,7 @@ export default function VehiclesScreen() {
 
       const filename = file.name || file.uri.split('/').pop() || `${docType}.pdf`;
       const extracted = extractDocumentMetadataFromFilename(filename, docType);
+      
       setPendingDocuments((prev) => ({
         ...prev,
         [docType]: {
@@ -339,6 +491,19 @@ export default function VehiclesScreen() {
         },
       }));
 
+      // For image files, attempt OCR processing
+      if (file.mimeType && file.mimeType.startsWith('image/')) {
+        setDocumentExtractionState((prev) => ({
+          ...prev,
+          [docType]: { status: 'extracting', message: 'Processing with OCR...' },
+        }));
+        
+        // Process with OCR
+        await processDocumentWithOCR(file.uri, docType, undefined, vehicleNumber);
+        return;
+      }
+
+      // For PDFs, fall back to filename extraction
       const labelMap: Record<DocType, string> = {
         INSURANCE: 'Insurance',
         POLLUTION: 'Pollution',
@@ -1137,6 +1302,21 @@ export default function VehiclesScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* OCR Result Modal */}
+      <OCRResultModal
+        visible={ocrResultModalVisible}
+        result={ocrResult}
+        loading={ocrLoading}
+        onClose={() => {
+          setOcrResultModalVisible(false);
+          setOcrResult(null);
+          setOcrPendingDocType(null);
+          setOcrPendingFileUri(null);
+          setOcrLoading(false);
+        }}
+        onConfirm={handleOCRConfirm}
+      />
     </View>
   );
 }
@@ -1181,7 +1361,7 @@ const styles = StyleSheet.create({
   expirySummaryValue: { fontSize: 11, color: COLORS.textDark, marginTop: 2 },
   docAlertRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 },
   docAlertText: { fontSize: 12, color: COLORS.textMuted },
-  docPreview: { width: '100%', height: 140, borderRadius: 10, marginTop: 10, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: COLORS.surfaceContainerLow },
+  docPreview: { width: '100%', aspectRatio: 4 / 3, borderRadius: 10, marginTop: 10, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: COLORS.surfaceContainerLow },
   imageErrorText: { color: '#991b1b', fontSize: 12, marginTop: 6, fontStyle: 'italic' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   statusBadgeText: { fontSize: 11, fontWeight: '800' },

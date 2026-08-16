@@ -206,9 +206,16 @@ export default function TripsScreen() {
 <head>
 <meta charset="UTF-8"/>
 <style>
-  @page { size: A4; margin: 18mm 14mm; }
+  @page { size: A4; margin: 12mm 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; background: #fff; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 12px;
+    color: #1e293b;
+    background: #fff;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
   .page-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 18px; }
   .brand { font-size: 22px; font-weight: 900; color: #1e3a5f; letter-spacing: 1px; }
   .brand-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
@@ -228,10 +235,12 @@ export default function TripsScreen() {
   .status-started, .status-on_the_way { background: #dbeafe; color: #1e40af; }
   .status-assigned { background: #f1f5f9; color: #475569; }
   .status-reached_destination { background: #fef9c3; color: #854d0e; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
   thead tr { background: #1e3a5f; color: #ffffff; }
   thead th { padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
-  tbody td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; word-break: break-word; overflow-wrap: anywhere; }
+  .info-value, .route-point, .info-item { word-break: break-word; overflow-wrap: anywhere; }
+  .section { break-inside: avoid; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
   .badge-fuel { background: #fef3c7; color: #92400e; }
   .badge-toll { background: #dbeafe; color: #1e40af; }
@@ -711,7 +720,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Initial Odometer Photo (Driver Upload):</Text>
                     <Image
                       source={{ uri: selectedTrip.odometerStartPhotoUri }}
-                      style={{ width: '100%', height: 180, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
+                      style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
                       resizeMode="cover"
                     />
                     <TouchableOpacity
@@ -755,7 +764,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 End Odometer Photo:</Text>
                     <Image
                       source={{ uri: selectedTrip.odometerEndPhotoUri }}
-                      style={{ width: '100%', height: 180, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
+                      style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
                       resizeMode="cover"
                     />
                     <TouchableOpacity
@@ -1464,8 +1473,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceContainerLow,
   },
   podSignatureImage: {
-    width: 240,
-    height: 90,
+    maxWidth: 240,
+    width: '100%',
+    aspectRatio: 8 / 3,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,

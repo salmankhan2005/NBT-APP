@@ -75,6 +75,9 @@ export default function GcScreen() {
   const [freight, setFreight] = useState('');
   const [lessAdvance, setLessAdvance] = useState('0');
   const [taxOption, setTaxOption] = useState<'CGST_SGST' | 'IGST' | 'NONE'>('NONE');
+  const [cgstPercent, setCgstPercent] = useState(0);
+  const [sgstPercent, setSgstPercent] = useState(0);
+  const [igstPercent, setIgstPercent] = useState(0);
 
   // Other details
   const [payableAt, setPayableAt] = useState('');
@@ -245,16 +248,12 @@ export default function GcScreen() {
   // Tax calculations
   const fValue = Number(freight) || 0;
   const advValue = Number(lessAdvance) || 0;
-  let cgst = 0, sgst = 0, igst = 0;
 
-  if (taxOption === 'CGST_SGST') {
-    cgst = fValue * 0.025; // 2.5%
-    sgst = fValue * 0.025; // 2.5%
-  } else if (taxOption === 'IGST') {
-    igst = fValue * 0.05; // 5%
-  }
-
-  const grandTotal = fValue + cgst + sgst + igst;
+  const cgstAmount = fValue * (Number(cgstPercent) || 0) / 100;
+  const sgstAmount = fValue * (Number(sgstPercent) || 0) / 100;
+  const igstAmount = fValue * (Number(igstPercent) || 0) / 100;
+  const totalTax = cgstAmount + sgstAmount + igstAmount;
+  const grandTotal = fValue + totalTax;
   const balanceDue = grandTotal - advValue;
   const itemsTotalValue = items.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
 
@@ -289,9 +288,9 @@ export default function GcScreen() {
       gstinNumber: gstinNumber.trim(),
       items: filledItems.length > 0 ? filledItems : [{ articlesCount: 1, description: 'Goods Consignment', weight: 0, value: 0 }],
       freight: fValue,
-      cgst,
-      sgst,
-      igst,
+      cgst: cgstAmount,
+      sgst: sgstAmount,
+      igst: igstAmount,
       total: grandTotal,
       lessAdvance: advValue,
       balance: balanceDue,
@@ -370,9 +369,9 @@ export default function GcScreen() {
         gstinNumber: gstinNumber.trim(),
         items: filledItems,
         freight: fValue,
-        cgst,
-        sgst,
-        igst,
+        cgst: cgstAmount,
+        sgst: sgstAmount,
+        igst: igstAmount,
         total: grandTotal,
         lessAdvance: advValue,
         balance: balanceDue,
@@ -427,6 +426,9 @@ export default function GcScreen() {
         setFreight('');
         setLessAdvance('0');
         setTaxOption('NONE');
+        setCgstPercent(0);
+        setSgstPercent(0);
+        setIgstPercent(0);
         setPayableAt('');
         setPaymentType('');
         setTaxPayee('Consignor');
@@ -561,10 +563,24 @@ export default function GcScreen() {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>
-          @page { size: A4 landscape; margin: 0; }
-          body { margin: 0; font-family: Arial, sans-serif; color: #0f172a; background: #ffffff; }
-          .page { width: 297mm; min-height: 210mm; padding: 12mm; box-sizing: border-box; }
-          .frame { border: 3px solid #0f172a; height: 100%; padding: 10px; box-sizing: border-box; }
+          @page { size: A4 landscape; margin: 8mm; }
+          body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+          }
+          .page {
+            width: 100%;
+            max-width: 297mm;
+            min-height: 210mm;
+            padding: 12mm;
+            box-sizing: border-box;
+            margin: 0 auto;
+          }
+          .frame { border: 3px solid #0f172a; min-height: 100%; padding: 10px; box-sizing: border-box; }
           .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
           .header-left { display: flex; align-items: center; gap: 14px; }
           .logo-mark { width: 100px; height: 100px; border: 3px solid #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 900; letter-spacing: 0.8px; }
@@ -586,10 +602,11 @@ export default function GcScreen() {
           .table-left { flex: 1; }
           .table-header { display: flex; background: #0f172a; color: #ffffff; font-size: 11px; font-weight: 700; }
           .table-row { display: flex; border-bottom: 1px solid #0f172a; min-height: 34px; }
-          .table-cell { padding: 10px 8px; border-right: 1px solid #0f172a; display: flex; align-items: center; }
+          .table-cell { padding: 10px 8px; border-right: 1px solid #0f172a; display: flex; align-items: center; word-break: break-word; overflow-wrap: anywhere; }
           .table-cell:last-child { border-right: none; }
           .cell-small { width: 110px; }
           .cell-large { flex: 1.9; }
+          .field-value, .amount-value, .info-grid, .route-bar { word-break: break-word; overflow-wrap: anywhere; }
           .value-row { margin-top: 6px; font-size: 11px; font-weight: 700; }
           .table-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-top: 1px solid #0f172a; background: #f8fafc; }
           .table-footer span { font-size: 11px; font-weight: 700; }
@@ -613,6 +630,11 @@ export default function GcScreen() {
           .authorise-text { font-size: 11px; font-weight: 700; margin-bottom: 6px; }
           .authorise-signature { width: 110px; height: auto; display: block; margin: 0 auto 6px; }
           .authorise-label { font-size: 10px; font-weight: 700; }
+          @media print {
+            body { background: #ffffff; }
+            .page { width: 100%; max-width: none; margin: 0; padding: 0; }
+            .frame { min-height: 0; }
+          }
         </style>
       </head>
       <body>
@@ -831,10 +853,10 @@ export default function GcScreen() {
     setConsigneeGst(n.consigneeGst);
     setFreight(n.freight.toString());
     setLessAdvance(n.lessAdvance.toString());
-    
-    if (n.cgst > 0) setTaxOption('CGST_SGST');
-    else if (n.igst > 0) setTaxOption('IGST');
-    else setTaxOption('NONE');
+    setCgstPercent(n.freight ? (n.cgst / n.freight) * 100 : 0);
+    setSgstPercent(n.freight ? (n.sgst / n.freight) * 100 : 0);
+    setIgstPercent(n.freight ? (n.igst / n.freight) * 100 : 0);
+    setTaxOption(n.cgst > 0 || n.sgst > 0 ? 'CGST_SGST' : n.igst > 0 ? 'IGST' : 'NONE');
 
     if (n.items && n.items.length > 0) {
       setItems(
@@ -1169,25 +1191,30 @@ export default function GcScreen() {
                     <Text style={[styles.amountLabel, styles.amountLabelSmall]}>Ps.</Text>
                   </View>
                   {[
-                    { label: 'Freight', value: freight, setter: setFreight },
-                    { label: 'CGST', value: cgst.toFixed(2), setter: undefined },
-                    { label: 'SGST', value: sgst.toFixed(2), setter: undefined },
-                    { label: 'IGST', value: igst.toFixed(2), setter: undefined },
-                    { label: 'TOTAL', value: grandTotal.toFixed(2), setter: undefined },
+                    { label: 'Freight Amount', value: freight, setter: setFreight },
+                    { label: 'CGST (%)', value: cgstPercent.toString(), setter: (text: string) => setCgstPercent(Number(text) || 0), amount: cgstAmount.toFixed(2) },
+                    { label: 'SGST (%)', value: sgstPercent.toString(), setter: (text: string) => setSgstPercent(Number(text) || 0), amount: sgstAmount.toFixed(2) },
+                    { label: 'IGST (%)', value: igstPercent.toString(), setter: (text: string) => setIgstPercent(Number(text) || 0), amount: igstAmount.toFixed(2) },
+                    { label: 'Total Tax', value: totalTax.toFixed(2), setter: undefined },
+                    { label: 'Grand Total', value: grandTotal.toFixed(2), setter: undefined },
                     { label: 'Less Advance', value: lessAdvance, setter: setLessAdvance },
-                    { label: 'BALANCE', value: balanceDue.toFixed(2), setter: undefined },
+                    { label: 'Balance', value: balanceDue.toFixed(2), setter: undefined },
                   ].map((row, index) => (
                     <View key={index} style={styles.amountRow}>
                       <Text style={styles.amountRowLabel}>{row.label}</Text>
-                      <TextInput
-                        style={[styles.amountCell, styles.amountInput]}
-                        value={row.setter ? row.value : row.value}
-                        onChangeText={row.setter ?? (() => {})}
-                        editable={!!row.setter}
-                        keyboardType="numeric"
-                        placeholder=""
-                      />
-                      <Text style={[styles.amountCell, styles.amountPs]}>00</Text>
+                      {row.setter ? (
+                        <TextInput
+                          style={[styles.amountCell, styles.amountInput]}
+                          value={row.value}
+                          onChangeText={row.setter}
+                          editable={true}
+                          keyboardType="decimal-pad"
+                          placeholder=""
+                        />
+                      ) : (
+                        <Text style={[styles.amountCell, styles.amountInput, styles.amountReadonly]}>{row.value}</Text>
+                      )}
+                      <Text style={[styles.amountCell, styles.amountPs]}>{row.amount ?? '00'}</Text>
                     </View>
                   ))}
                   <View style={styles.amountRow}>
@@ -2101,6 +2128,13 @@ const styles = StyleSheet.create({
     color: '#172554',
     textAlign: 'center',
   },
+  amountReadonly: {
+    backgroundColor: '#f8fafc',
+    color: '#0f172a',
+    textAlign: 'right',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
   amountFullWidth: {
     flex: 2.2,
   },
@@ -2235,8 +2269,9 @@ const styles = StyleSheet.create({
     color: '#172554',
   },
   authorisedSignatureImage: {
-    width: 110,
-    height: 55,
+    maxWidth: 110,
+    width: '100%',
+    aspectRatio: 2,
     alignSelf: 'center',
   },
   paymentNoteBlockSecondary: {

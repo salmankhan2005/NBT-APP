@@ -190,7 +190,7 @@ export default function LiveStatusScreen() {
                   <Text style={[styles.gridLabel, { marginBottom: 6 }]}>📸 INITIAL ODOMETER DASHBOARD PHOTO</Text>
                   <Image
                     source={{ uri: driverTrip.odometerStartPhotoUri }}
-                    style={{ width: '100%', height: 160, borderRadius: 8 }}
+                    style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8 }}
                     resizeMode="cover"
                   />
                   <TouchableOpacity
@@ -257,7 +257,7 @@ export default function LiveStatusScreen() {
                       <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 6 }}>📸 Delivery Photo:</Text>
                       <Image
                         source={{ uri: driverTrip.podPhotoUri }}
-                        style={{ width: '100%', height: 180, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
+                        style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
                         resizeMode="contain"
                       />
                       <TouchableOpacity
@@ -287,7 +287,7 @@ export default function LiveStatusScreen() {
                         <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 4 }}>✍️ Driver / Receiver Signature:</Text>
                         <Image
                           source={{ uri: normalizeImageUrl(driverTrip.podSignature) || driverTrip.podSignature }}
-                          style={{ width: 220, height: 75, borderRadius: 6, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#ffffff' }}
+                          style={{ maxWidth: 220, width: '100%', aspectRatio: 220 / 75, borderRadius: 6, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#ffffff' }}
                           resizeMode="contain"
                         />
                       </View>
