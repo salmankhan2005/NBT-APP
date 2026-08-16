@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "NBT-ARS Admin Dashboard",
+    "slug": "nbt-ars-admin",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": false,
+      "bundleIdentifier": "com.nbtars.admindashboard",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to support trip tracking and live GPS workflows.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location to support trip tracking and live GPS workflows.",
+        "NSPhotoLibraryUsageDescription": "This app may access your photo library when attaching vehicle or trip documents.",
+        "NSPhotoLibraryAddUsageDescription": "This app may save shared documents to your photo library.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false,
+      "package": "com.nbtars.admindashboard",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCRQ3QPWMeXqYFOBtayGkScl7lXynWqNus"
+        }
+      }
+    },
+
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "themeColor": "#031635",
+      "backgroundColor": "#031635",
+      "meta": {
+        "viewport": "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      }
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#031635"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d74ad885-d1e2-4925-a67e-c46bf4fa6510"
+      }
+    },
+    "owner": "krithickpranav"
+  }
+}
