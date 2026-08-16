@@ -44,6 +44,13 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
   // Simulator drawer state
   const [showSimulator, setShowSimulator] = useState(false);
 
+  const [lorryBookingProfit, setLorryBookingProfit] = useState<number>(0);
+  const [lorryBookingEntries, setLorryBookingEntries] = useState<Array<{
+    id: string; from_point: string; destination_point: string;
+    load_freight: number; lorry_freight: number; profit: number;
+    profit_date: string; expenses: number;
+  }>>([]);
+
   // Helper to format Current Month (e.g. "July 2026", "March 2026")
   const getCurrentMonthYear = () => {
     const now = new Date();
@@ -67,6 +74,30 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
       setFleetVehicles(fetchedFleetVehicles);
       setActivityLogs(fetchedLogs);
       setExpiryAlerts(fetchedAlerts.map((alert) => ({ vehicleId: alert.vehicleId, vehicleNumber: alert.vehicleNumber, docLabel: alert.docLabel, status: alert.status, daysLeft: alert.daysLeft })));
+
+      // Fetch today's lorry booking profit + recent entries
+      try {
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+        const token = db.getToken();
+        if (token) {
+          const [profitRes, entriesRes] = await Promise.all([
+            fetch(`http://localhost:3001/api/lorry-booking/profit?fromDate=${today}&toDate=${today}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`http://localhost:3001/api/lorry-booking/entries?limit=5`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+          if (profitRes.ok) {
+            const data = await profitRes.json();
+            if (data.success) setLorryBookingProfit(Number(data.totalProfit || 0));
+          }
+          if (entriesRes.ok) {
+            const data = await entriesRes.json();
+            if (data.success) setLorryBookingEntries(data.entries || []);
+          }
+        }
+      } catch {}
     } catch (e) {
       console.error('Error fetching admin dashboard data:', e);
     } finally {
@@ -263,11 +294,6 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
             <Text style={styles.subtitle}>Real-Time Central Command Admin Dashboard</Text>
           </View>
           <View style={[styles.headerActions, isPhone && styles.headerActionsStacked]}>
-            <TouchableOpacity style={styles.simBtn} onPress={() => setShowSimulator(!showSimulator)}>
-              <MaterialIcons name="bolt" size={16} color="#ffffff" />
-              <Text style={styles.simBtnText}>LIVE TEST</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.createBtn} onPress={onCreateTripPress}>
               <MaterialIcons name="add" size={18} color="#ffffff" />
               <Text style={styles.createBtnText}>NEW TRIP</Text>
@@ -471,6 +497,56 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
             </Text>
             <Text style={styles.cardSubtext}>Freight minus driver expenses & settlements</Text>
           </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* LORRY BOOKING AGENCY TODAY'S PROFIT + RECENT BOOKINGS                    */}
+        {/* ========================================================================= */}
+        <Text style={[styles.sectionHeading, { marginTop: 24 }]}>LORRY BOOKING AGENCY</Text>
+        <View style={[styles.summaryCard, { borderLeftColor: '#f97316' }]}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardLabel}>TODAY'S BOOKING PROFIT</Text>
+            <View style={[styles.iconCircle, { backgroundColor: '#fff7ed' }]}>
+              <MaterialIcons name="receipt-long" size={20} color="#f97316" />
+            </View>
+          </View>
+          <Text style={[styles.cardValue, { color: lorryBookingProfit >= 0 ? '#f97316' : '#dc2626', fontSize: 28 }]}>
+            {lorryBookingProfit >= 0 ? '+' : ''}{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(lorryBookingProfit)}
+          </Text>
+          <Text style={styles.cardSubtext}>Net profit from all bookings entered today</Text>
+          <View style={styles.syncBadge}>
+            <View style={[styles.syncDot, { backgroundColor: '#f97316' }]} />
+            <Text style={styles.syncText}>Refreshes every 3 seconds with dashboard</Text>
+          </View>
+        </View>
+
+        {/* Recent Bookings List */}
+        <View style={[styles.summaryCard, { borderLeftColor: '#f97316', marginBottom: 24, marginTop: 10 }]}>
+          <Text style={styles.cardLabel}>RECENT BOOKINGS</Text>
+          {lorryBookingEntries.length === 0 ? (
+            <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 10, fontStyle: 'italic' }}>No bookings yet.</Text>
+          ) : (
+            lorryBookingEntries.map((entry) => {
+              const dateStr = (() => {
+                if (!entry.profit_date) return '';
+                const d = new Date(entry.profit_date.includes('T') ? entry.profit_date : `${entry.profit_date}T00:00:00`);
+                return isNaN(d.getTime()) ? entry.profit_date : new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(d);
+              })();
+              return (
+                <View key={entry.id} style={styles.lbEntryRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.lbEntryRoute}>{entry.from_point} → {entry.destination_point}</Text>
+                    <Text style={styles.lbEntryMeta}>Load ₹{Number(entry.load_freight).toLocaleString('en-IN')} · Lorry ₹{Number(entry.lorry_freight).toLocaleString('en-IN')} · {dateStr}</Text>
+                  </View>
+                  <View style={[styles.lbProfitBadge, { backgroundColor: entry.profit >= 0 ? '#dcfce7' : '#fee2e2' }]}>
+                    <Text style={[styles.lbProfitText, { color: entry.profit >= 0 ? '#15803d' : '#dc2626' }]}>
+                      {entry.profit >= 0 ? '+' : ''}₹{Math.abs(Number(entry.profit)).toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         {/* ========================================================================= */}
@@ -1517,5 +1593,32 @@ const styles = StyleSheet.create({
   emptyModalText: {
     color: '#64748b',
     fontSize: 12,
+  },
+  lbEntryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    gap: 8,
+  },
+  lbEntryRoute: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  lbEntryMeta: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  lbProfitBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  lbProfitText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

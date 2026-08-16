@@ -20,7 +20,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
-import { db, Trip, Expense } from '../db/database';
+import { db, Trip, Expense, normalizeImageUrl } from '../db/database';
 
 export default function TripsScreen() {
   const { width } = useWindowDimensions();
@@ -39,6 +39,11 @@ export default function TripsScreen() {
   // Driver Payment input
   const [driverPaymentInput, setDriverPaymentInput] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
+
+  // Odometer edit
+  const [editingOdometer, setEditingOdometer] = useState<'start' | 'end' | null>(null);
+  const [odometerInput, setOdometerInput] = useState('');
+  const [savingOdometer, setSavingOdometer] = useState(false);
 
   // Ref to the modal-specific live refresh interval
   const modalIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -111,6 +116,34 @@ export default function TripsScreen() {
     setSyncing(false);
   };
 
+  const handleSaveOdometer = async () => {
+    if (!selectedTrip || !editingOdometer) return;
+    const val = Number(odometerInput);
+    if (isNaN(val) || val < 0) {
+      Alert.alert('Invalid Value', 'Please enter a valid odometer reading.');
+      return;
+    }
+    setSavingOdometer(true);
+    try {
+      const success = await db.updateTripOdometer(
+        selectedTrip.id,
+        editingOdometer === 'start' ? val : undefined,
+        editingOdometer === 'end' ? val : undefined,
+      );
+      if (success) {
+        Alert.alert('Saved', `Odometer ${editingOdometer === 'start' ? 'start' : 'end'} updated to ${val} km.`);
+        setEditingOdometer(null);
+        await fetchTrips(false);
+      } else {
+        Alert.alert('Error', 'Failed to update odometer reading.');
+      }
+    } catch {
+      Alert.alert('Error', 'Network error while saving.');
+    } finally {
+      setSavingOdometer(false);
+    }
+  };
+
   const handleSavePayment = async () => {
     if (!selectedTrip) return;
     const payment = Number(driverPaymentInput);
@@ -138,83 +171,210 @@ export default function TripsScreen() {
   const handlePrintPDF = async (tripId: string) => {
     if (!selectedTrip) return;
     try {
-      const html = `
-        <html>
-          <head>
-            <style>
-              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
-              h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-              .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
-              .details { margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-              th { background-color: #3498db; color: white; }
-              .total { font-weight: bold; font-size: 1.2em; text-align: right; margin-top: 20px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div>
-                <h1>Trip Details Report</h1>
-                <p><strong>Tracking ID:</strong> ${selectedTrip.trackingId}</p>
-                <p><strong>Trip ID:</strong> ${selectedTrip.id}</p>
-              </div>
-              <div>
-                <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-                <p><strong>Status:</strong> ${selectedTrip.status.replace('_', ' ')}</p>
-              </div>
-            </div>
-            
-            <div class="details">
-              <h3>Driver & Vehicle Information</h3>
-              <p><strong>Driver Name:</strong> ${selectedTrip.driverName}</p>
-              <p><strong>Vehicle Number:</strong> ${selectedTrip.vehicleNumber}</p>
-              <p><strong>Route:</strong> ${selectedTrip.startingPoint} &rarr; ${selectedTrip.destination}</p>
-              <p><strong>Agreed Freight:</strong> ₹${(selectedTrip.agreedFreight || 0).toLocaleString()}</p>
-            </div>
+      const trip = selectedTrip;
+      const totalExpenses = (trip.expenses || []).reduce((s, e) => s + Number(e.amount), 0);
+      const profitOrLoss = trip.profitOrLoss ?? 0;
+      const isProfitable = profitOrLoss >= 0;
 
-            <h3>Expenses Log</h3>
-            ${(!selectedTrip.expenses || selectedTrip.expenses.length === 0) ? '<p>No expenses logged.</p>' : `
-              <table>
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Reason / Details</th>
-                    <th>Amount (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${selectedTrip.expenses.map(exp => `
-                    <tr>
-                      <td>${exp.category}</td>
-                      <td>${exp.reason || (exp.liters ? exp.liters + ' Liters' : '')}</td>
-                      <td>₹${exp.amount.toLocaleString()}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-              <div class="total">Total Expenses: ₹${(selectedTrip.expenses.reduce((sum, e) => sum + e.amount, 0) || 0).toLocaleString()}</div>
-            `}
-            
-            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
-              <h3>Profit & Loss Settlement</h3>
-              <p><strong>Agreed Freight:</strong> ₹${(selectedTrip.agreedFreight || 0).toLocaleString()}</p>
-              <p><strong>Driver Payment:</strong> ₹${(selectedTrip.driverPayment || 0).toLocaleString()}</p>
-              <p><strong>Final Settlement:</strong> ${(selectedTrip.profitOrLoss ?? 0) >= 0 ? `Profit of ₹${(selectedTrip.profitOrLoss ?? 0).toLocaleString()}` : `Loss of ₹${Math.abs(selectedTrip.profitOrLoss ?? 0).toLocaleString()}`}</p>
-            </div>
-          </body>
-        </html>
-      `;
+      const expenseCats = ['FUEL','TOLL','RTO','POLICE','LORRY','OTHER'] as const;
+      const catTotals = expenseCats.map(cat => ({
+        cat,
+        total: (trip.expenses || []).filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount), 0),
+      }));
+
+      const expenseRows = (trip.expenses || []).map((exp, i) => `
+        <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'}">
+          <td>${i + 1}</td>
+          <td><span class="badge badge-${exp.category.toLowerCase()}">${exp.category}</span></td>
+          <td>${exp.reason || (exp.liters ? `${exp.liters} L` : '—')}</td>
+          <td>${exp.liters ? `${exp.liters} L` : '—'}</td>
+          <td>${exp.location ? exp.location.city : '—'}</td>
+          <td>${exp.timestamp || '—'}</td>
+          <td style="text-align:right;font-weight:700">₹${Number(exp.amount).toLocaleString('en-IN')}</td>
+        </tr>
+      `).join('');
+
+      const catSummaryRows = catTotals.filter(c => c.total > 0).map(c => `
+        <tr>
+          <td><span class="badge badge-${c.cat.toLowerCase()}">${c.cat}</span></td>
+          <td style="text-align:right;font-weight:700">₹${c.total.toLocaleString('en-IN')}</td>
+        </tr>
+      `).join('');
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page { size: A4; margin: 12mm 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 12px;
+    color: #1e293b;
+    background: #fff;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .page-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 18px; }
+  .brand { font-size: 22px; font-weight: 900; color: #1e3a5f; letter-spacing: 1px; }
+  .brand-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
+  .report-meta { text-align: right; font-size: 11px; color: #475569; line-height: 1.7; }
+  .report-meta strong { color: #1e3a5f; }
+  .section { margin-bottom: 18px; }
+  .section-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #1e3a5f; border-left: 4px solid #f97316; padding-left: 8px; margin-bottom: 10px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+  .info-item { display: flex; flex-direction: column; }
+  .info-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .info-value { font-size: 12px; font-weight: 600; color: #1e293b; }
+  .route-bar { display: flex; align-items: center; gap: 10px; background: #f1f5f9; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
+  .route-point { font-size: 13px; font-weight: 800; color: #1e3a5f; }
+  .route-arrow { font-size: 18px; color: #f97316; }
+  .status-chip { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+  .status-completed { background: #dcfce7; color: #166534; }
+  .status-started, .status-on_the_way { background: #dbeafe; color: #1e40af; }
+  .status-assigned { background: #f1f5f9; color: #475569; }
+  .status-reached_destination { background: #fef9c3; color: #854d0e; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+  thead tr { background: #1e3a5f; color: #ffffff; }
+  thead th { padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; word-break: break-word; overflow-wrap: anywhere; }
+  .info-value, .route-point, .info-item { word-break: break-word; overflow-wrap: anywhere; }
+  .section { break-inside: avoid; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+  .badge-fuel { background: #fef3c7; color: #92400e; }
+  .badge-toll { background: #dbeafe; color: #1e40af; }
+  .badge-rto { background: #ede9fe; color: #5b21b6; }
+  .badge-police { background: #fee2e2; color: #991b1b; }
+  .badge-lorry { background: #d1fae5; color: #065f46; }
+  .badge-other { background: #f1f5f9; color: #475569; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .summary-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; }
+  .summary-box-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .summary-box-value { font-size: 18px; font-weight: 900; color: #1e3a5f; }
+  .settlement-box { border: 2px solid #1e3a5f; border-radius: 10px; padding: 14px 18px; }
+  .settlement-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+  .settlement-row:last-child { border-bottom: none; }
+  .settlement-total { font-size: 15px; font-weight: 900; padding-top: 10px; margin-top: 6px; border-top: 2px solid #1e3a5f; display: flex; justify-content: space-between; }
+  .profit { color: #16a34a; }
+  .loss { color: #dc2626; }
+  .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; }
+  .pod-section { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 14px; }
+  .no-expenses { text-align: center; padding: 20px; color: #94a3b8; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div>
+    <div class="brand">NEW BALAJI TRANSPORTS</div>
+    <div class="brand-sub">Trip Settlement Report</div>
+  </div>
+  <div class="report-meta">
+    <div><strong>Trip ID:</strong> ${trip.id}</div>
+    <div><strong>Tracking ID:</strong> ${trip.trackingId}</div>
+    <div><strong>Generated:</strong> ${new Date().toLocaleString('en-IN')}</div>
+    <div style="margin-top:4px"><span class="status-chip status-${trip.status.toLowerCase().replace(/ /g,'_')}">${trip.status.replace(/_/g,' ')}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Route</div>
+  <div class="route-bar">
+    <div class="route-point">${trip.startingPoint}</div>
+    <div class="route-arrow">→</div>
+    <div class="route-point">${trip.destination}</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Driver & Vehicle</div>
+  <div class="info-grid">
+    <div class="info-item"><span class="info-label">Driver Name</span><span class="info-value">${trip.driverName}</span></div>
+    <div class="info-item"><span class="info-label">Driver ID</span><span class="info-value">${trip.driverId}</span></div>
+    <div class="info-item"><span class="info-label">Vehicle Number</span><span class="info-value">${trip.vehicleNumber}</span></div>
+    <div class="info-item"><span class="info-label">Vehicle Type</span><span class="info-value">${trip.vehicleType}</span></div>
+    <div class="info-item"><span class="info-label">Odometer Start</span><span class="info-value">${trip.odometerStart ? trip.odometerStart + ' km' : 'N/A'}</span></div>
+    <div class="info-item"><span class="info-label">Odometer End</span><span class="info-value">${trip.odometerEnd ? trip.odometerEnd + ' km' : 'N/A'}</span></div>
+    <div class="info-item"><span class="info-label">Diesel Start</span><span class="info-value">${trip.dieselStart || 'N/A'}</span></div>
+    <div class="info-item"><span class="info-label">Diesel End</span><span class="info-value">${trip.dieselEnd || 'N/A'}</span></div>
+    <div class="info-item"><span class="info-label">Start Date</span><span class="info-value">${trip.startDate || 'N/A'}</span></div>
+    <div class="info-item"><span class="info-label">End Date</span><span class="info-value">${trip.endDate || 'N/A'}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Expense Breakdown</div>
+  ${(trip.expenses || []).length === 0
+    ? '<div class="no-expenses">No expenses recorded for this trip.</div>'
+    : `<table>
+        <thead><tr>
+          <th>#</th><th>Category</th><th>Reason / Details</th><th>Liters</th><th>Location</th><th>Time</th><th style="text-align:right">Amount</th>
+        </tr></thead>
+        <tbody>${expenseRows}</tbody>
+        <tfoot><tr style="background:#f8fafc">
+          <td colspan="6" style="text-align:right;font-weight:800;padding:8px 10px">TOTAL EXPENSES</td>
+          <td style="text-align:right;font-weight:900;font-size:13px;padding:8px 10px">₹${totalExpenses.toLocaleString('en-IN')}</td>
+        </tr></tfoot>
+      </table>
+      <div style="margin-top:12px">
+        <table style="width:260px;margin-left:auto">
+          <thead><tr><th>Category</th><th style="text-align:right">Sub-Total</th></tr></thead>
+          <tbody>${catSummaryRows}</tbody>
+        </table>
+      </div>`
+  }
+</div>
+
+<div class="section">
+  <div class="section-title">Financial Settlement</div>
+  <div class="settlement-box">
+    <div class="settlement-row"><span>Agreed Freight</span><span style="font-weight:700">₹${(trip.agreedFreight || 0).toLocaleString('en-IN')}</span></div>
+    <div class="settlement-row"><span>Total Expenses</span><span style="font-weight:700;color:#dc2626">− ₹${totalExpenses.toLocaleString('en-IN')}</span></div>
+    <div class="settlement-row"><span>Driver Payment</span><span style="font-weight:700;color:#dc2626">− ₹${(trip.driverPayment || 0).toLocaleString('en-IN')}</span></div>
+    <div class="settlement-total">
+      <span>NET ${isProfitable ? 'PROFIT' : 'LOSS'}</span>
+      <span class="${isProfitable ? 'profit' : 'loss'}">${isProfitable ? '+' : '−'} ₹${Math.abs(profitOrLoss).toLocaleString('en-IN')}</span>
+    </div>
+  </div>
+</div>
+
+${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) ? `
+<div class="section">
+  <div class="section-title">Proof of Delivery</div>
+  <div class="pod-section">
+    <div class="info-grid">
+      <div class="info-item"><span class="info-label">POD Status</span><span class="info-value" style="color:#16a34a">✓ Uploaded</span></div>
+      <div class="info-item"><span class="info-label">Delivery Date</span><span class="info-value">${trip.endDate || 'N/A'} ${trip.endTime || ''}</span></div>
+      <div class="info-item"><span class="info-label">Notes</span><span class="info-value">${trip.podNotes || 'None'}</span></div>
+      <div class="info-item"><span class="info-label">Signature</span><span class="info-value">${trip.podSignature ? 'Captured' : 'N/A'}</span></div>
+    </div>
+    ${trip.podPhotoUri ? `<div style="margin-top:12px;"><span class="info-label" style="font-weight:700;display:block;margin-bottom:4px;">Delivery Photo:</span><img src="${trip.podPhotoUri}" style="max-width:280px;max-height:180px;border-radius:6px;border:1px solid #cbd5e1;" /></div>` : ''}
+    ${trip.podSignature && (trip.podSignature.startsWith('data:image/') || trip.podSignature.startsWith('http') || trip.podSignature.startsWith('blob:') || trip.podSignature.startsWith('/uploads/')) ? `<div style="margin-top:10px;"><span class="info-label" style="font-weight:700;display:block;margin-bottom:4px;">Receiver Signature:</span><img src="${trip.podSignature}" style="max-width:220px;max-height:80px;border-radius:4px;border:1px solid #cbd5e1;background:#fff;" /></div>` : ''}
+  </div>
+</div>` : ''}
+
+<div class="footer">
+  <span>New Balaji Transports — NBT-ARS System</span>
+  <span>Trip ${trip.id} | Printed ${new Date().toLocaleDateString('en-IN')}</span>
+</div>
+
+</body></html>`;
 
       if (Platform.OS === 'web') {
-        // Open web print dialog
-        await Print.printAsync({ html });
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => printWindow.print(), 400);
+        } else {
+          await Print.printAsync({ html });
+        }
       } else {
-        // Save to PDF on mobile
         const { uri } = await Print.printToFileAsync({ html });
-        Alert.alert('PDF Generated', 'The PDF has been generated successfully.');
         if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri);
+          await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
         }
       }
     } catch (error) {
@@ -237,6 +397,14 @@ export default function TripsScreen() {
     return matchesSearch && matchesStatus;
   }).sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
 
+  const catBadgeColor = (cat: string) => {
+    const map: Record<string, string> = {
+      FUEL: '#fef3c7', TOLL: '#dbeafe', RTO: '#ede9fe',
+      POLICE: '#fee2e2', LORRY: '#d1fae5', OTHER: '#f1f5f9',
+    };
+    return map[cat] ?? '#f1f5f9';
+  };
+
   const getStatusColor = (status: Trip['status']) => {
     switch (status) {
       case 'ASSIGNED': return COLORS.textMuted;
@@ -247,6 +415,15 @@ export default function TripsScreen() {
       default: return COLORS.textMuted;
     }
   };
+
+  // Expanded expense IDs
+  const [expandedExpenses, setExpandedExpenses] = useState<Set<string>>(new Set());
+  const toggleExpense = (id: string) =>
+    setExpandedExpenses(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   // Edit Trip states
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -336,8 +513,15 @@ export default function TripsScreen() {
                 </View>
               )}
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '15' }]}>
-              <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status.replace('_', ' ')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '15' }]}>
+                <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status.replace('_', ' ')}</Text>
+              </View>
+              {(item.podSubmitted || item.podPhotoUri || item.podSignature || item.podNotes) ? (
+                <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#86efac' }}>
+                  <Text style={{ fontSize: 10, color: '#15803d', fontWeight: 'bold' }}>📸 POD</Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -505,14 +689,38 @@ export default function TripsScreen() {
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Odometer Start:</Text>
-                  <Text style={styles.detailValue}>{selectedTrip.odometerStart ? `${selectedTrip.odometerStart} km` : 'Pending start'}</Text>
+                  {editingOdometer === 'start' ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <TextInput
+                        style={[styles.paymentInput, { width: 100 }]}
+                        keyboardType="numeric"
+                        value={odometerInput}
+                        onChangeText={setOdometerInput}
+                        autoFocus
+                      />
+                      <Text style={{ fontSize: 12, color: COLORS.textMuted }}>km</Text>
+                      <TouchableOpacity onPress={handleSaveOdometer} disabled={savingOdometer} style={[styles.savePaymentBtn, { paddingHorizontal: 10 }]}>
+                        {savingOdometer ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.savePaymentText}>SAVE</Text>}
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setEditingOdometer(null)}>
+                        <MaterialIcons name="close" size={18} color={COLORS.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.detailValue}>{selectedTrip.odometerStart ? `${selectedTrip.odometerStart} km` : 'Pending start'}</Text>
+                      <TouchableOpacity onPress={() => { setEditingOdometer('start'); setOdometerInput(selectedTrip.odometerStart?.toString() ?? ''); }}>
+                        <MaterialIcons name="edit" size={16} color={COLORS.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
                 {selectedTrip.odometerStartPhotoUri ? (
                   <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: '#f0f4f8', padding: 10, borderRadius: 8 }}>
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Initial Odometer Photo (Driver Upload):</Text>
                     <Image
                       source={{ uri: selectedTrip.odometerStartPhotoUri }}
-                      style={{ width: '100%', height: 180, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
+                      style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
                       resizeMode="cover"
                     />
                     <TouchableOpacity
@@ -525,8 +733,48 @@ export default function TripsScreen() {
                 ) : null}
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Odometer End:</Text>
-                  <Text style={styles.detailValue}>{selectedTrip.odometerEnd ? `${selectedTrip.odometerEnd} km` : 'Trip active'}</Text>
+                  {editingOdometer === 'end' ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <TextInput
+                        style={[styles.paymentInput, { width: 100 }]}
+                        keyboardType="numeric"
+                        value={odometerInput}
+                        onChangeText={setOdometerInput}
+                        autoFocus
+                      />
+                      <Text style={{ fontSize: 12, color: COLORS.textMuted }}>km</Text>
+                      <TouchableOpacity onPress={handleSaveOdometer} disabled={savingOdometer} style={[styles.savePaymentBtn, { paddingHorizontal: 10 }]}>
+                        {savingOdometer ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.savePaymentText}>SAVE</Text>}
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setEditingOdometer(null)}>
+                        <MaterialIcons name="close" size={18} color={COLORS.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.detailValue}>{selectedTrip.odometerEnd ? `${selectedTrip.odometerEnd} km` : 'Trip active'}</Text>
+                      <TouchableOpacity onPress={() => { setEditingOdometer('end'); setOdometerInput(selectedTrip.odometerEnd?.toString() ?? ''); }}>
+                        <MaterialIcons name="edit" size={16} color={COLORS.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
+                {selectedTrip.odometerEndPhotoUri ? (
+                  <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: '#f0f4f8', padding: 10, borderRadius: 8 }}>
+                    <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 End Odometer Photo:</Text>
+                    <Image
+                      source={{ uri: selectedTrip.odometerEndPhotoUri }}
+                      style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
+                      resizeMode="cover"
+                    />
+                    <TouchableOpacity
+                      style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                      onPress={() => Linking.openURL(selectedTrip.odometerEndPhotoUri!)}
+                    >
+                      <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Diesel Start:</Text>
                   <Text style={styles.detailValue}>{selectedTrip.dieselStart || 'Pending'}</Text>
@@ -604,39 +852,72 @@ export default function TripsScreen() {
                 <Text style={styles.cardSectionTitle}>Proof of Delivery (POD)</Text>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>POD STATUS:</Text>
-                  <Text style={[styles.detailValue, { fontWeight: 'bold', color: selectedTrip.podPhotoUri ? COLORS.success : COLORS.secondary }]}>
-                    {selectedTrip.podPhotoUri ? 'POD UPLOADED ✓' : 'POD PENDING'}
+                  <Text style={[styles.detailValue, { fontWeight: 'bold', color: (selectedTrip.podSubmitted || selectedTrip.podPhotoUri || selectedTrip.podSignature || selectedTrip.podNotes) ? COLORS.success : COLORS.secondary }]}>
+                    {(selectedTrip.podSubmitted || selectedTrip.podPhotoUri || selectedTrip.podSignature || selectedTrip.podNotes) ? 'POD UPLOADED ✓' : 'POD PENDING'}
                   </Text>
                 </View>
-                {selectedTrip.podPhotoUri ? (
+                {(selectedTrip.podSubmitted || selectedTrip.podPhotoUri || selectedTrip.podSignature || selectedTrip.podNotes) ? (
                   <View style={styles.podDetailBlock}>
                     {/* POD Photo — displayed directly in Admin */}
-                    <Text style={[styles.podInfoText, { fontWeight: 'bold', marginBottom: 8 }]}>📸 Delivery Photo:</Text>
-                    {selectedTrip.podPhotoUri.startsWith('file://') ? (
-                      <View style={{ padding: 12, backgroundColor: '#fef3c7', borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#f59e0b' }}>
-                        <Text style={{ fontSize: 12, color: '#92400e', fontWeight: 'bold' }}>⚠️ Saved locally on driver device</Text>
-                        <Text style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>File path: {selectedTrip.podPhotoUri}</Text>
-                      </View>
-                    ) : (
-                      <View style={{ marginBottom: 10 }}>
+                    {selectedTrip.podPhotoUri ? (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={[styles.podInfoText, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Delivery Photo / Invoice:</Text>
                         <Image
                           source={{ uri: selectedTrip.podPhotoUri }}
                           style={styles.podPhotoImage}
-                          resizeMode="cover"
+                          resizeMode="contain"
                         />
                         <TouchableOpacity
-                          style={{ marginTop: 4, alignSelf: 'flex-start' }}
-                          onPress={() => Linking.openURL(selectedTrip.podPhotoUri!)}
+                          style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          onPress={() => {
+                            if (Platform.OS === 'web') {
+                              window.open(selectedTrip.podPhotoUri, '_blank');
+                            } else {
+                              Linking.openURL(selectedTrip.podPhotoUri!).catch(() => {});
+                            }
+                          }}
                         >
+                          <MaterialIcons name="open-in-new" size={14} color={COLORS.primary} />
                           <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
                         </TouchableOpacity>
                       </View>
+                    ) : (
+                      <Text style={[styles.podInfoText, { color: COLORS.textMuted, fontStyle: 'italic', marginBottom: 8 }]}>No delivery photo uploaded.</Text>
                     )}
+
+                    {/* Signature Rendering (Image vs Text) */}
+                    {selectedTrip.podSignature ? (
+                      (selectedTrip.podSignature.startsWith('data:image/') ||
+                       selectedTrip.podSignature.startsWith('http://') ||
+                       selectedTrip.podSignature.startsWith('https://') ||
+                       selectedTrip.podSignature.startsWith('blob:') ||
+                       selectedTrip.podSignature.startsWith('file://') ||
+                       selectedTrip.podSignature.startsWith('/uploads/')) ? (
+                        <View style={{ marginTop: 6, marginBottom: 10 }}>
+                          <Text style={[styles.podInfoText, { fontWeight: 'bold', marginBottom: 6 }]}>✍️ Driver / Receiver Signature:</Text>
+                          <Image
+                            source={{ uri: normalizeImageUrl(selectedTrip.podSignature) || selectedTrip.podSignature }}
+                            style={styles.podSignatureImage}
+                            resizeMode="contain"
+                          />
+                        </View>
+                      ) : (
+                        <Text style={styles.podInfoText}>
+                          <Text style={{ fontWeight: 'bold' }}>Signature:</Text> {selectedTrip.podSignature}
+                        </Text>
+                      )
+                    ) : (
+                      <Text style={styles.podInfoText}><Text style={{ fontWeight: 'bold' }}>Signature:</Text> N/A</Text>
+                    )}
+
                     <Text style={styles.podInfoText}><Text style={{ fontWeight: 'bold' }}>Notes:</Text> {selectedTrip.podNotes || 'No notes added'}</Text>
-                    <Text style={styles.podInfoText}><Text style={{ fontWeight: 'bold' }}>Signature:</Text> {selectedTrip.podSignature || 'N/A'}</Text>
-                    <Text style={styles.podInfoText}><Text style={{ fontWeight: 'bold' }}>Delivery Date/Time:</Text> {selectedTrip.endDate} {selectedTrip.endTime}</Text>
+                    <Text style={styles.podInfoText}><Text style={{ fontWeight: 'bold' }}>Delivery Date/Time:</Text> {selectedTrip.endDate || selectedTrip.lastUpdatedDate || 'N/A'} {selectedTrip.endTime || selectedTrip.lastUpdatedTime || ''}</Text>
                   </View>
-                ) : null}
+                ) : (
+                  <Text style={[styles.podInfoText, { color: COLORS.textMuted, fontStyle: 'italic', marginTop: 6 }]}>
+                    Awaiting proof of delivery upload from driver app.
+                  </Text>
+                )}
               </View>
 
               {/* Individual Expense entries list */}
@@ -645,40 +926,98 @@ export default function TripsScreen() {
                 {(!selectedTrip.expenses || selectedTrip.expenses.length === 0) ? (
                   <Text style={styles.emptyExpensesText}>No expenses logged yet.</Text>
                 ) : (
-                  selectedTrip.expenses.map((exp, index) => (
-                    <View key={exp.id} style={styles.individualExpenseCard}>
-                      <View style={styles.indExpHeader}>
-                        <Text style={styles.indExpCat}>{exp.category}</Text>
-                        <Text style={styles.indExpAmt}>₹{exp.amount}</Text>
+                  selectedTrip.expenses.map((exp, index) => {
+                    const isExpanded = expandedExpenses.has(exp.id);
+                    return (
+                      <View key={exp.id} style={styles.individualExpenseCard}>
+                        {/* Tappable header row */}
+                        <TouchableOpacity
+                          onPress={() => toggleExpense(exp.id)}
+                          activeOpacity={0.7}
+                          style={styles.indExpHeaderRow}
+                        >
+                          <View style={styles.indExpHeaderLeft}>
+                            <View style={[styles.indExpCatBadge, { backgroundColor: catBadgeColor(exp.category) }]}>
+                              <Text style={styles.indExpCatText}>{exp.category}</Text>
+                            </View>
+                            {exp.reason ? (
+                              <Text style={styles.indExpReasonInline} numberOfLines={1}>{exp.reason}</Text>
+                            ) : exp.liters ? (
+                              <Text style={styles.indExpReasonInline} numberOfLines={1}>{exp.liters} L</Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.indExpHeaderRight}>
+                            <Text style={styles.indExpAmt}>₹{Number(exp.amount).toLocaleString('en-IN')}</Text>
+                            <MaterialIcons
+                              name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                              size={18}
+                              color={COLORS.textMuted}
+                            />
+                          </View>
+                        </TouchableOpacity>
+
+                        {/* Expanded detail body */}
+                        {isExpanded && (
+                          <View style={styles.indExpBody}>
+                            <View style={styles.indExpDetailGrid}>
+                              <View style={styles.indExpDetailItem}>
+                                <Text style={styles.indExpDetailLabel}>AMOUNT</Text>
+                                <Text style={[styles.indExpDetailValue, { color: '#b91c1c', fontWeight: '900' }]}>₹{Number(exp.amount).toLocaleString('en-IN')}</Text>
+                              </View>
+                              <View style={styles.indExpDetailItem}>
+                                <Text style={styles.indExpDetailLabel}>CATEGORY</Text>
+                                <Text style={styles.indExpDetailValue}>{exp.category}</Text>
+                              </View>
+                              {exp.reason ? (
+                                <View style={styles.indExpDetailItem}>
+                                  <Text style={styles.indExpDetailLabel}>REASON</Text>
+                                  <Text style={styles.indExpDetailValue}>{exp.reason}</Text>
+                                </View>
+                              ) : null}
+                              {exp.liters ? (
+                                <View style={styles.indExpDetailItem}>
+                                  <Text style={styles.indExpDetailLabel}>FUEL LITERS</Text>
+                                  <Text style={styles.indExpDetailValue}>{exp.liters} L</Text>
+                                </View>
+                              ) : null}
+                              <View style={styles.indExpDetailItem}>
+                                <Text style={styles.indExpDetailLabel}>TIME</Text>
+                                <Text style={styles.indExpDetailValue}>{exp.timestamp || '—'}</Text>
+                              </View>
+                              {exp.location ? (
+                                <View style={[styles.indExpDetailItem, { flex: 2 }]}>
+                                  <Text style={styles.indExpDetailLabel}>LOCATION</Text>
+                                  <Text style={styles.indExpDetailValue}>
+                                    {exp.location.city}{' '}({exp.location.latitude.toFixed(4)}, {exp.location.longitude.toFixed(4)})
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+
+                            {exp.receiptUri ? (
+                              <View style={styles.receiptContainer}>
+                                <Text style={styles.receiptLabel}>📄 Receipt Photo</Text>
+                                <Image
+                                  source={{ uri: exp.receiptUri }}
+                                  style={styles.receiptImage}
+                                  resizeMode="cover"
+                                />
+                                <TouchableOpacity
+                                  style={styles.viewReceiptBtn}
+                                  onPress={() => Linking.openURL(exp.receiptUri!)}
+                                >
+                                  <MaterialIcons name="open-in-new" size={14} color={COLORS.primary} />
+                                  <Text style={styles.viewReceiptText}>View Full Size</Text>
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
+                              <Text style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 8, fontStyle: 'italic' }}>No receipt photo attached.</Text>
+                            )}
+                          </View>
+                        )}
                       </View>
-                      {exp.reason ? <Text style={styles.indExpReason}>{exp.reason}</Text> : null}
-                      {exp.liters ? <Text style={styles.indExpReason}>{exp.liters} Liters</Text> : null}
-                      <Text style={styles.indExpTime}>Time: {exp.timestamp}</Text>
-                      {exp.location ? (
-                        <Text style={styles.indExpLoc}>
-                          Loc: {exp.location.city} ({exp.location.latitude.toFixed(4)}, {exp.location.longitude.toFixed(4)})
-                        </Text>
-                      ) : null}
-                      {/* Expense Receipt Photo */}
-                      {exp.receiptUri ? (
-                        <View style={styles.receiptContainer}>
-                          <Text style={styles.receiptLabel}>📄 Receipt Photo:</Text>
-                          <Image
-                            source={{ uri: exp.receiptUri }}
-                            style={styles.receiptImage}
-                            resizeMode="cover"
-                          />
-                          <TouchableOpacity
-                            style={styles.viewReceiptBtn}
-                            onPress={() => Linking.openURL(exp.receiptUri!)}
-                          >
-                            <MaterialIcons name="open-in-new" size={14} color={COLORS.primary} />
-                            <Text style={styles.viewReceiptText}>View Full Size</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ) : null}
-                    </View>
-                  ))
+                    );
+                  })
                 )}
               </View>
             </ScrollView>
@@ -1133,6 +1472,17 @@ const styles = StyleSheet.create({
     borderColor: COLORS.outlineVariant,
     backgroundColor: COLORS.surfaceContainerLow,
   },
+  podSignatureImage: {
+    maxWidth: 240,
+    width: '100%',
+    aspectRatio: 8 / 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    backgroundColor: '#ffffff',
+    marginTop: 4,
+    marginBottom: 4,
+  },
   podInfoText: {
     fontSize: 12,
     color: COLORS.textDark,
@@ -1178,38 +1528,77 @@ const styles = StyleSheet.create({
   },
   individualExpenseCard: {
     backgroundColor: COLORS.background,
-    borderRadius: 6,
-    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
     marginBottom: 8,
+    overflow: 'hidden',
   },
-  indExpHeader: {
+  indExpHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
   },
-  indExpCat: {
+  indExpHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  indExpHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  indExpCatBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  indExpCatText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#374151',
+  },
+  indExpReasonInline: {
     fontSize: 11,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    color: COLORS.textMuted,
+    flex: 1,
   },
   indExpAmt: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#b91c1c',
   },
-  indExpReason: {
-    fontSize: 11,
+  indExpBody: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    padding: 12,
+    backgroundColor: '#fafafa',
+  },
+  indExpDetailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 8,
+  },
+  indExpDetailItem: {
+    flex: 1,
+    minWidth: 100,
+  },
+  indExpDetailLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  indExpDetailValue: {
+    fontSize: 12,
+    fontWeight: '600',
     color: COLORS.textDark,
-    marginTop: 2,
-  },
-  indExpTime: {
-    fontSize: 9,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  indExpLoc: {
-    fontSize: 9,
-    color: COLORS.textMuted,
-    marginTop: 2,
   },
   liveSyncRow: {
     flexDirection: 'row',
