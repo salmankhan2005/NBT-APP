@@ -95,9 +95,9 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
     .date-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; }
     .date-label { font-weight: 700; }
     .date-value { min-width: 140px; border-bottom: 1px solid #102168; padding-bottom: 2px; }
-    .editable-area { flex: 1; outline: none; font-size: 12px; line-height: 1.7; min-height: calc(100% - 68mm); max-height: calc(100% - 68mm); overflow: hidden; }
+    .editable-area { flex: 1; outline: none; font-size: 12px; line-height: 1.4; min-height: calc(100% - 68mm); max-height: calc(100% - 68mm); overflow: hidden; }
     .editable-area:empty::before { content: 'Type memo content here...'; color: #94a3b8; }
-    .memo-content p { margin: 0 0 10px; }
+    .memo-content p, .memo-content div, .memo-content blockquote, .memo-content ul, .memo-content ol { margin: 0; padding: 0; line-height: 1.4; }
     .footer { display: flex; justify-content: flex-end; margin-top: 10mm; }
     .signature-block { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 140px; }
     .signature-caption { font-size: 10px; font-weight: 900; letter-spacing: 0.08em; }
@@ -792,16 +792,30 @@ const MemoScreen = () => {
                     )}
                   </View>
                   {isWeb ? (
-                    <div
-                      ref={webEditorRef as any}
-                      style={{ ...styles.editableArea as any, whiteSpace: 'pre-wrap', outline: 'none', display: 'block', width: '100%', cursor: 'text', flex: 1 }}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onInput={handleWebEditorInput as any}
-                      onFocus={handleWebEditorFocus as any}
-                      onBlur={handleWebEditorBlur as any}
-                      tabIndex={0}
-                    />
+                    <>
+                      <style>{`
+                        .editable-area p, .editable-area div, .editable-area blockquote, .editable-area ul, .editable-area ol {
+                          margin: 0 !important;
+                          padding: 0 !important;
+                          line-height: 1.4 !important;
+                        }
+                        .editable-area:empty::before {
+                          content: 'Type memo content here...';
+                          color: #94a3b8;
+                        }
+                      `}</style>
+                      <div
+                        ref={webEditorRef as any}
+                        className="editable-area memo-content"
+                        style={{ ...styles.editableArea as any, whiteSpace: 'pre-wrap', outline: 'none', display: 'block', width: '100%', cursor: 'text', flex: 1 }}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={handleWebEditorInput as any}
+                        onFocus={handleWebEditorFocus as any}
+                        onBlur={handleWebEditorBlur as any}
+                        tabIndex={0}
+                      />
+                    </>
                   ) : (
                     <View ref={webEditorRef as any} style={styles.editableArea as any}>
                       <Text style={styles.memoText}>{''}</Text>
@@ -1015,8 +1029,8 @@ const styles = StyleSheet.create({
   dateLabel: { fontWeight: '700', color: '#102168', fontSize: 12 },
   dateValue: { minWidth: 200, borderBottomWidth: 2, borderBottomColor: '#102168', paddingBottom: 2, color: '#102168', fontSize: 12 },
   dateText: { color: '#102168', fontSize: 12 },
-  editableArea: { flex: 1, fontSize: 13, lineHeight: 24, color: '#08124a', padding: 4, backgroundColor: 'transparent' },
-  memoText: { fontSize: 12, lineHeight: 20, color: '#08124a' },
+  editableArea: { flex: 1, fontSize: 13, lineHeight: 18, color: '#08124a', padding: 4, backgroundColor: 'transparent' },
+  memoText: { fontSize: 12, lineHeight: 17, color: '#08124a' },
   footer: { width: '100%', flexDirection: 'row', justifyContent: 'flex-end', marginTop: 42, paddingBottom: 8, paddingRight: 16 },
   signatureBlock: { alignItems: 'flex-end', gap: 4, maxWidth: 180 },
   signatureCaption: { fontSize: 10, fontWeight: '900', letterSpacing: 1, color: '#102168' },

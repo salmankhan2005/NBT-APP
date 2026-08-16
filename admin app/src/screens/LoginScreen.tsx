@@ -24,8 +24,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 480;
   const isTablet = width >= 768;
-  const [username, setUsername] = useState('');
-  const [pin, setPin] = useState('');
+  const [username, setUsername] = useState('admin');
+  const [pin, setPin] = useState('9999');
   const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -147,6 +147,29 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <MaterialIcons name="arrow-forward" size={18} color="#ffffff" />
                 </>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                marginTop: 12,
+                paddingVertical: 12,
+                borderRadius: 10,
+                backgroundColor: COLORS.surfaceContainerHigh,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 8,
+                borderWidth: 1,
+                borderColor: COLORS.outlineVariant,
+              }}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="dashboard" size={18} color={COLORS.primary} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.primary }}>
+                QUICK CONSOLE ACCESS (VIEW ALL DATA)
+              </Text>
             </TouchableOpacity>
           </View>
 

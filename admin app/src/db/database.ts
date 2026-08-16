@@ -303,6 +303,18 @@ export interface GcNote {
   isPinned?: boolean;
 }
 
+export interface MemoDocument {
+  id: string;
+  memoId: string;
+  date: string;
+  contentHtml: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  status: 'DRAFT' | 'SAVED';
+  isPinned?: boolean;
+}
+
 export interface ActivityLog {
   id: string;
   tripId: string;
@@ -367,6 +379,329 @@ export interface FleetVehicle {
   updatedAt: string;
 }
 
+const INITIAL_SEED_DRIVERS: Driver[] = [
+  {
+    id: 'DRV-5566',
+    name: 'Senthil Rajesh',
+    pin: '123456',
+    pinHash: 'mockHash',
+    phone: '+91 98765 43210',
+    license: 'TN3820190001234',
+    vehicleNumber: 'TN 38 AB 1234',
+    active: true,
+  },
+  {
+    id: 'DRV-4421',
+    name: 'Karthik Raja',
+    pin: '654321',
+    pinHash: 'mockHash',
+    phone: '+91 98765 43211',
+    license: 'TN3720200005678',
+    vehicleNumber: 'TN 37 CB 5678',
+    active: true,
+  },
+];
+
+const INITIAL_SEED_MANAGED_VEHICLES: ManagedVehicle[] = [
+  {
+    vehicle_id: 'VEH-101',
+    vehicleNumber: 'TN 38 AB 1234',
+    vehicleType: '12 Wheel',
+    wheelType: '12 Wheel',
+    vehicleMake: 'Ashok Leyland',
+    vehicleModel: 'Captain 3118',
+    ownerName: 'NBT Logistics',
+    ownerPhone: '+91 94433 51789',
+    rcNumber: 'TN38AB1234RC',
+    engineNumber: 'ENG889123',
+    chassisNumber: 'CHS991234',
+    yearOfManufacture: '2022',
+    status: 'ON TRIP',
+    insuranceExpiryDate: '2027-12-31',
+    pollutionExpiryDate: '2027-10-15',
+    permitExpiryDate: '2028-05-20',
+    fcExpiryDate: '2027-08-30',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    vehicle_id: 'VEH-102',
+    vehicleNumber: 'TN 37 CB 5678',
+    vehicleType: '16 Wheel',
+    wheelType: '16 Wheel',
+    vehicleMake: 'Tata Motors',
+    vehicleModel: 'Signa 4825.TK',
+    ownerName: 'ARS Fleet',
+    ownerPhone: '+91 93622 51789',
+    rcNumber: 'TN37CB5678RC',
+    engineNumber: 'ENG772341',
+    chassisNumber: 'CHS882345',
+    yearOfManufacture: '2023',
+    status: 'ON TRIP',
+    insuranceExpiryDate: '2027-11-20',
+    pollutionExpiryDate: '2027-09-10',
+    permitExpiryDate: '2028-03-15',
+    fcExpiryDate: '2027-07-25',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    vehicle_id: 'VEH-103',
+    vehicleNumber: 'TN 38 BK 9999',
+    vehicleType: '10 Wheel',
+    wheelType: '10 Wheel',
+    vehicleMake: 'Eicher Motors',
+    vehicleModel: 'Pro 6028',
+    ownerName: 'NBT Logistics',
+    ownerPhone: '+91 94433 51789',
+    rcNumber: 'TN38BK9999RC',
+    engineNumber: 'ENG661234',
+    chassisNumber: 'CHS773456',
+    yearOfManufacture: '2021',
+    status: 'AVAILABLE',
+    insuranceExpiryDate: '2027-08-15',
+    pollutionExpiryDate: '2027-06-30',
+    permitExpiryDate: '2028-01-10',
+    fcExpiryDate: '2027-05-18',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+const INITIAL_SEED_FLEET_VEHICLES: FleetVehicle[] = [
+  {
+    id: 'FV-201',
+    vehicleNumber: 'TN 38 AB 1234',
+    vehicleType: '12 Wheel',
+    vehicleMake: 'Ashok Leyland',
+    vehicleModel: 'Captain 3118',
+    ownerName: 'NBT Logistics',
+    registrationDate: '2022-01-15',
+    vehicleStatus: 'Active',
+    gpsProvider: 'Jio GPS',
+    gpsDeviceBrand: 'Teltonika',
+    gpsDeviceModel: 'FMB920',
+    gpsDeviceId: 'GPS-DEV-8891',
+    imeiNumber: '864209048123456',
+    simNumber: '9842109876',
+    gpsInstallationDate: '2022-02-01',
+    gpsDeviceStatus: 'Connected',
+    lastKnownLatitude: 11.6643,
+    lastKnownLongitude: 78.1460,
+    lastKnownCity: 'Salem Bypass',
+    lastKnownAddress: 'NH544, Salem, Tamil Nadu',
+    gpsHistory: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'FV-202',
+    vehicleNumber: 'TN 37 CB 5678',
+    vehicleType: '16 Wheel',
+    vehicleMake: 'Tata Motors',
+    vehicleModel: 'Signa 4825.TK',
+    ownerName: 'ARS Fleet',
+    registrationDate: '2023-03-10',
+    vehicleStatus: 'Active',
+    gpsProvider: 'Jio GPS',
+    gpsDeviceBrand: 'Concox',
+    gpsDeviceModel: 'JM-VL03',
+    gpsDeviceId: 'GPS-DEV-8892',
+    imeiNumber: '864209048123457',
+    simNumber: '9842109877',
+    gpsInstallationDate: '2023-03-15',
+    gpsDeviceStatus: 'Connected',
+    lastKnownLatitude: 13.0827,
+    lastKnownLongitude: 80.2707,
+    lastKnownCity: 'Chennai Central',
+    lastKnownAddress: 'Rajaji Salai, Chennai, Tamil Nadu',
+    gpsHistory: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+const INITIAL_SEED_TRIPS: Trip[] = [
+  {
+    id: 'DRV-5566',
+    driverId: 'DRV-5566',
+    driverPin: '123456',
+    driverName: 'Senthil Rajesh',
+    trackingId: 'TRK-5566',
+    status: 'STARTED',
+    customerCompany: 'Lumen Technologies',
+    loaderName: 'Senthil Rajesh',
+    loaderPhone: '+91 98765 43210',
+    startingPoint: 'Salem A2B Restaurant',
+    startingAddress: 'Salem Bypass, NH544, Salem, Tamil Nadu',
+    startingLat: 11.6643,
+    startingLng: 78.1460,
+    startingPlaceId: 'DEPOT-001',
+    startingMapsUrl: 'https://maps.google.com/?q=Salem+A2B+Restaurant',
+    destination: 'Lumen Technologies, Bengaluru',
+    destinationAddress: 'Manyata Tech Park, Nagavara, Bengaluru, Karnataka',
+    destinationLat: 13.0457,
+    destinationLng: 77.6200,
+    destinationPlaceId: 'DEST-001',
+    destinationMapsUrl: 'https://maps.google.com/?q=Lumen+Technologies+Bengaluru',
+    distanceKm: 210,
+    estimatedTravelTime: '4 hrs 15 mins',
+    recommendedRoute: 'via NH44',
+    tollsCount: 8,
+    estimatedTollCost: 2450,
+    tollPlazas: [],
+    vehicleNumber: 'TN 38 AB 1234',
+    vehicleType: '12 Wheel',
+    agreedFreight: 35000,
+    isPinned: true,
+    odometerStart: 45200,
+    dieselStart: 'FULL',
+    startDate: '16 Aug 2026',
+    startTime: '08:30 AM',
+    lastUpdatedDate: '16 Aug 2026',
+    lastUpdatedTime: '10:15 AM',
+    lastKnownLocation: 'NH44 Krishnagiri Toll Plaza',
+    locationIsGps: true,
+    linkedGpsDeviceId: 'GPS-DEV-8891',
+    linkedImei: '864209048123456',
+    expenses: [
+      {
+        id: 'EXP-101',
+        category: 'FUEL',
+        amount: 5000,
+        reason: 'Diesel refill at HP Salem Bypass',
+        liters: 55,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: 'EXP-102',
+        category: 'TOLL',
+        amount: 850,
+        reason: 'FASTag Krishnagiri Plaza',
+        timestamp: new Date().toISOString(),
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'DRV-4421',
+    driverId: 'DRV-4421',
+    driverPin: '654321',
+    driverName: 'Karthik Raja',
+    trackingId: 'TRK-4421',
+    status: 'ON_THE_WAY',
+    customerCompany: 'Coimbatore Textile Cargo',
+    loaderName: 'Karthik Raja',
+    loaderPhone: '+91 98765 43211',
+    startingPoint: 'Chennai Port Terminal',
+    startingAddress: 'Rajaji Salai, Chennai Port, Tamil Nadu',
+    startingLat: 13.0827,
+    startingLng: 80.2707,
+    startingPlaceId: 'DEPOT-002',
+    startingMapsUrl: 'https://maps.google.com/?q=Chennai+Port+Terminal',
+    destination: 'Coimbatore Cargo Terminal',
+    destinationAddress: 'Avinashi Road, Coimbatore, Tamil Nadu',
+    destinationLat: 11.0168,
+    destinationLng: 76.9558,
+    destinationPlaceId: 'DEST-002',
+    destinationMapsUrl: 'https://maps.google.com/?q=Coimbatore+Cargo+Terminal',
+    distanceKm: 510,
+    estimatedTravelTime: '9 hrs 30 mins',
+    recommendedRoute: 'via NH48 & NH544',
+    tollsCount: 12,
+    estimatedTollCost: 3200,
+    tollPlazas: [],
+    vehicleNumber: 'TN 37 CB 5678',
+    vehicleType: '16 Wheel',
+    agreedFreight: 48000,
+    isPinned: false,
+    odometerStart: 89400,
+    dieselStart: 'FULL',
+    startDate: '16 Aug 2026',
+    startTime: '06:00 AM',
+    lastUpdatedDate: '16 Aug 2026',
+    lastUpdatedTime: '11:00 AM',
+    lastKnownLocation: 'NH48 Vellore Toll Plaza',
+    locationIsGps: true,
+    linkedGpsDeviceId: 'GPS-DEV-8892',
+    linkedImei: '864209048123457',
+    expenses: [
+      {
+        id: 'EXP-103',
+        category: 'FUEL',
+        amount: 8000,
+        reason: 'Diesel refill at Indian Oil Vellore',
+        liters: 88,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  },
+];
+
+const INITIAL_SEED_GC_NOTES: GcNote[] = [
+  {
+    id: 'GC-1001',
+    noteNumber: 'GC-1001',
+    date: '16 Aug 2026',
+    billNumber: 'BILL-1001',
+    from: 'Salem',
+    to: 'Bengaluru',
+    truckNumber: 'TN 38 AB 1234',
+    consignor: 'Lumen Logistics Salem',
+    consignee: 'Tech Park Bengaluru',
+    consignorGst: '33AAAAL1234A1Z1',
+    consigneeGst: '29BBBBB5678B1Z2',
+    gstinNumber: '33AAAAL1234A1Z1',
+    pan: 'AAAAL1234A',
+    items: [
+      { articlesCount: 150, description: 'IT Hardware & Office Equipment', weight: 12500, value: 35000 }
+    ],
+    freight: 35000,
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    total: 35000,
+    lessAdvance: 10000,
+    balance: 25000,
+    payableAt: 'Bengaluru',
+    paymentType: 'To Pay',
+    deliveryAt: 'Bengaluru',
+    driverName: 'Senthil Rajesh',
+    driverSignature: '',
+    dlNumber: 'TN3820190001234',
+    lorryOwner: 'NBT Logistics',
+    bankAccountName: 'NBT Logistics',
+    bankAccountNumber: '998877665544',
+    bankIfsc: 'HDFC0001234',
+    bankName: 'HDFC Bank',
+    bankBranch: 'Salem Main',
+    addressLine1: '3/131 VKV Complex, Salem',
+    addressLine2: 'Bangalore Bye Pass Road',
+    phone1: '+91 94433 51789',
+    phone2: '+91 93622 51789',
+    phone3: '0427-2225575',
+    bankDetails: 'HDFC Bank - 998877665544',
+    terms: 'Goods carried at owner risk.',
+    createdAt: new Date().toISOString(),
+    isPinned: true,
+  },
+];
+
+const INITIAL_SEED_MEMOS: MemoDocument[] = [
+  {
+    id: 'MEM-0001',
+    memoId: 'MEM-0001',
+    date: '2026-08-16',
+    contentHtml: '<div><b>NBT LORRY SUPPLIERS &amp; COMMISSION AGENT</b></div><div>Lorry Transport Agreement &amp; Delivery Memo for Vehicle <b>TN 38 AB 1234</b>.</div><div>Destination: Bengaluru. Freight Agreed: ₹35,000.</div>',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'admin',
+    status: 'SAVED',
+    isPinned: true,
+  },
+];
+
 type DatabaseListener = () => void;
 
 class AdminDatabase {
@@ -375,30 +710,34 @@ class AdminDatabase {
   private currentUsername: string | null = null;
 
   // Drivers Data
-  private mockDrivers: Driver[] = [];
+  private mockDrivers: Driver[] = [...INITIAL_SEED_DRIVERS];
 
   // Vehicles List (legacy — kept for GPS screen compatibility)
   private mockVehicles: Vehicle[] = [];
 
-  // Managed Vehicles — starts empty, Admin adds manually
-  private managedVehicles: ManagedVehicle[] = [];
+  // Managed Vehicles — default seeded
+  private managedVehicles: ManagedVehicle[] = [...INITIAL_SEED_MANAGED_VEHICLES];
 
   // Vehicle Documents — starts empty
   private vehicleDocuments: VehicleDocument[] = [];
 
-  private mockFleetVehicles: FleetVehicle[] = [];
+  private mockFleetVehicles: FleetVehicle[] = [...INITIAL_SEED_FLEET_VEHICLES];
 
   // Trips Database
-  private mockTrips: Trip[] = [];
+  private mockTrips: Trip[] = [...INITIAL_SEED_TRIPS];
 
-  private mockGcNotes: GcNote[] = [];
+  private mockGcNotes: GcNote[] = [...INITIAL_SEED_GC_NOTES];
+  private mockMemoDocuments: MemoDocument[] = [...INITIAL_SEED_MEMOS];
   private readonly gcStorageKey = 'nbt_gc_notes';
+  private readonly memoStorageKey = 'nbt_memo_documents';
 
   private mockActivityLogs: ActivityLog[] = [];
+  private mockExpenses: Expense[] = [];
 
   constructor() {
     this.loadSession();
     this.loadGcNotes();
+    this.loadMemoDocuments();
   }
 
   async loadSession() {
@@ -417,11 +756,74 @@ class AdminDatabase {
       }
     }
     try {
+      const savedTrips = await AsyncStorage.getItem('nbt_trips_cache');
+      if (savedTrips) {
+        const parsed = JSON.parse(savedTrips);
+        if (Array.isArray(parsed) && parsed.length > 0) this.mockTrips = parsed;
+        else this.mockTrips = [...INITIAL_SEED_TRIPS];
+      } else {
+        this.mockTrips = [...INITIAL_SEED_TRIPS];
+        await this.saveTrips();
+      }
+
       const savedVehicles = await AsyncStorage.getItem('nbt_managed_vehicles');
-      if (savedVehicles) this.managedVehicles = JSON.parse(savedVehicles);
+      if (savedVehicles) {
+        const parsed = JSON.parse(savedVehicles);
+        if (Array.isArray(parsed) && parsed.length > 0) this.managedVehicles = parsed;
+        else this.managedVehicles = [...INITIAL_SEED_MANAGED_VEHICLES];
+      } else {
+        this.managedVehicles = [...INITIAL_SEED_MANAGED_VEHICLES];
+        await this.saveVehicles();
+      }
+
       const savedDocs = await AsyncStorage.getItem('nbt_vehicle_documents');
-      if (savedDocs) this.vehicleDocuments = JSON.parse(savedDocs);
-    } catch {}
+      if (savedDocs) {
+        const parsed = JSON.parse(savedDocs);
+        if (Array.isArray(parsed) && parsed.length > 0) this.vehicleDocuments = parsed;
+      }
+
+      const savedDrivers = await AsyncStorage.getItem('nbt_drivers_cache');
+      if (savedDrivers) {
+        const parsed = JSON.parse(savedDrivers);
+        if (Array.isArray(parsed) && parsed.length > 0) this.mockDrivers = parsed;
+        else this.mockDrivers = [...INITIAL_SEED_DRIVERS];
+      } else {
+        this.mockDrivers = [...INITIAL_SEED_DRIVERS];
+        await this.saveDrivers();
+      }
+
+      const savedExpenses = await AsyncStorage.getItem('nbt_expenses_cache');
+      if (savedExpenses) {
+        const parsed = JSON.parse(savedExpenses);
+        if (Array.isArray(parsed) && parsed.length > 0) this.mockExpenses = parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load local cached storage', e);
+    }
+  }
+
+  private async saveTrips() {
+    try {
+      await AsyncStorage.setItem('nbt_trips_cache', JSON.stringify(this.mockTrips));
+    } catch (e) {
+      console.warn('Failed to save trips cache', e);
+    }
+  }
+
+  private async saveDrivers() {
+    try {
+      await AsyncStorage.setItem('nbt_drivers_cache', JSON.stringify(this.mockDrivers));
+    } catch (e) {
+      console.warn('Failed to save drivers cache', e);
+    }
+  }
+
+  private async saveExpenses() {
+    try {
+      await AsyncStorage.setItem('nbt_expenses_cache', JSON.stringify(this.mockExpenses));
+    } catch (e) {
+      console.warn('Failed to save expenses cache', e);
+    }
   }
 
   private async saveVehicles() {
@@ -620,6 +1022,7 @@ class AdminDatabase {
 
       // Replace cache with backend data (don't merge — deleted items must disappear)
       this.mockTrips = mappedBackendTrips;
+      await this.saveTrips();
     } catch (err) {
       console.warn('[AdminDB] Live getTrips sync error, falling back to cached state:', err);
     }
@@ -755,6 +1158,7 @@ class AdminDatabase {
     };
 
     this.mockTrips.unshift(newTrip);
+    await this.saveTrips();
 
     // Sync trip & driver credentials to Neon Postgres backend API
     try {
@@ -1057,6 +1461,15 @@ class AdminDatabase {
     if (!note) return false;
     note.isPinned = !note.isPinned;
     await this.persistGcNotes();
+    this.notify();
+    return true;
+  }
+
+  async togglePinMemo(id: string): Promise<boolean> {
+    const memo = this.mockMemoDocuments.find(item => item.id === id);
+    if (!memo) return false;
+    memo.isPinned = !memo.isPinned;
+    await this.persistMemoDocuments();
     this.notify();
     return true;
   }
@@ -1644,12 +2057,16 @@ class AdminDatabase {
     try {
       const raw = await AsyncStorage.getItem(this.gcStorageKey);
       if (raw) {
-        this.mockGcNotes = JSON.parse(raw);
-        this.notify();
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) this.mockGcNotes = parsed;
+        else this.mockGcNotes = [...INITIAL_SEED_GC_NOTES];
+      } else {
+        this.mockGcNotes = [...INITIAL_SEED_GC_NOTES];
+        await this.persistGcNotes();
       }
     } catch (e) {
       console.warn('Failed to load GC notes:', e);
-      this.mockGcNotes = [];
+      this.mockGcNotes = [...INITIAL_SEED_GC_NOTES];
     }
   }
 
@@ -1766,6 +2183,126 @@ class AdminDatabase {
 
     this.notify();
     return Promise.resolve({ success: true });
+  }
+
+  async loadMemoDocuments() {
+    try {
+      const raw = await AsyncStorage.getItem(this.memoStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) this.mockMemoDocuments = parsed;
+        else this.mockMemoDocuments = [...INITIAL_SEED_MEMOS];
+      } else {
+        this.mockMemoDocuments = [...INITIAL_SEED_MEMOS];
+        await this.persistMemoDocuments();
+      }
+    } catch (e) {
+      console.warn('Failed to load memo documents:', e);
+      this.mockMemoDocuments = [...INITIAL_SEED_MEMOS];
+    }
+  }
+
+  private async persistMemoDocuments() {
+    try {
+      await AsyncStorage.setItem(this.memoStorageKey, JSON.stringify(this.mockMemoDocuments));
+    } catch (e) {
+      console.warn('Failed to persist memo documents:', e);
+    }
+  }
+
+  async getMemoDocuments(): Promise<MemoDocument[]> {
+    if (!this.token) {
+      await this.loadSession();
+    }
+    if (this.token) {
+      try {
+        const res = await fetch(`${API_HOST}/api/memos`, {
+          headers: { Authorization: `Bearer ${this.token}` }
+        });
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            this.mockMemoDocuments = rows.map((r: any) => ({
+              id: r.id,
+              memoId: r.id,
+              date: r.date,
+              contentHtml: r.content_html || '',
+              createdBy: r.created_by || 'Admin',
+              status: r.status || 'SAVED',
+              createdAt: r.created_at,
+              updatedAt: r.updated_at
+            }));
+            await this.persistMemoDocuments();
+          }
+        }
+      } catch (err) {
+        console.warn('[AdminDB] getMemoDocuments API error:', err);
+      }
+    }
+    return Promise.resolve([...this.mockMemoDocuments]);
+  }
+
+  async getMemoDocumentById(memoId: string): Promise<MemoDocument | null> {
+    const list = await this.getMemoDocuments();
+    const memo = list.find((doc) => doc.memoId === memoId);
+    return Promise.resolve(memo ? { ...memo } : null);
+  }
+
+  async saveMemoDocument(data: Omit<MemoDocument, 'createdAt' | 'updatedAt'>): Promise<MemoDocument> {
+    const now = new Date().toISOString();
+    const existingIndex = this.mockMemoDocuments.findIndex((doc) => doc.memoId === data.memoId);
+    const memo = {
+      ...data,
+      createdAt: existingIndex === -1 ? now : this.mockMemoDocuments[existingIndex].createdAt,
+      updatedAt: now,
+    };
+
+    if (existingIndex === -1) {
+      this.mockMemoDocuments.unshift(memo);
+    } else {
+      this.mockMemoDocuments[existingIndex] = memo;
+    }
+
+    await this.persistMemoDocuments();
+
+    if (this.token) {
+      try {
+        await fetch(`${API_HOST}/api/memos`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.token}`
+          },
+          body: JSON.stringify(memo)
+        });
+      } catch (err) {
+        console.warn('[AdminDB] saveMemoDocument API error:', err);
+      }
+    }
+
+    this.notify();
+    return Promise.resolve(memo);
+  }
+
+  async deleteMemoDocument(memoId: string): Promise<boolean> {
+    const index = this.mockMemoDocuments.findIndex((doc) => doc.memoId === memoId);
+    if (index === -1) return Promise.resolve(false);
+    this.mockMemoDocuments.splice(index, 1);
+    await this.persistMemoDocuments();
+
+    if (this.token) {
+      try {
+        await fetch(`${API_HOST}/api/memos/${memoId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${this.token}` }
+        });
+      } catch (err) {
+        console.warn('[AdminDB] deleteMemoDocument API error:', err);
+      }
+    }
+
+    this.notify();
+    return Promise.resolve(true);
   }
 
   getTripPrintUrl(tripId: string): string {
@@ -1913,8 +2450,11 @@ class AdminDatabase {
 
     // Clear local storage
     try {
+      await AsyncStorage.removeItem('nbt_trips_cache');
       await AsyncStorage.removeItem('nbt_managed_vehicles');
       await AsyncStorage.removeItem('nbt_vehicle_documents');
+      await AsyncStorage.removeItem('nbt_drivers_cache');
+      await AsyncStorage.removeItem('nbt_expenses_cache');
       await AsyncStorage.removeItem(this.gcStorageKey);
       await AsyncStorage.removeItem(this.memoStorageKey);
     } catch (err) {
