@@ -45,7 +45,11 @@ export default function VehicleDocumentsModal({
     setImageError((prev) => ({ ...prev, [docId]: true }));
   };
 
-  const getDocTypeLabel = (type: string) => {
+  const getDocTypeLabel = (type: string, customLabel?: string) => {
+    if (customLabel && customLabel.trim()) {
+      return customLabel.trim();
+    }
+
     switch (type.toUpperCase()) {
       case 'RC':
       case 'RC_FRONT':
@@ -207,7 +211,7 @@ export default function VehicleDocumentsModal({
                         </View>
                         <View style={styles.docMeta}>
                           <Text style={styles.docLabel} numberOfLines={1}>
-                            {getDocTypeLabel(doc.docType)}
+                            {getDocTypeLabel(doc.docType, doc.docLabel)}
                           </Text>
                           <Text style={styles.docNumber}>No. {doc.docNumber || 'Verified'}</Text>
                         </View>
@@ -231,7 +235,7 @@ export default function VehicleDocumentsModal({
               <View style={[styles.viewerContainer, isDesktop && styles.desktopViewer]}>
                 <ScrollView contentContainerStyle={styles.viewerContent}>
                   <View style={styles.viewerCard}>
-                    <Text style={styles.viewerDocTitle}>{getDocTypeLabel(activeDocDetail.docType)}</Text>
+                    <Text style={styles.viewerDocTitle}>{getDocTypeLabel(activeDocDetail.docType, activeDocDetail.docLabel)}</Text>
                     <View style={styles.viewerMetaRow}>
                       <View style={styles.metaCol}>
                         <Text style={styles.metaLabel}>DOCUMENT NUMBER</Text>

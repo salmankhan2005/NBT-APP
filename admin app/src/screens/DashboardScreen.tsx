@@ -34,7 +34,7 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
   const [trips, setTrips] = useState<Trip[]>([]);
   const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [expiryAlerts, setExpiryAlerts] = useState<Array<{ vehicleId: string; vehicleNumber: string; docLabel: string; status: DocumentExpiryStatus; daysLeft: number | null }>>([]);
+  const [expiryAlerts, setExpiryAlerts] = useState<Array<{ vehicleId: string; vehicleNumber: string; driverName: string; docLabel: string; expiryDate: string; status: DocumentExpiryStatus; daysLeft: number | null }>>([]);
   
   // Modal states
   const [monthlyReportVisible, setMonthlyReportVisible] = useState(false);
@@ -73,7 +73,15 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
       setTrips(fetchedTrips);
       setFleetVehicles(fetchedFleetVehicles);
       setActivityLogs(fetchedLogs);
-      setExpiryAlerts(fetchedAlerts.map((alert) => ({ vehicleId: alert.vehicleId, vehicleNumber: alert.vehicleNumber, docLabel: alert.docLabel, status: alert.status, daysLeft: alert.daysLeft })));
+      setExpiryAlerts(fetchedAlerts.map((alert) => ({
+        vehicleId: alert.vehicleId,
+        vehicleNumber: alert.vehicleNumber,
+        driverName: alert.driverName || 'Unassigned Driver',
+        docLabel: alert.docLabel,
+        expiryDate: alert.expiryDate,
+        status: alert.status,
+        daysLeft: alert.daysLeft,
+      })));
 
       // Fetch today's lorry booking profit + recent entries
       try {
@@ -320,12 +328,22 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
               <Text style={styles.alertMetricLabel}>Within 30 Days</Text>
             </View>
           </View>
-          {expiryAlerts.slice(0, 3).map((alert) => (
-            <View key={`${alert.vehicleId}-${alert.docLabel}`} style={styles.alertItem}>
-              <Text style={styles.alertItemText}>{alert.vehicleNumber} · {alert.docLabel}</Text>
-              <Text style={styles.alertItemMeta}>{alert.status.replace(/_/g, ' ').toLowerCase()}</Text>
-            </View>
-          ))}
+          {expiryAlerts.slice(0, 3).map((alert) => {
+            const expiryText = alert.expiryDate ? new Date(alert.expiryDate).toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            }) : 'Date missing';
+            const daysText = alert.daysLeft !== null ? `${alert.daysLeft} day${Math.abs(alert.daysLeft) === 1 ? '' : 's'} left` : 'No date';
+
+            return (
+              <View key={`${alert.vehicleId}-${alert.docLabel}-${alert.expiryDate}`} style={styles.alertItem}>
+                <Text style={styles.alertItemText}>{alert.driverName} · {alert.vehicleNumber} · {alert.docLabel}</Text>
+                <Text style={styles.alertItemMeta}>{alert.status.replace(/_/g, ' ').toLowerCase()} · {expiryText}</Text>
+                <Text style={[styles.alertItemMeta, { marginTop: 2, color: '#a5b4fc' }]}>{daysText}</Text>
+              </View>
+            );
+          })}
         </View>
 
         {showSimulator && (

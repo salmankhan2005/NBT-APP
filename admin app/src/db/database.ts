@@ -1795,6 +1795,7 @@ class AdminDatabase {
   async getVehicleDocumentExpiryAlerts(): Promise<Array<{
     vehicleId: string;
     vehicleNumber: string;
+    driverName: string;
     docType: DocType;
     docLabel: string;
     expiryDate: string;
@@ -1804,6 +1805,7 @@ class AdminDatabase {
     const alerts: Array<{
       vehicleId: string;
       vehicleNumber: string;
+      driverName: string;
       docType: DocType;
       docLabel: string;
       expiryDate: string;
@@ -1812,25 +1814,39 @@ class AdminDatabase {
     }> = [];
 
     for (const vehicle of this.managedVehicles) {
-      const relevantDocs: Array<{ docType: DocType; docLabel: string; expiryDate: string }> = [];
+      const activeTrip = this.mockTrips.find((trip) =>
+        trip.vehicleNumber?.trim().toLowerCase() === vehicle.vehicleNumber.trim().toLowerCase() &&
+        trip.status !== 'COMPLETED'
+      );
+      const driverName = activeTrip?.driverName || 'Unassigned Driver';
       const vehicleDocs = this.vehicleDocuments.filter((doc) => doc.vehicle_id === vehicle.vehicle_id && doc.isActive);
-      const docByType = (type: DocType) => vehicleDocs.find((doc) => doc.docType === type);
+      const relevantDocs: Array<{ docType: DocType; docLabel: string; expiryDate: string }> = [];
 
-      const fcDoc = docByType('FC');
-      if (fcDoc?.expiryDate) relevantDocs.push({ docType: 'FC', docLabel: fcDoc.docLabel || 'FC Certificate', expiryDate: fcDoc.expiryDate });
-      else if (vehicle.fcExpiryDate) relevantDocs.push({ docType: 'FC', docLabel: 'FC Certificate', expiryDate: vehicle.fcExpiryDate });
+      for (const doc of vehicleDocs) {
+        if (!doc.expiryDate) continue;
+        relevantDocs.push({
+          docType: doc.docType,
+          docLabel: doc.docLabel || doc.docType,
+          expiryDate: doc.expiryDate,
+        });
+      }
 
-      const insuranceDoc = docByType('INSURANCE');
-      if (insuranceDoc?.expiryDate) relevantDocs.push({ docType: 'INSURANCE', docLabel: insuranceDoc.docLabel || 'Insurance', expiryDate: insuranceDoc.expiryDate });
-      else if (vehicle.insuranceExpiryDate) relevantDocs.push({ docType: 'INSURANCE', docLabel: 'Insurance', expiryDate: vehicle.insuranceExpiryDate });
+      const fallbackDocMap: Array<{ field: 'fcExpiryDate' | 'insuranceExpiryDate' | 'pollutionExpiryDate' | 'permitExpiryDate'; docType: DocType; docLabel: string }> = [
+        { field: 'fcExpiryDate', docType: 'FC', docLabel: 'FC Certificate' },
+        { field: 'insuranceExpiryDate', docType: 'INSURANCE', docLabel: 'Insurance' },
+        { field: 'pollutionExpiryDate', docType: 'POLLUTION', docLabel: 'Pollution Certificate' },
+        { field: 'permitExpiryDate', docType: 'PERMIT', docLabel: 'Permit' },
+      ];
 
-      const pollutionDoc = docByType('POLLUTION');
-      if (pollutionDoc?.expiryDate) relevantDocs.push({ docType: 'POLLUTION', docLabel: pollutionDoc.docLabel || 'Pollution Certificate', expiryDate: pollutionDoc.expiryDate });
-      else if (vehicle.pollutionExpiryDate) relevantDocs.push({ docType: 'POLLUTION', docLabel: 'Pollution Certificate', expiryDate: vehicle.pollutionExpiryDate });
-
-      const permitDoc = docByType('PERMIT');
-      if (permitDoc?.expiryDate) relevantDocs.push({ docType: 'PERMIT', docLabel: permitDoc.docLabel || 'Permit', expiryDate: permitDoc.expiryDate });
-      else if (vehicle.permitExpiryDate) relevantDocs.push({ docType: 'PERMIT', docLabel: 'Permit', expiryDate: vehicle.permitExpiryDate });
+      for (const fallback of fallbackDocMap) {
+        const fallbackExpiry = vehicle[fallback.field];
+        if (!fallbackExpiry || relevantDocs.some((doc) => doc.docType === fallback.docType)) continue;
+        relevantDocs.push({
+          docType: fallback.docType,
+          docLabel: fallback.docLabel,
+          expiryDate: fallbackExpiry,
+        });
+      }
 
       for (const doc of relevantDocs) {
         const status = this.getDocumentExpiryStatus(doc.expiryDate);
@@ -1838,6 +1854,7 @@ class AdminDatabase {
         alerts.push({
           vehicleId: vehicle.vehicle_id,
           vehicleNumber: vehicle.vehicleNumber,
+          driverName,
           docType: doc.docType,
           docLabel: doc.docLabel,
           expiryDate: doc.expiryDate,

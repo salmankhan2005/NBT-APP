@@ -38,16 +38,31 @@ export default function MapScreen({
   const [mapTileUrl, setMapTileUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    const fallbackDistanceText = trip.distanceKm !== undefined && trip.distanceKm !== null ? `${trip.distanceKm} km` : '-- km';
+    const fallbackDurationText = trip.estimatedTravelTime || '--';
+
     // 1. Fetch live directions via OpenStreetMap (OSRM)
     const fetchDirections = async () => {
+      if (!trip.startingPoint || !trip.destination) {
+        setDistanceText(fallbackDistanceText);
+        setDurationText(fallbackDurationText);
+        setEta('--:--');
+        return;
+      }
+
       const route = await getLiveRouteDetails(trip.startingPoint, trip.destination);
-      if (route) {
+      if (route && route.distanceText && route.durationText) {
         setDistanceText(route.distanceText);
         setDurationText(route.durationText);
         const etaDate = new Date();
         etaDate.setMinutes(etaDate.getMinutes() + route.durationMinutes);
         setEta(etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        return;
       }
+
+      setDistanceText(fallbackDistanceText);
+      setDurationText(fallbackDurationText);
+      setEta('--:--');
     };
     fetchDirections();
 
@@ -92,7 +107,7 @@ export default function MapScreen({
     return () => {
       if (subscription) subscription.remove();
     };
-  }, [trip.id]);
+  }, [trip.id, trip.startingPoint, trip.destination, trip.distanceKm, trip.estimatedTravelTime]);
 
   const openGoogleMaps = () => {
     // We deep link to Google Maps
