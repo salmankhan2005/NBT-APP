@@ -94,10 +94,10 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
     .body { margin-top: 14mm; display: flex; flex-direction: column; min-height: calc(100% - 104mm); }
     .date-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; }
     .date-label { font-weight: 700; }
-    .date-value { min-width: 140px; border-bottom: 1px solid #102168; padding-bottom: 2px; }
-    .editable-area { flex: 1; outline: none; font-size: 12px; line-height: 1.4; min-height: calc(100% - 68mm); max-height: calc(100% - 68mm); overflow: hidden; }
+    .editable-area { flex: 1; outline: none; font-size: 13px; line-height: 1.35; min-height: calc(100% - 68mm); max-height: calc(100% - 68mm); overflow: hidden; word-break: break-word; overflow-wrap: break-word; }
     .editable-area:empty::before { content: 'Type memo content here...'; color: #94a3b8; }
-    .memo-content p, .memo-content div, .memo-content blockquote, .memo-content ul, .memo-content ol { margin: 0; padding: 0; line-height: 1.4; }
+    .memo-content, .memo-content *, .editable-area, .editable-area * { margin: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; margin-block-start: 0 !important; margin-block-end: 0 !important; padding: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; line-height: 1.35 !important; }
+    .memo-content p, .memo-content div, .memo-content blockquote, .memo-content ul, .memo-content ol { margin: 0 !important; padding: 0 !important; margin-block-start: 0 !important; margin-block-end: 0 !important; line-height: 1.35 !important; }
     .footer { display: flex; justify-content: flex-end; margin-top: 10mm; }
     .signature-block { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 140px; }
     .signature-caption { font-size: 10px; font-weight: 900; letter-spacing: 0.08em; }
@@ -169,6 +169,8 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
       ? `<script>
     const editor = document.getElementById('memoEditor');
     const dateField = document.getElementById('dateField');
+
+    try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch(e) {}
 
     const sendState = () => {
       const html = editor.innerHTML;
@@ -794,10 +796,44 @@ const MemoScreen = () => {
                   {isWeb ? (
                     <>
                       <style>{`
-                        .editable-area p, .editable-area div, .editable-area blockquote, .editable-area ul, .editable-area ol {
+                        .editable-area,
+                        .editable-area *,
+                        .memo-content,
+                        .memo-content * {
                           margin: 0 !important;
+                          margin-top: 0 !important;
+                          margin-bottom: 0 !important;
+                          margin-block-start: 0 !important;
+                          margin-block-end: 0 !important;
+                          margin-inline-start: 0 !important;
+                          margin-inline-end: 0 !important;
                           padding: 0 !important;
-                          line-height: 1.4 !important;
+                          padding-top: 0 !important;
+                          padding-bottom: 0 !important;
+                          line-height: 1.35 !important;
+                          box-sizing: border-box !important;
+                        }
+                        .editable-area p,
+                        .editable-area div,
+                        .editable-area span,
+                        .editable-area blockquote,
+                        .editable-area ul,
+                        .editable-area ol,
+                        .editable-area li,
+                        .memo-content p,
+                        .memo-content div,
+                        .memo-content span,
+                        .memo-content blockquote,
+                        .memo-content ul,
+                        .memo-content ol,
+                        .memo-content li {
+                          margin: 0 !important;
+                          margin-top: 0 !important;
+                          margin-bottom: 0 !important;
+                          margin-block-start: 0 !important;
+                          margin-block-end: 0 !important;
+                          padding: 0 !important;
+                          line-height: 1.35 !important;
                         }
                         .editable-area:empty::before {
                           content: 'Type memo content here...';
@@ -807,11 +843,23 @@ const MemoScreen = () => {
                       <div
                         ref={webEditorRef as any}
                         className="editable-area memo-content"
-                        style={{ ...styles.editableArea as any, whiteSpace: 'pre-wrap', outline: 'none', display: 'block', width: '100%', cursor: 'text', flex: 1 }}
+                        style={{
+                          ...styles.editableArea as any,
+                          outline: 'none',
+                          display: 'block',
+                          width: '100%',
+                          cursor: 'text',
+                          flex: 1,
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word',
+                        }}
                         contentEditable
                         suppressContentEditableWarning
                         onInput={handleWebEditorInput as any}
-                        onFocus={handleWebEditorFocus as any}
+                        onFocus={(e: any) => {
+                          try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch(err) {}
+                          handleWebEditorFocus();
+                        }}
                         onBlur={handleWebEditorBlur as any}
                         tabIndex={0}
                       />
