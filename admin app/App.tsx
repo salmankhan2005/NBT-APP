@@ -33,6 +33,7 @@ import TripsScreen from './src/screens/TripsScreen';
 import CreateTripScreen from './src/screens/CreateTripScreen';
 import LiveStatusScreen from './src/screens/LiveStatusScreen';
 import GcScreen from './src/screens/GcScreen';
+import MemoScreen from './src/screens/MemoScreen';
 import VehiclesScreen from './src/screens/VehiclesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import GpsVehicleScreen from './src/screens/GpsVehicleScreen';
@@ -44,6 +45,7 @@ export type AdminTab =
   | 'CREATE_TRIP'
   | 'LIVE'
   | 'GC'
+  | 'MEMO'
   | 'MENU'
   | 'VEHICLES'
   | 'SETTINGS'
@@ -66,6 +68,7 @@ const NAV_ITEMS: NavigationItem[] = [
   { id: 'LORRY_BOOKING', label: 'Lorry Booking Agency', icon: 'account-balance-wallet', category: 'Main' },
   { id: 'LIVE', label: 'Live GPS Status', icon: 'my-location', category: 'Fleet' },
   { id: 'GC', label: 'GC Notes', icon: 'description', category: 'Fleet' },
+  { id: 'MEMO', label: 'Memo', icon: 'sticky-note-2', category: 'Fleet' },
   { id: 'GPS_VEHICLES', label: 'GPS Management', icon: 'gps-fixed', category: 'Fleet' },
   { id: 'SETTINGS', label: 'System Settings', icon: 'settings', category: 'System' },
 ];
@@ -171,6 +174,8 @@ function AppContent() {
         return <LiveStatusScreen />;
       case 'GC':
         return <GcScreen />;
+      case 'MEMO':
+        return <MemoScreen />;
       case 'VEHICLES':
         return (
           <View style={{ flex: 1 }}>
@@ -214,14 +219,20 @@ function AppContent() {
             <Text style={styles.menuTitle}>Control Center Registries</Text>
 
             <View style={[styles.menuGrid, !isDesktop && styles.menuGridStacked]}>
-
-
               <TouchableOpacity style={[styles.menuItem, !isDesktop && styles.menuItemFullWidth]} onPress={() => setAdminTab('VEHICLES')}>
                 <View style={[styles.menuIconContainer, { backgroundColor: COLORS.secondary }]}>
                   <MaterialIcons name="local-shipping" size={28} color="#ffffff" />
                 </View>
                 <Text style={styles.menuItemTitle}>Lorry Directory</Text>
                 <Text style={styles.menuItemDesc}>Review permits, fitness &amp; RCs</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.menuItem, !isDesktop && styles.menuItemFullWidth]} onPress={() => setAdminTab('MEMO')}>
+                <View style={[styles.menuIconContainer, { backgroundColor: '#7c3aed' }]}>
+                  <MaterialIcons name="sticky-note-2" size={28} color="#ffffff" />
+                </View>
+                <Text style={styles.menuItemTitle}>Memo Documents</Text>
+                <Text style={styles.menuItemDesc}>Create &amp; print transport memos</Text>
               </TouchableOpacity>
             </View>
 
@@ -536,7 +547,7 @@ function AppContent() {
               <TouchableOpacity
                 style={[
                   styles.mobileNavItem,
-                  ['MENU', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC'].includes(
+                  ['MENU', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC', 'MEMO'].includes(
                     adminTab,
                   ) && styles.mobileNavItemActive,
                 ]}
@@ -546,7 +557,7 @@ function AppContent() {
                   name="grid-view"
                   size={22}
                   color={
-                    ['MENU', 'DRIVERS', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC'].includes(
+                    ['MENU', 'DRIVERS', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC', 'MEMO'].includes(
                       adminTab,
                     )
                       ? COLORS.secondary
@@ -556,7 +567,7 @@ function AppContent() {
                 <Text
                   style={[
                     styles.mobileNavText,
-                    ['MENU', 'DRIVERS', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC'].includes(
+                    ['MENU', 'DRIVERS', 'VEHICLES', 'SETTINGS', 'GPS_VEHICLES', 'GC', 'MEMO'].includes(
                       adminTab,
                     ) && styles.mobileNavTextActive,
                   ]}
