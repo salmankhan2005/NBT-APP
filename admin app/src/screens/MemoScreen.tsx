@@ -112,13 +112,13 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
       <div class="logo-area">
         <div class="logo-circle">
           <div class="logo-mark">NBT</div>
-          <div class="logo-text">NEW BALAJI TRANSPORTS</div>
+          <div class="logo-text">NEW BALAJI TRANSPORT</div>
           <div class="logo-sub">LOGISTICS SOLUTIONS SINCE 2010</div>
         </div>
       </div>
       <div class="header-center">
         <div class="signed-by">Sri Ramajayam</div>
-        <div class="company-name">NEW BALAJI TRANSPORTS</div>
+        <div class="company-name">NEW BALAJI TRANSPORT</div>
         <div class="company-subtitle">(Lorry Suppliers & Commission Agent)</div>
         <div class="address">
           3/131, V.K.V. Complex, 1st Floor,<br />
@@ -157,7 +157,7 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
       <div id="memoEditor" class="editable-area memo-content" ${editableAttributes}>${safeContent}</div>
       <div class="footer">
         <div class="signature-block">
-          <div class="signature-caption">For NEW BALAJI TRANSPORTS</div>
+          <div class="signature-caption">For NEW BALAJI TRANSPORT</div>
           <img class="signature-img" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
           <div class="signatory-text">Authorised Signatory</div>
         </div>
@@ -723,7 +723,7 @@ const MemoScreen = () => {
             </ScrollView>
           </View>
 
-          <View style={[styles.pageWrapper, { width: pageWidth, height: pageHeight }]}> 
+          <View style={[styles.pageWrapper, { width: isDesktop ? pageWidth : '100%', minHeight: isDesktop ? pageHeight : undefined }]}> 
             {isWeb ? (
               <View
                 style={styles.memoPage}
@@ -734,14 +734,14 @@ const MemoScreen = () => {
                   <View style={styles.logoArea}>
                     <View style={styles.logoCircle}>
                       <Text style={styles.logoMark}>NBT</Text>
-                      <Text style={styles.logoText}>NEW BALAJI TRANSPORTS</Text>
+                      <Text style={styles.logoText}>NEW BALAJI TRANSPORT</Text>
                       <Text style={styles.logoSub}>LOGISTICS SOLUTIONS SINCE 2010</Text>
                     </View>
                   </View>
                   <View style={styles.headerCenter}>
                     <Text style={styles.signedBy}>Sri Ramajayam</Text>
-                    <Text style={styles.companyName}>NEW BALAJI</Text>
-                    <Text style={styles.companyNameSecondary}>TRANSPORTS</Text>
+                    <Text style={[styles.companyName, !isDesktop && { fontSize: 20, lineHeight: 26 }]}>NEW BALAJI</Text>
+                    <Text style={[styles.companyNameSecondary, !isDesktop && { fontSize: 20, lineHeight: 26 }]}>TRANSPORT</Text>
                     <Text style={styles.companySubtitle}>(Lorry Suppliers & Commission Agent)</Text>
                     <Text style={styles.address}>
                       3/131, V.K.V. Complex, 1st Floor,
@@ -871,7 +871,7 @@ const MemoScreen = () => {
                   )}
                   <View style={styles.footer}>
                     <View style={styles.signatureBlock}>
-                      <Text style={styles.signatureCaption}>For NEW BALAJI TRANSPORTS</Text>
+                      <Text style={styles.signatureCaption}>For NEW BALAJI TRANSPORT</Text>
                       <Image source={{ uri: nbtAuthorisedSignatureBase64 }} style={styles.signatureImgWeb} resizeMode="contain" />
                       <View style={styles.signatureLine} />
                       <Text style={styles.signatureText}>Authorised Signatory</Text>
@@ -1037,7 +1037,7 @@ const styles = StyleSheet.create({
   headerRow: { paddingHorizontal: SPACING.gutter, paddingTop: SPACING.gutter, paddingBottom: SPACING.base, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   screenTitle: { fontSize: 24, fontWeight: '900', color: COLORS.primary },
   screenSubtitle: { marginTop: 4, fontSize: 13, color: COLORS.textMuted },
-  tabRow: { flexDirection: 'row', gap: 8 },
+  tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tabButton: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: COLORS.surfaceContainerLow },
   tabButtonActive: { backgroundColor: COLORS.primary },
   tabButtonText: { color: COLORS.textMuted, fontWeight: '700', fontSize: 12 },
@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
   overflowWarning: { position: 'absolute', bottom: 12, left: 12, right: 12, backgroundColor: '#fef3c7', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#fde68a' },
   overflowText: { color: '#92400e', fontSize: 12, textAlign: 'center' },
   memoCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 16, marginBottom: 14, ...SHADOWS.light },
-  memoCardRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  memoCardRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
   memoCardId: { fontSize: 14, fontWeight: '700', color: COLORS.primary, marginBottom: 6 },
   memoCardMeta: { fontSize: 12, color: COLORS.textMuted },
   memoCardActions: { alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 },

@@ -45,7 +45,7 @@ export default function GcScreen() {
   const [gstinNumber, setGstinNumber] = useState('33AMTPR8487P2ZM');
   const [panNumber, setPanNumber] = useState('AMTPR8487P');
   const [paymentType, setPaymentType] = useState<'TBB' | 'TO_PAY' | 'PAID' | ''>('');
-  const [bankAccountName, setBankAccountName] = useState('New Balaji Transports');
+  const [bankAccountName, setBankAccountName] = useState('New Balaji Transport');
   const [bankAccountNumber, setBankAccountNumber] = useState('118715000014102');
   const [bankIfsc, setBankIfsc] = useState('KVBLO001187');
   const [bankName, setBankName] = useState('Karur Vysya Bank');
@@ -437,7 +437,7 @@ export default function GcScreen() {
         setDriverSignature('');
         setDlNumber('');
         setLorryOwner('');
-        setBankAccountName('New Balaji Transports');
+        setBankAccountName('New Balaji Transport');
         setBankAccountNumber('118715000014102');
         setBankIfsc('KVBLO001187');
         setBankName('Karur Vysya Bank');
@@ -646,7 +646,7 @@ export default function GcScreen() {
               </div>
               <div class="header-title">
                 <div class="top-name">Sri Ramajayam</div>
-                <div class="main-title">NEW BALAJI TRANSPORTS</div>
+                <div class="main-title">NEW BALAJI TRANSPORT</div>
                 <div class="subtitle">(LORRY SUPPLIERS & COMMISSION AGENT)</div>
                 <div class="badge">GOODS CONSIGNMENT / CONSIGNEE COPY</div>
               </div>
@@ -775,7 +775,7 @@ export default function GcScreen() {
               <div class="signature-box"><div class="signature-label">LORRY OWNER</div><div class="signature-line"></div><div style="font-size:11px; margin-top:6px;">${note.lorryOwner || ''}</div></div>
             </div>
             <div class="authorise-row">
-              <div class="authorise-text">For NEW BALAJI TRANSPORTS</div>
+              <div class="authorise-text">For NEW BALAJI TRANSPORT</div>
               <img class="authorise-signature" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
               <div class="authorise-label">Authorised Signatory</div>
             </div>
@@ -981,18 +981,18 @@ export default function GcScreen() {
       {activeTab === 'CREATE' ? (
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.gcWrapper}>
-            <View style={styles.gcPage}>
+            <View style={[styles.gcPage, !isDesktop && { padding: 10, borderRadius: 8 }]}>
               <View style={[styles.gcHeader, !isDesktop && { flexDirection: 'column', alignItems: 'center', gap: 16 }]}>
                 <View style={[styles.gcHeaderBrand, !isDesktop && { borderRightWidth: 0, paddingRight: 0, alignItems: 'center' }]}>
                   <View style={styles.logoCircle}>
                     <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
                   </View>
-                  <Text style={styles.brandTitle}>NEW BALAJI TRANSPORTS</Text>
+                  <Text style={styles.brandTitle}>NEW BALAJI TRANSPORT</Text>
                   <Text style={styles.brandSubtitle}>(LORRY SUPPLIERS & COMMISSION AGENT)</Text>
                 </View>
                 <View style={[styles.gcHeaderTitle, !isDesktop && { minWidth: '100%', alignItems: 'center', marginVertical: 12 }]}>
                   <Text style={styles.gcHeaderTitleTop}>Sri Ramajayam</Text>
-                  <Text style={styles.gcHeaderMain}>NEW BALAJI TRANSPORTS</Text>
+                  <Text style={[styles.gcHeaderMain, !isDesktop && { fontSize: 22, letterSpacing: 1 }]}>NEW BALAJI TRANSPORT</Text>
                   <Text style={styles.gcHeaderSub}>(LORRY SUPPLIERS & COMMISSION AGENT)</Text>
                   <View style={styles.gcBadge}>
                     <Text style={styles.gcBadgeText}>GOODS CONSIGNMENT / CONSIGNEE COPY</Text>
@@ -1048,7 +1048,7 @@ export default function GcScreen() {
                 </View>
               </View>
 
-              <View style={[styles.gcSectionRow, !isDesktop && { flexDirection: 'column', gap: 10 }]}>
+              <View style={styles.gcSectionRow}>
                 <View style={[styles.gcFieldBlock, styles.gcFieldBlockWide]}>
                   <Text style={styles.fieldLabel}>From</Text>
                   <TextInput style={styles.fieldInput} value={from} onChangeText={setFrom} placeholder="From" />
@@ -1069,7 +1069,7 @@ export default function GcScreen() {
                 </View>
               </View>
 
-              <View style={[styles.gcSectionRow, !isDesktop && { flexDirection: 'column', gap: 10 }]}> 
+              <View style={styles.gcSectionRow}> 
                 <View style={[styles.gcFieldBlock, styles.gcFieldBlockWide]}>
                   <Text style={styles.fieldLabel}>To</Text>
                   <TextInput style={styles.fieldInput} value={to} onChangeText={setTo} placeholder="To" />
@@ -1084,7 +1084,7 @@ export default function GcScreen() {
                 </View>
               </View>
 
-              <View style={[styles.gcSectionRow, !isDesktop && { flexDirection: 'column', gap: 10 }]}>
+              <View style={styles.gcSectionRow}>
                 <View style={[styles.gcFieldBlock, styles.gcFieldBlockWide]}>
                   <Text style={styles.fieldLabel}>Consignor M/s.</Text>
                   <TextInput style={styles.fieldInput} value={consignor} onChangeText={setConsignor} placeholder="Consignor" />
@@ -1095,7 +1095,7 @@ export default function GcScreen() {
                 </View>
               </View>
 
-              <View style={[styles.gcSectionRow, !isDesktop && { flexDirection: 'column', gap: 10 }]}>
+              <View style={styles.gcSectionRow}>
                 <View style={[styles.gcFieldBlock, styles.gcFieldBlockMedium]}>
                   <Text style={styles.fieldLabel}>Consignor GSTIN</Text>
                   <TextInput style={styles.fieldInput} value={consignorGst} onChangeText={setConsignorGst} placeholder="Consignor GSTIN" autoCapitalize="characters" />
@@ -1267,7 +1267,7 @@ export default function GcScreen() {
                   </View>
 
                   <View style={[styles.rightFooterNote, !isDesktop && { paddingLeft: 0, alignItems: 'center', marginTop: 12 }]}>
-                    <Text style={styles.rightFooterTitle}>For NEW BALAJI TRANSPORTS</Text>
+                    <Text style={styles.rightFooterTitle}>For NEW BALAJI TRANSPORT</Text>
                     <View style={styles.authorisedRow}>
                       <Image
                         source={require('../../assets/signatures/nbt-authorised-signature.png')}
@@ -1835,21 +1835,22 @@ const styles = StyleSheet.create({
   contactBox: {
     width: '100%',
     borderWidth: 1,
-    borderColor: '#172554',
-    borderRadius: 10,
-    padding: 12,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    padding: 10,
     backgroundColor: '#ffffff',
   },
   contactAddress: {
     width: '100%',
-    marginBottom: 10,
+    marginBottom: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#e2e8f0',
     backgroundColor: '#f8fafc',
     color: '#172554',
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 11,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   contactNumbers: {
     marginTop: 4,
@@ -1897,15 +1898,17 @@ const styles = StyleSheet.create({
   },
   gcSectionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
-    marginTop: 10,
+    marginBottom: 10,
   },
   gcFieldBlock: {
     flex: 1,
+    minWidth: 140,
     borderWidth: 1,
     borderColor: '#0f172a',
     borderRadius: 6,
-    padding: 8,
+    padding: 6,
     backgroundColor: '#ffffff',
   },
   gcFieldBlockLarge: {
@@ -1930,14 +1933,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   fieldInput: {
-    borderWidth: 1,
-    borderColor: '#0f172a',
-    borderRadius: 4,
-    height: 36,
-    paddingHorizontal: 10,
+    borderWidth: 0,
+    height: 32,
+    paddingHorizontal: 4,
     color: '#0f172a',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent',
     fontSize: 12,
+    fontWeight: '600',
   },
   noteNumberInput: {
     color: '#c70000',
@@ -2206,8 +2208,9 @@ const styles = StyleSheet.create({
   },
   paymentTypeBlock: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 32,
     marginBottom: 12,
   },
   paymentTypeRow: {
@@ -2284,8 +2287,9 @@ const styles = StyleSheet.create({
   },
   footerSignatureRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 24,
   },
   signatureBox: {
     flex: 1,
@@ -2384,7 +2388,9 @@ const styles = StyleSheet.create({
   },
   summaryGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
   summaryCol: {
     flex: 1,

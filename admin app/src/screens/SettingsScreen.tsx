@@ -120,7 +120,7 @@ export default function SettingsScreen({ onLogout }: SettingsScreenProps) {
               <MaterialIcons name="person" size={28} color="#ffffff" />
             </View>
             <View>
-              <Text style={styles.profileName}>NBT+ARS Administrator</Text>
+              <Text style={styles.profileName}>New Balaji Transport Administrator</Text>
               <Text style={styles.profileRole}>Role: Super Admin (Read & Write)</Text>
             </View>
           </View>
@@ -149,7 +149,7 @@ export default function SettingsScreen({ onLogout }: SettingsScreenProps) {
             <MaterialIcons name="info" size={20} color={COLORS.primary} />
             <View style={styles.itemTextContainer}>
               <Text style={styles.itemTitle}>Application Version</Text>
-              <Text style={styles.itemDesc}>NBT+ARS Admin Console Mobile</Text>
+              <Text style={styles.itemDesc}>New Balaji Transport Admin Console</Text>
             </View>
             <Text style={styles.itemStatus}>V2.4.1</Text>
           </View>

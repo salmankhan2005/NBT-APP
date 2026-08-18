@@ -108,7 +108,7 @@ export default function GpsVehicleScreen() {
   const [fVehicleType, setFVehicleType] = useState<'6 Wheel' | '10 Wheel' | '12 Wheel' | '14 Wheel' | '16 Wheel'>('12 Wheel');
   const [fVehicleModel, setFVehicleModel] = useState('');
   const [fVehicleMake, setFVehicleMake] = useState('');
-  const [fOwnerName, setFOwnerName] = useState('New Balaji Transports');
+  const [fOwnerName, setFOwnerName] = useState('New Balaji Transport');
   const [fRegistrationDate, setFRegistrationDate] = useState('');
   const [fVehicleStatus, setFVehicleStatus] = useState<VehicleStatus>('Active');
   const [fGpsProvider, setFGpsProvider] = useState('');
@@ -210,7 +210,7 @@ export default function GpsVehicleScreen() {
 
   const clearForm = () => {
     setFVehicleNumber(''); setFVehicleType('12 Wheel'); setFVehicleModel('');
-    setFVehicleMake(''); setFOwnerName('New Balaji Transports'); setFRegistrationDate('');
+    setFVehicleMake(''); setFOwnerName('New Balaji Transport'); setFRegistrationDate('');
     setFVehicleStatus('Active'); setFGpsProvider(''); setFGpsDeviceBrand('');
     setFGpsDeviceModel(''); setFGpsDeviceId(''); setFImeiNumber(''); setFSimNumber('');
     setFExternalGpsDeviceId(''); setFGpsInstallationDate(''); setFGpsDeviceStatus('Not Configured');
@@ -612,7 +612,7 @@ export default function GpsVehicleScreen() {
           {/* Owner */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>OWNER / COMPANY <Text style={styles.required}>*</Text></Text>
-            <TextInput style={styles.formInput} placeholder="e.g. New Balaji Transports" value={fOwnerName} onChangeText={setFOwnerName} />
+            <TextInput style={styles.formInput} placeholder="e.g. New Balaji Transport" value={fOwnerName} onChangeText={setFOwnerName} />
           </View>
 
           {/* Registration Date */}

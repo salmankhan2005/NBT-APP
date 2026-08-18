@@ -50,7 +50,7 @@ export default function LandingPage({ onEnterDashboard }: LandingPageProps) {
               <Text style={styles.logoText}>NBT</Text>
             </View>
             <View>
-              <Text style={styles.brandTitle}>NEW BALAJI TRANSPORTS</Text>
+              <Text style={styles.brandTitle}>NEW BALAJI TRANSPORT</Text>
               <Text style={styles.brandSubtitle}>Logistics & Fleet Command Center</Text>
             </View>
           </View>
@@ -180,7 +180,7 @@ export default function LandingPage({ onEnterDashboard }: LandingPageProps) {
 
         {/* Copyright */}
         <Text style={styles.copyrightText}>
-          © 2026 New Balaji Transports (NBT). All Rights Reserved. Enterprise Logistics Command Platform.
+          © 2026 New Balaji Transport (NBT). All Rights Reserved. Enterprise Logistics Command Platform.
         </Text>
       </ScrollView>
     </SafeAreaView>

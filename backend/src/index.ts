@@ -120,7 +120,37 @@ async function bootstrap() {
     await sql`UPDATE trips SET pod_signature = NULL WHERE pod_signature = ''`;
     await sql`UPDATE trips SET pod_notes = NULL WHERE pod_notes = ''`;
     await sql`UPDATE trips SET pod_photo_url = NULL WHERE pod_photo_url = ''`;
-    app.log.info('  ✓ DB auto-migrations applied (expenses + trips financial columns + driver pin + odometer_start_url + is_pinned + lorry booking tables + vehicle_documents is_active fix)');
+    // Auto-migrate: gc_notes table
+    await sql`
+      CREATE TABLE IF NOT EXISTS gc_notes (
+        id               TEXT PRIMARY KEY,
+        gc_number        TEXT UNIQUE NOT NULL,
+        date             TEXT NOT NULL,
+        consignor_name   TEXT DEFAULT '',
+        consignee_name   TEXT DEFAULT '',
+        items            JSONB DEFAULT '[]',
+        freight_amount   NUMERIC(12,2) DEFAULT 0,
+        total_amount     NUMERIC(12,2) DEFAULT 0,
+        advance_amount   NUMERIC(12,2) DEFAULT 0,
+        balance_amount   NUMERIC(12,2) DEFAULT 0,
+        raw_data         JSONB DEFAULT '{}',
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+    // Auto-migrate: memos table
+    await sql`
+      CREATE TABLE IF NOT EXISTS memos (
+        id           TEXT PRIMARY KEY,
+        date         TEXT NOT NULL,
+        content_html TEXT NOT NULL DEFAULT '',
+        created_by   TEXT DEFAULT 'Admin',
+        status       TEXT DEFAULT 'SAVED',
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+    app.log.info('  ✓ DB auto-migrations applied (expenses + trips financial columns + driver pin + odometer_start_url + is_pinned + lorry booking tables + vehicle_documents is_active fix + gc_notes + memos)');
   } catch (err) {
     app.log.warn(`Database connection or auto-migration failed: ${err}`);
   }

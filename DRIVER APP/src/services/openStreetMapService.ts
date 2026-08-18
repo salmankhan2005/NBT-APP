@@ -46,6 +46,16 @@ function resolveKnownPlaceCoordinates(query: string): { lat: number; lng: number
   return null;
 }
 
+/**
+ * Validates that coordinates fall within India's geographic bounding box.
+ * Prevents coordinates from foreign countries (e.g. Salem, Oregon, USA)
+ * being sent to OSRM alongside Indian coordinates, which causes 400 errors.
+ * India bounding box: lat 6.5-37.1, lng 68.1-97.4
+ */
+function isInIndia(lat: number, lng: number): boolean {
+  return lat >= 6.5 && lat <= 37.1 && lng >= 68.1 && lng <= 97.4;
+}
+
 const getApiHost = (): string => {
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3001';
@@ -312,14 +322,20 @@ async function geocodePlace(query: string): Promise<{ lat: number; lng: number }
   const candidates = generateGeocodeCandidates(query);
   for (const candidate of candidates) {
     try {
-      const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(candidate)}&format=json&limit=8&addressdetails=1&accept-language=en`;
+      const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(candidate)}&format=json&limit=8&addressdetails=1&accept-language=en&countrycodes=in`;
       const res = await fetch(url, {
         headers: { 'User-Agent': USER_AGENT },
       });
       const data = await res.json();
       const best = chooseBestGeocodeResult(Array.isArray(data) ? data : []);
       if (best) {
-        return { lat: parseFloat(best.lat), lng: parseFloat(best.lon) };
+        const lat = parseFloat(best.lat);
+        const lng = parseFloat(best.lon);
+        // Reject any result that falls outside India's bounding box
+        if (isInIndia(lat, lng)) {
+          return { lat, lng };
+        }
+        console.warn(`[DriverMaps] Geocode result for "${candidate}" is outside India (${lat}, ${lng}), skipping.`);
       }
     } catch {
       // Try next candidate

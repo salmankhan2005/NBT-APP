@@ -22,6 +22,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, Expense, normalizeImageUrl } from '../db/database';
 
+export interface TripDocument {
+  id: string;
+  type: 'ODOMETER' | 'POD' | 'EXPENSE';
+  title: string;
+  subtitle: string;
+  uri: string;
+}
+
 export default function TripsScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 880;
@@ -35,6 +43,37 @@ export default function TripsScreen() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  // Document Viewer State
+  const [isDocViewerVisible, setIsDocViewerVisible] = useState(false);
+  const [docFilter, setDocFilter] = useState<'ALL' | 'ODOMETER' | 'POD' | 'EXPENSE'>('ALL');
+  const [selectedDoc, setSelectedDoc] = useState<TripDocument | null>(null);
+
+  const getTripDocuments = (): TripDocument[] => {
+    if (!selectedTrip) return [];
+    const docs: TripDocument[] = [];
+    
+    if (selectedTrip.odometerStartPhotoUri) {
+      docs.push({ id: 'odo-start', type: 'ODOMETER', title: 'Odometer Start Photo', subtitle: `Reading: ${selectedTrip.odometerStart || 'N/A'} km`, uri: selectedTrip.odometerStartPhotoUri });
+    }
+    if (selectedTrip.odometerEndPhotoUri) {
+      docs.push({ id: 'odo-end', type: 'ODOMETER', title: 'Odometer End Photo', subtitle: `Reading: ${selectedTrip.odometerEnd || 'N/A'} km`, uri: selectedTrip.odometerEndPhotoUri });
+    }
+    if (selectedTrip.podPhotoUri) {
+      docs.push({ id: 'pod-photo', type: 'POD', title: 'Proof of Delivery (POD)', subtitle: selectedTrip.endDate ? `Delivered: ${selectedTrip.endDate}` : 'Delivery Photo', uri: selectedTrip.podPhotoUri });
+    }
+    if (selectedTrip.expenses && selectedTrip.expenses.length > 0) {
+      selectedTrip.expenses.forEach(exp => {
+        if (exp.receiptUri) {
+          docs.push({ id: `exp-${exp.id}`, type: 'EXPENSE', title: `${exp.category} Receipt`, subtitle: `Amount: ₹${exp.amount}`, uri: exp.receiptUri });
+        }
+      });
+    }
+    return docs;
+  };
+
+  const tripDocs = getTripDocuments();
+  const filteredDocs = tripDocs.filter(d => docFilter === 'ALL' || d.type === docFilter);
 
   // Driver Payment input
   const [driverPaymentInput, setDriverPaymentInput] = useState('');
@@ -267,7 +306,7 @@ export default function TripsScreen() {
 
 <div class="page-header">
   <div>
-    <div class="brand">NEW BALAJI TRANSPORTS</div>
+    <div class="brand">NEW BALAJI TRANSPORT</div>
     <div class="brand-sub">Trip Settlement Report</div>
   </div>
   <div class="report-meta">
@@ -355,7 +394,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
 </div>` : ''}
 
 <div class="footer">
-  <span>New Balaji Transports — NBT-ARS System</span>
+  <span>New Balaji Transport — NBT-ARS System</span>
   <span>Trip ${trip.id} | Printed ${new Date().toLocaleDateString('en-IN')}</span>
 </div>
 
@@ -644,7 +683,144 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
           transparent={false}
           onRequestClose={handleCloseDetails}
         >
-          <SafeAreaView style={styles.modalContainer}>
+          {isDocViewerVisible ? (
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#f1f5f9' }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b' }}>Trip Documents</Text>
+                  <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{selectedTrip?.id} • {selectedTrip?.vehicleNumber}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setIsDocViewerVisible(false)} style={{ padding: 8 }}>
+                  <MaterialIcons name="close" size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Filters */}
+              {/* Filters */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', gap: 8 }}>
+                {(['ALL', 'ODOMETER', 'POD', 'EXPENSE'] as const).map(filter => (
+                  <TouchableOpacity
+                    key={filter}
+                    onPress={() => setDocFilter(filter)}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 6,
+                      borderRadius: 16,
+                      backgroundColor: docFilter === filter ? '#0f172a' : '#f1f5f9',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                      color: docFilter === filter ? '#fff' : '#64748b'
+                    }}>
+                      {filter}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
+                {/* Document List Pane */}
+                <View style={{ 
+                  width: isDesktop ? 320 : '100%', 
+                  height: isDesktop ? '100%' : 220, 
+                  backgroundColor: '#f8fafc', 
+                  borderRightWidth: isDesktop ? 1 : 0, 
+                  borderBottomWidth: isDesktop ? 0 : 1, 
+                  borderRightColor: '#e2e8f0',
+                  borderBottomColor: '#e2e8f0'
+                }}>
+                  <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }}>
+                    {filteredDocs.length === 0 ? (
+                      <Text style={{ textAlign: 'center', color: '#94a3b8', marginTop: 20 }}>No documents found.</Text>
+                    ) : (
+                      filteredDocs.map(doc => {
+                        const isSelected = selectedDoc?.id === doc.id;
+                        return (
+                          <TouchableOpacity
+                            key={doc.id}
+                            onPress={() => setSelectedDoc(doc)}
+                            style={{
+                              backgroundColor: '#fff',
+                              borderRadius: 8,
+                              padding: 12,
+                              borderWidth: 1,
+                              borderColor: isSelected ? '#3b82f6' : '#e2e8f0',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.05,
+                              shadowRadius: 2,
+                              elevation: 1,
+                            }}
+                          >
+                            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
+                              <MaterialIcons 
+                                name={doc.type === 'ODOMETER' ? 'speed' : doc.type === 'POD' ? 'local-shipping' : 'receipt'} 
+                                size={18} 
+                                color="#3b82f6" 
+                              />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1e293b' }}>{doc.title}</Text>
+                              <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{doc.subtitle}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </ScrollView>
+                </View>
+
+                {/* Document Viewer Pane */}
+                <View style={{ flex: 1, backgroundColor: '#fff', padding: isDesktop ? 24 : 16 }}>
+                  {selectedDoc ? (
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b' }}>{selectedDoc.title}</Text>
+                      <Text style={{ fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 24 }}>{selectedDoc.subtitle}</Text>
+                      
+                      <View style={{ flex: 1, backgroundColor: '#f1f5f9', borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                        <Image 
+                          source={{ uri: normalizeImageUrl(selectedDoc.uri) || selectedDoc.uri }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="contain"
+                        />
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => Linking.openURL(selectedDoc.uri)}
+                        style={{
+                          marginTop: 24,
+                          alignSelf: 'center',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          paddingVertical: 12,
+                          paddingHorizontal: 24,
+                          borderWidth: 1,
+                          borderColor: '#cbd5e1',
+                          borderRadius: 6,
+                        }}
+                      >
+                        <MaterialIcons name="open-in-new" size={18} color="#334155" />
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#334155' }}>OPEN FULL RESOLUTION</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                      <MaterialIcons name="image-search" size={64} color="#e2e8f0" />
+                      <Text style={{ color: '#94a3b8', marginTop: 12, fontSize: 16 }}>Select a document to view</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </SafeAreaView>
+          ) : (
+            <SafeAreaView style={styles.modalContainer}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={handleCloseDetails} style={styles.closeBtn}>
@@ -664,6 +840,20 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                 <MaterialIcons name="print" size={20} color="#ffffff" />
                 <Text style={styles.printBtnText}>PDF</Text>
               </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant }}>
+               <TouchableOpacity 
+                  style={{ backgroundColor: COLORS.primary, padding: 12, borderRadius: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}
+                  onPress={() => {
+                     const docs = getTripDocuments();
+                     if (docs.length > 0) setSelectedDoc(docs[0]);
+                     setIsDocViewerVisible(true);
+                  }}
+               >
+                 <MaterialIcons name="collections" size={20} color="#fff" />
+                 <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>VIEW ALL UPLOADED DOCUMENTS</Text>
+               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.modalContent}>
@@ -720,8 +910,8 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Initial Odometer Photo (Driver Upload):</Text>
                     <Image
                       source={{ uri: selectedTrip.odometerStartPhotoUri }}
-                      style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
-                      resizeMode="cover"
+                      style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#e2e8f0' }}
+                      resizeMode="contain"
                     />
                     <TouchableOpacity
                       style={{ marginTop: 6, alignSelf: 'flex-start' }}
@@ -764,8 +954,8 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 End Odometer Photo:</Text>
                     <Image
                       source={{ uri: selectedTrip.odometerEndPhotoUri }}
-                      style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
-                      resizeMode="cover"
+                      style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#e2e8f0' }}
+                      resizeMode="contain"
                     />
                     <TouchableOpacity
                       style={{ marginTop: 6, alignSelf: 'flex-start' }}
@@ -1000,7 +1190,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                                 <Image
                                   source={{ uri: exp.receiptUri }}
                                   style={styles.receiptImage}
-                                  resizeMode="cover"
+                                  resizeMode="contain"
                                 />
                                 <TouchableOpacity
                                   style={styles.viewReceiptBtn}
@@ -1022,6 +1212,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
               </View>
             </ScrollView>
           </SafeAreaView>
+          )}
         </Modal>
       )}
 
@@ -1465,17 +1656,18 @@ const styles = StyleSheet.create({
   },
   podPhotoImage: {
     width: '100%',
+    maxWidth: 350,
     height: 200,
     borderRadius: 8,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: '#e2e8f0',
   },
   podSignatureImage: {
     maxWidth: 240,
     width: '100%',
-    aspectRatio: 8 / 3,
+    height: 100,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
@@ -1501,11 +1693,12 @@ const styles = StyleSheet.create({
   },
   receiptImage: {
     width: '100%',
-    height: 120,
+    maxWidth: 350,
+    height: 150,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: '#e2e8f0',
     marginBottom: 6,
   },
   viewReceiptBtn: {

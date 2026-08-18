@@ -35,6 +35,7 @@ export default function AddExpenseScreen({
   onBackToTrip,
 }: AddExpenseScreenProps) {
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | null>(null);
+  const [successMsg, setSuccessMsg] = useState('');
   
   // Form common states
   const [amount, setAmount] = useState('');
@@ -195,15 +196,12 @@ export default function AddExpenseScreen({
         console.log('Speech error:', err);
       }
       
-      Alert.alert('Success', 'Expense Saved Successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm();
-            onExpenseSaved();
-          }
-        }
-      ]);
+      const savedCat = selectedCategory;
+      resetForm();
+      onExpenseSaved();
+      
+      setSuccessMsg(`✅ ${savedCat} expense of ₹${amtNum} submitted successfully!`);
+      setTimeout(() => setSuccessMsg(''), 4000);
     } catch (e) {
       Alert.alert('Error', 'Failed to save expense.');
     } finally {
@@ -247,6 +245,11 @@ export default function AddExpenseScreen({
       {selectedCategory === null ? (
         /* CATEGORY PICKER & EXPENSES SUMMARY LIST */
         <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {!!successMsg && (
+            <View style={{ backgroundColor: '#dcfce7', padding: 12, borderRadius: 8, marginBottom: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }}>
+              <Text style={{ color: '#166534', fontWeight: 'bold', fontSize: 14 }}>{successMsg}</Text>
+            </View>
+          )}
           <Text style={styles.sectionTitle}>Add New Expense</Text>
           
           <View style={styles.grid}>

@@ -154,7 +154,7 @@ export default function ProfileScreen({
           <View style={styles.badge}>
             <Text style={styles.badgeText}>Tracking ID: {currentTrackingId}</Text>
           </View>
-          <Text style={styles.subtext}>Verified Operator • NBT Logistics & ARS Fleet</Text>
+          <Text style={styles.subtext}>Verified Operator • New Balaji Transport (NBT)</Text>
         </View>
 
         {/* Statistics Grid */}
@@ -364,7 +364,7 @@ export default function ProfileScreen({
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>New Balaji Transports & ARS Fleet Transit</Text>
+          <Text style={styles.footerText}>New Balaji Transport (NBT)</Text>
           <Text style={styles.footerSub}>Secure Logistics Console © 2026</Text>
         </View>
       </ScrollView>

@@ -277,7 +277,7 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading NBT + ARS Fleet Transit Dashboard...</Text>
+        <Text style={styles.loadingText}>Loading New Balaji Transport Dashboard...</Text>
       </View>
     );
   }
@@ -297,7 +297,7 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
           <View>
             <View style={styles.headerTitleRow}>
               <MaterialIcons name="directions-bus" size={24} color={COLORS.primary} style={{ marginRight: 8 }} />
-              <Text style={styles.title}>NBT + ARS Fleet Transit</Text>
+              <Text style={styles.title}>New Balaji Transport</Text>
             </View>
             <Text style={styles.subtitle}>Real-Time Central Command Admin Dashboard</Text>
           </View>
@@ -739,7 +739,7 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Monthly Completed Trips Report</Text>
-                <Text style={styles.modalSubtitle}>NBT + ARS Fleet Transit Archive</Text>
+                <Text style={styles.modalSubtitle}>New Balaji Transport Archive</Text>
               </View>
               <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setMonthlyReportVisible(false)}>
                 <MaterialIcons name="close" size={24} color="#1e293b" />

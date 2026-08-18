@@ -85,7 +85,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
           </View>
         </Animated.View>
 
-        <Text style={styles.appTitle}>NEW BALAJI TRANSPORTS</Text>
+        <Text style={styles.appTitle}>NEW BALAJI TRANSPORT</Text>
         <Text style={styles.appSubtitle}>Enterprise Logistics & Dispatch Suite</Text>
 
         {/* Progress Bar Container */}

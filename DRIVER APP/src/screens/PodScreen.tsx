@@ -69,7 +69,7 @@ export default function PodScreen({
             {/* Header */}
             <View style={styles.docketHeader}>
               <MaterialIcons name="local-shipping" size={32} color={COLORS.secondary} />
-              <Text style={styles.docketTitle}>NBT + ARS TRANSIT SYSTEM</Text>
+              <Text style={styles.docketTitle}>NEW BALAJI TRANSPORT SYSTEM</Text>
               <Text style={styles.docketSub}>DIGITAL TRANSIT & DELIVERY DOCKET</Text>
             </View>
 

@@ -72,7 +72,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <View style={styles.logoContainer}>
               <MaterialIcons name="local-shipping" size={48} color={COLORS.onPrimary} />
             </View>
-            <Text style={styles.title}>NBT + ARS</Text>
+            <Text style={styles.title}>New Balaji Transport</Text>
             <Text style={styles.subtitle}>Driver Console</Text>
           </View>
 
