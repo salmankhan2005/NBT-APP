@@ -1,0 +1,210 @@
+import { NextResponse } from 'next/server';
+import { Database, hashSha256, DatabaseSchema } from '@/lib/db';
+
+const DEFAULT_DB: DatabaseSchema = {
+  admins: [
+    {
+      username: 'admin',
+      pinHash: hashSha256('9999'),
+    }
+  ],
+  drivers: [
+    {
+      id: '4421',
+      name: 'Rajesh Kumar',
+      pin: '1234',
+      pinHash: hashSha256('1234'),
+      phone: '9876543210',
+      license: 'DL-TN30-20150912',
+      vehicleNumber: 'TN 01 AB 1234',
+      active: true,
+    },
+    {
+      id: '5566',
+      name: 'Senthil Nathan',
+      pin: '4321',
+      pinHash: hashSha256('4321'),
+      phone: '9876543211',
+      license: 'DL-TN37-20180405',
+      vehicleNumber: 'TN 37 B 5678',
+      active: true,
+    }
+  ],
+  vehicles: [
+    {
+      number: 'TN 01 AB 1234',
+      type: '12 Wheel',
+      wheelType: '12 Wheeler Container',
+      owner: 'New Balaji Transports',
+      insurance: 'POL-991244A (Exp: 24/12/2026)',
+      permit: 'National Permit NP-912A',
+      fitness: 'FIT-10928 (Exp: 10/10/2026)',
+      rc: 'RC-TN01AB1234'
+    },
+    {
+      number: 'TN 37 B 5678',
+      type: '6 Wheel',
+      wheelType: '6 Wheeler Open-Body',
+      owner: 'New Balaji Transports',
+      insurance: 'POL-558231C (Exp: 15/09/2026)',
+      permit: 'Tamil Nadu State Permit',
+      fitness: 'FIT-20412 (Exp: 01/01/2027)',
+      rc: 'RC-TN37B5678'
+    },
+    {
+      number: 'KA 03 MM 7890',
+      type: '16 Wheel',
+      wheelType: '16 Wheeler Heavy Container',
+      owner: 'Self',
+      insurance: 'POL-102941X (Exp: 30/11/2026)',
+      permit: 'All-India National Permit',
+      fitness: 'FIT-99411 (Exp: 14/08/2026)',
+      rc: 'RC-KA03MM7890'
+    }
+  ],
+  trips: [
+    {
+      id: 'TRP-9824',
+      driverId: '4421',
+      driverName: 'Rajesh Kumar',
+      vehicleNumber: 'TN 01 AB 1234',
+      vehicleType: '12 Wheel',
+      startingPoint: 'Chennai Hub',
+      destination: 'Bangalore FC',
+      tollsCount: 8,
+      estimatedTollCost: 3200,
+      status: 'ASSIGNED',
+      expenses: [],
+      trackingId: 'NBT-84213',
+      currentGPS: {
+        latitude: 13.0827,
+        longitude: 80.2707,
+        city: 'Chennai',
+        address: 'Guindy Industrial Estate, Chennai, Tamil Nadu',
+        lastUpdated: new Date().toLocaleTimeString(),
+      }
+    },
+    {
+      id: 'TRP-5021',
+      driverId: '5566',
+      driverName: 'Senthil Nathan',
+      vehicleNumber: 'TN 37 B 5678',
+      vehicleType: '6 Wheel',
+      startingPoint: 'Salem Junction',
+      destination: 'Coimbatore Hub',
+      tollsCount: 4,
+      estimatedTollCost: 1400,
+      status: 'STARTED',
+      odometerStart: 120500,
+      dieselStart: '1/2',
+      startDate: new Date().toLocaleDateString(),
+      startTime: '10:00 AM',
+      expenses: [
+        {
+          id: 'EXP-1',
+          category: 'FUEL',
+          amount: 6500,
+          liters: 65,
+          reason: 'Initial Diesel Fill up',
+          timestamp: '10:15 AM',
+          location: {
+            latitude: 11.6643,
+            longitude: 78.1460,
+            city: 'Salem',
+            address: 'BPCL Petrol Pump, Salem Bypass',
+            lastUpdated: '10:15 AM'
+          }
+        },
+        {
+          id: 'EXP-2',
+          category: 'TOLL',
+          amount: 350,
+          reason: 'Salem Toll Plaza',
+          timestamp: '11:20 AM',
+          location: {
+            latitude: 11.5540,
+            longitude: 77.9230,
+            city: 'Salem Outskirts',
+            address: 'Salem Toll Barrier',
+            lastUpdated: '11:20 AM'
+          }
+        }
+      ],
+      trackingId: 'NBT-99999',
+      currentGPS: {
+        latitude: 11.3410,
+        longitude: 77.7172,
+        city: 'Erode Bypass',
+        address: 'NH544 Erode Exit, Tamil Nadu',
+        lastUpdated: new Date().toLocaleTimeString(),
+      }
+    }
+  ],
+  gcNotes: [
+    {
+      id: 'MAR-26-01',
+      date: '2026-03-12',
+      from: 'Chennai',
+      to: 'Bangalore',
+      truckNumber: 'TN 01 AB 1234',
+      consignor: 'Make India Private Limited',
+      consignee: 'Apex Retail Distribution',
+      consignorGst: '33AAAAA1111A1Z1',
+      consigneeGst: '29BBBBB2222B2Z2',
+      items: [
+        {
+          articlesCount: 150,
+          description: 'Industrial Gear Parts',
+          weight: 4.5,
+          value: 1250000
+        }
+      ],
+      freight: 45000,
+      cgst: 1125,
+      sgst: 1125,
+      igst: 0,
+      total: 47250,
+      lessAdvance: 15000,
+      balance: 32250,
+      payableAt: 'Bangalore Office',
+      gstPayee: 'Consignor',
+      deliveryAt: 'Door Delivery',
+      pan: 'AAAAA1111A',
+      driverName: 'Rajesh Kumar',
+      driverSignature: 'Rajesh',
+      dlNumber: 'DL-TN30-20150912',
+      lorryOwner: 'New Balaji Transports',
+      bankDetails: 'SBI A/C: 10928374656, IFSC: SBIN0001234',
+      terms: '1. Goods carried at owner risk. 2. Demurrage charged after 24 hrs. 3. Disputes subject to Chennai jurisdiction.',
+    }
+  ],
+  activityLogs: [
+    {
+      id: 'LOG-1',
+      tripId: 'TRP-5021',
+      driverId: '5566',
+      driverName: 'Senthil Nathan',
+      vehicleNumber: 'TN 37 B 5678',
+      action: 'TRIP STARTED',
+      timestamp: new Date().toLocaleTimeString(),
+      details: 'Started trip from Salem to Coimbatore with odometer 120500.'
+    }
+  ]
+};
+
+export async function POST() {
+  try {
+    Database.update(db => {
+      db.admins = DEFAULT_DB.admins;
+      db.drivers = DEFAULT_DB.drivers;
+      db.vehicles = DEFAULT_DB.vehicles;
+      db.trips = DEFAULT_DB.trips;
+      db.gcNotes = DEFAULT_DB.gcNotes;
+      db.activityLogs = DEFAULT_DB.activityLogs;
+    });
+    return NextResponse.json({ success: true, message: 'Database reset successfully' });
+  } catch (e) {
+    console.error('Error resetting database:', e);
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+  }
+}

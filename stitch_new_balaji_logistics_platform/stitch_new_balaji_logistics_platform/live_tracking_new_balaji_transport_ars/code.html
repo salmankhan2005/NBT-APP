@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Live Tracking Results - New Balaji Transport &amp; ARS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-fixed-variant": "#374860",
+                      "surface-variant": "#e0e3e6",
+                      "surface-container-highest": "#e0e3e6",
+                      "surface-bright": "#f7f9fc",
+                      "on-secondary-container": "#fefcff",
+                      "surface-tint": "#4f5f78",
+                      "background": "#f7f9fc",
+                      "tertiary-container": "#2b1900",
+                      "surface": "#f7f9fc",
+                      "secondary": "#0350d7",
+                      "secondary-fixed": "#dbe1ff",
+                      "inverse-surface": "#2d3133",
+                      "on-tertiary-fixed-variant": "#633f00",
+                      "on-surface-variant": "#44474d",
+                      "surface-container": "#eceef1",
+                      "primary-fixed": "#d4e3ff",
+                      "on-secondary-fixed-variant": "#003da9",
+                      "on-secondary-fixed": "#00174c",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#356bf1",
+                      "outline-variant": "#c4c6cd",
+                      "error-container": "#ffdad6",
+                      "on-background": "#191c1e",
+                      "tertiary-fixed": "#ffddb4",
+                      "primary": "#000206",
+                      "inverse-on-surface": "#eff1f4",
+                      "on-tertiary-fixed": "#291800",
+                      "on-tertiary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "tertiary-fixed-dim": "#ffb955",
+                      "tertiary": "#050200",
+                      "outline": "#74777e",
+                      "on-surface": "#191c1e",
+                      "on-primary-container": "#7586a0",
+                      "on-primary": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "inverse-primary": "#b7c7e5",
+                      "on-secondary": "#ffffff",
+                      "surface-container-low": "#f2f4f7",
+                      "surface-dim": "#d8dadd",
+                      "on-tertiary-container": "#b67800",
+                      "primary-fixed-dim": "#b7c7e5",
+                      "secondary-fixed-dim": "#b4c5ff",
+                      "primary-container": "#0b1d33",
+                      "error": "#ba1a1a",
+                      "on-primary-fixed": "#0a1c32",
+                      "surface-container-high": "#e6e8eb"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container-max": "1280px",
+                      "base": "8px",
+                      "margin-desktop": "40px",
+                      "stack-sm": "8px",
+                      "gutter": "24px",
+                      "margin-mobile": "16px",
+                      "stack-lg": "32px",
+                      "stack-md": "16px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "body-md": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "headline-xl": ["Inter"],
+                      "body-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "label-md": ["14px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                      "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex flex-col">
+<!-- TopNavBar (Shared Component) -->
+<header class="bg-surface dark:bg-background docked full-width top-0 shadow-sm z-50">
+<div class="flex justify-between items-center w-full px-margin-desktop max-w-container-max mx-auto h-20">
+<div class="flex items-center gap-4">
+<span class="text-headline-md font-headline-md font-bold text-on-surface dark:text-inverse-on-surface">New Balaji Transport &amp; ARS</span>
+</div>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-secondary transition-colors hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-all px-3 py-2 rounded-lg text-label-md font-label-md" href="#">Home</a>
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-secondary transition-colors hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-all px-3 py-2 rounded-lg text-label-md font-label-md" href="#">About Us</a>
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-secondary transition-colors hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-all px-3 py-2 rounded-lg text-label-md font-label-md" href="#">Services</a>
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-secondary transition-colors hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-all px-3 py-2 rounded-lg text-label-md font-label-md" href="#">Business Details</a>
+<a class="text-on-surface-variant dark:text-outline-variant hover:text-secondary transition-colors hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-all px-3 py-2 rounded-lg text-label-md font-label-md" href="#">Contact</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="text-secondary dark:text-secondary-fixed font-label-md text-label-md px-4 py-2 border border-outline-variant rounded-lg hover:bg-surface-container-low transition-colors">Get a Quote</button>
+<!-- Active action intent matched to Track Shipment -->
+<button class="bg-secondary text-on-secondary font-label-md text-label-md px-4 py-2 rounded-lg hover:bg-secondary-container transition-colors shadow-sm scale-95 duration-100 transition-transform">Track Shipment</button>
+</div>
+</div>
+</header>
+<!-- Tracking Sub-Header -->
+<div class="bg-surface-container-lowest border-b border-surface-variant w-full">
+<div class="max-w-container-max mx-auto px-margin-desktop py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline">local_shipping</span>
+<span class="text-label-md font-label-md text-on-surface-variant">Tracking ID:</span>
+<span class="text-body-md font-body-md font-semibold">NBT-84213</span>
+</div>
+<a class="text-secondary text-label-sm font-label-sm hover:underline flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-[16px]">search</span>
+                Track another shipment
+            </a>
+</div>
+</div>
+<!-- Main Content Canvas -->
+<main class="flex-grow relative w-full h-[calc(100vh-140px)] overflow-hidden">
+<!-- Live Map Background (Placeholder) -->
+<div class="absolute inset-0 w-full h-full bg-surface-container-low flex flex-col justify-center items-center">
+<!-- Simulated Map Visual -->
+<div class="w-full h-full bg-cover bg-center" data-alt="A detailed, modern digital map interface displaying a logistics route across a subtle, light-mode terrain. The map features a soft color palette of off-whites and light grays, representing a corporate B2B logistics dashboard. A prominent dotted route line connects two clear location markers, with a truck icon positioned partway along the path to indicate active transit. The lighting is bright and crisp, emphasizing precision and data clarity in a professional SaaS environment." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCeiyrKY_Rl5oN6QaRSK4y-5yKwYO4G5WKPUsmlSWZ9GQBTMt7grRDDUW4Z8EUa86k9qcbqPGHXQBU4JxsWBDcjD52ZoIfU6O2m4g14OCbULzShsekyznkpqAWIz9Yv_ozX71Qob-9DVvrgCWaKWebTnmjEHjopnH6IFj87kdzFctD30JK_8bttnju9GwfxZjspaiqv1RLkU85e55sVk8gRJPthAt-CXVEl6cJdb3aQxztrF4fl2VoN')"></div>
+</div>
+<!-- Floating UI Overlay Container -->
+<div class="absolute inset-0 w-full max-w-container-max mx-auto px-margin-desktop pointer-events-none flex flex-col justify-between py-stack-lg">
+<!-- Top Right: Status Card (Bento Style) -->
+<div class="self-end pointer-events-auto max-w-sm w-full bg-surface-container-lowest rounded-xl border border-surface-variant shadow-[0px_12px_32px_rgba(11,29,51,0.12)] p-6 flex flex-col gap-stack-sm">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h2 class="text-headline-md font-headline-md text-on-surface">In Transit</h2>
+<p class="text-label-sm font-label-sm text-on-surface-variant mt-1">Expected Delivery: Oct 24, 14:00</p>
+</div>
+<div class="bg-tertiary-fixed-dim/10 px-3 py-1 rounded-full border border-tertiary-fixed-dim/20">
+<span class="text-tertiary-fixed-dim text-label-sm font-label-sm font-semibold uppercase tracking-wider flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></span> Active
+                        </span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="w-full mt-4">
+<div class="flex justify-between text-label-sm font-label-sm text-on-surface-variant mb-1">
+<span>Progress</span>
+<span class="text-on-surface font-semibold">63%</span>
+</div>
+<div class="h-2 bg-surface-container rounded-full overflow-hidden w-full">
+<div class="h-full bg-secondary rounded-full" style="width: 63%;"></div>
+</div>
+</div>
+<!-- Logistics Data Grid -->
+<div class="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-surface-variant">
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-outline mb-1 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">route</span> Remaining</span>
+<span class="text-body-md font-body-md font-semibold">412 km</span>
+</div>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-outline mb-1 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">speed</span> Avg Speed</span>
+<span class="text-body-md font-body-md font-semibold">62 km/h</span>
+</div>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-outline mb-1 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">local_shipping</span> Vehicle</span>
+<span class="text-body-md font-body-md font-semibold">22ft Container</span>
+</div>
+<div class="flex flex-col">
+<span class="text-label-sm font-label-sm text-outline mb-1 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">satellite_alt</span> GPS Ping</span>
+<span class="text-body-md font-body-md font-semibold">2 mins ago</span>
+</div>
+</div>
+</div>
+<!-- Bottom: Shipment Timeline (Glassmorphism/Card) -->
+<div class="w-full pointer-events-auto mt-auto bg-surface-container-lowest/90 backdrop-blur-md rounded-xl border border-surface-variant shadow-[0px_4px_12px_rgba(11,29,51,0.05)] p-6">
+<div class="flex flex-col sm:flex-row items-center justify-between gap-4 relative">
+<!-- Progress Line Background -->
+<div class="absolute top-1/2 left-0 w-full h-1 bg-surface-container -z-10 hidden sm:block -translate-y-1/2"></div>
+<!-- Progress Line Active -->
+<div class="absolute top-1/2 left-0 w-[50%] h-1 bg-secondary -z-10 hidden sm:block -translate-y-1/2"></div>
+<!-- Step 1: Confirmed -->
+<div class="flex flex-col items-center gap-2 z-10 w-full sm:w-auto">
+<div class="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-on-secondary shadow-sm">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="text-center">
+<p class="text-label-sm font-label-sm font-semibold text-on-surface">Order Confirmed</p>
+<p class="text-[10px] text-outline mt-0.5">Oct 21, 09:15</p>
+</div>
+</div>
+<!-- Step 2: Picked Up -->
+<div class="flex flex-col items-center gap-2 z-10 w-full sm:w-auto">
+<div class="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-on-secondary shadow-sm">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">package</span>
+</div>
+<div class="text-center">
+<p class="text-label-sm font-label-sm font-semibold text-on-surface">Picked Up</p>
+<p class="text-[10px] text-outline mt-0.5">Oct 21, 16:30</p>
+</div>
+</div>
+<!-- Step 3: In Transit (Active - Amber) -->
+<div class="flex flex-col items-center gap-2 z-10 w-full sm:w-auto relative">
+<!-- Pulsing glow effect -->
+<div class="absolute inset-0 bg-tertiary-fixed-dim/30 rounded-full blur-md animate-pulse"></div>
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed-dim flex items-center justify-center text-on-tertiary shadow-[0px_4px_12px_rgba(255,185,85,0.4)] z-10 border-2 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+</div>
+<div class="text-center mt-[-4px]">
+<p class="text-label-md font-label-md font-bold text-tertiary-container">In Transit</p>
+<p class="text-[11px] text-on-surface-variant mt-0.5 font-medium">Currently updating</p>
+</div>
+</div>
+<!-- Step 4: Out for Delivery -->
+<div class="flex flex-col items-center gap-2 z-10 w-full sm:w-auto opacity-50">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined text-[18px]">directions_run</span>
+</div>
+<div class="text-center">
+<p class="text-label-sm font-label-sm font-semibold text-on-surface-variant">Out for Delivery</p>
+<p class="text-[10px] text-outline mt-0.5">Pending</p>
+</div>
+</div>
+<!-- Step 5: Delivered -->
+<div class="flex flex-col items-center gap-2 z-10 w-full sm:w-auto opacity-50">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined text-[18px]">home</span>
+</div>
+<div class="text-center">
+<p class="text-label-sm font-label-sm font-semibold text-on-surface-variant">Delivered</p>
+<p class="text-[10px] text-outline mt-0.5">Pending</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer (Shared Component) -->
+<footer class="bg-primary-container dark:bg-primary full-width bottom-0 z-50">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-lg w-full px-margin-desktop py-stack-lg max-w-container-max mx-auto text-on-primary-container dark:text-primary-fixed">
+<div class="flex flex-col gap-4">
+<span class="text-headline-sm font-headline-sm font-bold text-on-primary dark:text-primary-fixed-dim">New Balaji Transport &amp; ARS</span>
+<p class="text-body-sm font-body-sm text-on-primary-container/80">Providing reliable logistics and fleet management solutions.</p>
+<p class="text-label-sm font-label-sm text-on-primary-container/60 mt-4">© 2024 New Balaji Transport &amp; ARS. All rights reserved. Registration No: TN-45-X-9876</p>
+</div>
+<div class="flex flex-col md:items-end gap-4">
+<nav class="flex flex-wrap gap-4 md:justify-end">
+<a class="text-label-sm font-label-sm text-on-primary-container/80 dark:text-outline-variant hover:text-on-primary hover:underline transition-all" href="#">Home</a>
+<a class="text-label-sm font-label-sm text-on-primary-container/80 dark:text-outline-variant hover:text-on-primary hover:underline transition-all" href="#">Services</a>
+<a class="text-label-sm font-label-sm text-on-primary-container/80 dark:text-outline-variant hover:text-on-primary hover:underline transition-all" href="#">Contact</a>
+<a class="text-label-sm font-label-sm text-secondary-fixed font-bold hover:underline transition-all opacity-80" href="#">Track Shipment</a>
+</nav>
+</div>
+</div>
+</footer>
+</body></html>
