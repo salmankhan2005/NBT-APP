@@ -19,7 +19,7 @@ const fleetCards: FleetCard[] = [
     vehicle: '12-Wheeler Open Body Truck',
     type: 'Open Body',
     units: 4,
-    image: '/images/WhatsApp Image 2026-08-16 at 22.24.26 (1).jpeg',
+    image: '/images/truck-12-wheeler-1.jpeg',
     icon: <Truck className="w-6 h-6" />,
   },
   {
@@ -27,7 +27,7 @@ const fleetCards: FleetCard[] = [
     vehicle: '12-Wheeler Open Body Truck',
     type: 'Open Body',
     units: 2,
-    image: '/images/WhatsApp Image 2026-08-16 at 22.24.26 (2).jpeg',
+    image: '/images/truck-12-wheeler-2.jpeg',
     icon: <Truck className="w-6 h-6" />,
   },
   {
@@ -35,7 +35,7 @@ const fleetCards: FleetCard[] = [
     vehicle: '16-Wheeler Open Body Truck',
     type: 'Open Body',
     units: 3,
-    image: '/images/WhatsApp Image 2026-08-16 at 22.24.26 (3).jpeg',
+    image: '/images/truck-16-wheeler.jpeg',
     icon: <Truck className="w-6 h-6" />,
   },
   {
@@ -43,7 +43,7 @@ const fleetCards: FleetCard[] = [
     vehicle: '10-Wheeler 32 FT Container Truck',
     type: '32 FT Container',
     units: 2,
-    image: '/images/WhatsApp Image 2026-08-16 at 22.24.26.jpeg',
+    image: '/images/truck-container-10-wheeler.jpeg',
     icon: <Container className="w-6 h-6" />,
   },
 ];
