@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FleetSection from "@/components/FleetSection";
 
 export default function Services() {
   return (
@@ -76,6 +77,9 @@ export default function Services() {
           </div>
         </div>
       </section>
+
+      {/* Fleet Section */}
+      <FleetSection />
 
       {/* Comparison Table */}
       <section className="mb-stack-lg bg-surface-container-lowest border border-surface-variant rounded-xl shadow-sm overflow-hidden">
