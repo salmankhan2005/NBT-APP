@@ -24,7 +24,7 @@ const fleetCards: FleetCard[] = [
   },
   {
     id: 2,
-    vehicle: '14-Wheeler Open Body Truck',
+    vehicle: '12-Wheeler Open Body Truck',
     type: 'Open Body',
     units: 2,
     image: '/images/WhatsApp Image 2026-08-16 at 22.24.26 (2).jpeg',
