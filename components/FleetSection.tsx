@@ -198,13 +198,13 @@ export default function FleetSection() {
             {/* Detail Content */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 h-full">
               {/* Left: Image Carousel Section */}
-              <div className="flex flex-col justify-center items-center bg-gradient-to-br from-slate-50 to-slate-100 p-8 lg:p-12 rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none">
-                <div className="relative w-full max-h-96 lg:max-h-full bg-white rounded-2xl overflow-hidden group shadow-lg border border-slate-200 flex items-center justify-center">
+              <div className="flex flex-col justify-center items-center bg-gradient-to-br from-slate-50 to-slate-100 p-8 lg:p-12 rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none min-h-96 lg:min-h-screen">
+                <div className="relative w-full h-80 lg:h-96 bg-white rounded-2xl overflow-hidden group shadow-lg border border-slate-200">
                   <Image
                     src={selectedFleet.images?.[currentImageIndex] || selectedFleet.image}
                     alt={`${selectedFleet.vehicle} - View ${currentImageIndex + 1}`}
                     fill
-                    className="w-full h-full object-contain transition-transform duration-500 p-2"
+                    className="w-full h-full object-contain transition-transform duration-500 p-4"
                     priority
                     sizes="(max-width: 768px) 100vw, 50vw"
                   />
