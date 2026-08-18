@@ -182,30 +182,34 @@ export default function FleetSection() {
 
       {/* Detail View Modal */}
       {selectedFleet && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-y-auto">
             {/* Close Button */}
             <button
-              onClick={() => setSelectedFleet(null)}
-              className="absolute top-6 right-6 z-10 p-2 bg-slate-100 hover:bg-red-100 rounded-full transition-all duration-300 hover:scale-110"
+              onClick={() => {
+                setSelectedFleet(null);
+                setCurrentImageIndex(0);
+              }}
+              className="absolute top-6 right-6 z-10 p-2 bg-slate-100 hover:bg-red-100 rounded-full transition-all duration-300 hover:scale-110 shadow-md"
             >
               <X className="w-6 h-6 text-slate-700" />
             </button>
 
             {/* Detail Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-8 lg:p-12">
-              {/* Left: Image Carousel */}
-              <div className="lg:col-span-1.5 flex flex-col justify-center">
-                <div className="relative h-96 lg:h-full min-h-96 bg-slate-100 rounded-2xl overflow-hidden group">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 h-full">
+              {/* Left: Image Carousel Section */}
+              <div className="flex flex-col justify-center items-center bg-gradient-to-br from-slate-50 to-slate-100 p-8 lg:p-12 rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none">
+                <div className="relative w-full h-80 lg:h-96 bg-white rounded-2xl overflow-hidden group shadow-lg border border-slate-200">
                   <Image
                     src={selectedFleet.images?.[currentImageIndex] || selectedFleet.image}
-                    alt={selectedFleet.vehicle}
+                    alt={`${selectedFleet.vehicle} - View ${currentImageIndex + 1}`}
                     fill
                     className="w-full h-full object-cover transition-transform duration-500"
                     priority
+                    sizes="(max-width: 768px) 100vw, 50vw"
                   />
                   {/* Gradient Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                   {/* Image Navigation - Show only if multiple images */}
                   {selectedFleet.images && selectedFleet.images.length > 1 && (
@@ -219,7 +223,7 @@ export default function FleetSection() {
                               : currentImageIndex - 1
                           )
                         }
-                        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/90 hover:bg-white rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 shadow-lg"
+                        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/95 hover:bg-white rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 shadow-lg"
                       >
                         <ChevronLeft className="w-6 h-6 text-slate-900" />
                       </button>
@@ -233,27 +237,28 @@ export default function FleetSection() {
                               : currentImageIndex + 1
                           )
                         }
-                        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/90 hover:bg-white rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 shadow-lg"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/95 hover:bg-white rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 shadow-lg"
                       >
                         <ChevronRight className="w-6 h-6 text-slate-900" />
                       </button>
 
                       {/* Image Counter */}
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/75 text-white rounded-full text-sm font-semibold backdrop-blur-sm">
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 text-white rounded-full text-sm font-semibold backdrop-blur-sm">
                         {currentImageIndex + 1} / {selectedFleet.images.length}
                       </div>
 
-                      {/* Thumbnail Navigation */}
-                      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-3">
+                      {/* Thumbnail Navigation Dots */}
+                      <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-3">
                         {selectedFleet.images.map((_, idx) => (
                           <button
                             key={idx}
                             onClick={() => setCurrentImageIndex(idx)}
-                            className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                            className={`transition-all duration-300 rounded-full ${
                               idx === currentImageIndex
-                                ? 'bg-white w-8'
-                                : 'bg-white/50 hover:bg-white/75'
+                                ? 'bg-blue-600 w-3 h-3'
+                                : 'bg-slate-300 hover:bg-slate-400 w-2.5 h-2.5'
                             }`}
+                            aria-label={`View image ${idx + 1}`}
                           />
                         ))}
                       </div>
@@ -262,45 +267,55 @@ export default function FleetSection() {
                 </div>
               </div>
 
-              {/* Right: Vehicle Details */}
-              <div className="lg:col-span-1.5 flex flex-col justify-center space-y-6">
-                {/* Header */}
-                <div>
-                  <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 rounded-full bg-blue-100">
-                    {selectedFleet.icon}
+              {/* Right: Vehicle Details Section */}
+              <div className="flex flex-col justify-between p-8 lg:p-12 bg-white rounded-b-3xl lg:rounded-r-3xl lg:rounded-bl-none">
+                {/* Header Section */}
+                <div className="space-y-4 pb-6">
+                  {/* Badge */}
+                  <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-blue-100 w-fit">
+                    <div className="text-blue-600">{selectedFleet.icon}</div>
                     <span className="text-sm font-semibold text-blue-700">{selectedFleet.type}</span>
                   </div>
-                  <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 mb-3">
-                    {selectedFleet.vehicle}
-                  </h1>
-                  <p className="text-lg text-slate-600">Premium heavy-duty transport solution</p>
+
+                  {/* Title */}
+                  <div>
+                    <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 leading-tight">
+                      {selectedFleet.vehicle}
+                    </h1>
+                    <p className="text-base text-slate-500 mt-2">Premium heavy-duty transport solution</p>
+                  </div>
                 </div>
 
-                {/* Key Specs */}
+                {/* Specifications Grid */}
                 <div className="space-y-4 py-6 border-y border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600 font-medium">Vehicle Type:</span>
-                    <span className="text-xl font-bold text-slate-900">{selectedFleet.type}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600 font-medium">Available Units:</span>
-                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-teal-500 text-white font-bold text-lg">
-                      {selectedFleet.units}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Vehicle Type */}
+                    <div className="bg-slate-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Vehicle Type</p>
+                      <p className="text-lg font-bold text-slate-900">{selectedFleet.type}</p>
+                    </div>
+
+                    {/* Available Units */}
+                    <div className="bg-blue-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Available Units</p>
+                      <p className="text-lg font-bold text-blue-600">{selectedFleet.units} Units</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600 font-medium">Status:</span>
-                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-700 font-semibold">
+
+                  {/* Status */}
+                  <div className="bg-emerald-50 rounded-xl p-4 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Status</p>
+                    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold">
                       <div className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></div>
-                      Available for Booking
+                      Available
                     </span>
                   </div>
                 </div>
 
                 {/* Description */}
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">About this Vehicle</h3>
-                  <p className="text-slate-600 leading-relaxed">
+                <div className="space-y-3 py-6">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">About This Vehicle</h3>
+                  <p className="text-slate-600 leading-relaxed text-sm">
                     {selectedFleet.id === 1 && "Our 12-wheeler open body trucks are perfect for transporting construction materials, agricultural produce, and industrial goods across India. Equipped with modern safety features and GPS tracking."}
                     {selectedFleet.id === 2 && "The 14-wheeler open body truck offers superior load capacity and stability for long-haul transportation. Ideal for heavy industrial cargo and bulk material movement with enhanced suspension systems."}
                     {selectedFleet.id === 3 && "Our 16-wheeler open body trucks are designed for heavy-duty infrastructure hauling and oversized machinery transport. Maximum payload capacity with advanced braking and safety systems."}
@@ -309,37 +324,40 @@ export default function FleetSection() {
                 </div>
 
                 {/* Features */}
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">Key Features</h3>
-                  <ul className="space-y-2">
-                    <li className="flex items-center gap-3 text-slate-700">
-                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                      GPS Tracking & Live Monitoring
+                <div className="space-y-3 py-6 border-t border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Key Features</h3>
+                  <ul className="grid grid-cols-2 gap-3">
+                    <li className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></span>
+                      <span className="text-sm text-slate-700">GPS Tracking</span>
                     </li>
-                    <li className="flex items-center gap-3 text-slate-700">
-                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                      Professional & Experienced Drivers
+                    <li className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></span>
+                      <span className="text-sm text-slate-700">Expert Drivers</span>
                     </li>
-                    <li className="flex items-center gap-3 text-slate-700">
-                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                      Regular Maintenance & Inspections
+                    <li className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></span>
+                      <span className="text-sm text-slate-700">Regular Maintenance</span>
                     </li>
-                    <li className="flex items-center gap-3 text-slate-700">
-                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                      Comprehensive Insurance Coverage
+                    <li className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></span>
+                      <span className="text-sm text-slate-700">Insurance Coverage</span>
                     </li>
                   </ul>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-4 pt-4">
-                  <button className="flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-teal-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
+                <div className="flex gap-3 pt-6">
+                  <button className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
                     Request Quote
-                    <ArrowRight className="w-5 h-5" />
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => setSelectedFleet(null)}
-                    className="flex-1 px-6 py-3.5 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:border-slate-400 transition-all duration-300"
+                    onClick={() => {
+                      setSelectedFleet(null);
+                      setCurrentImageIndex(0);
+                    }}
+                    className="flex-1 px-6 py-3 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all duration-300"
                   >
                     Close
                   </button>
