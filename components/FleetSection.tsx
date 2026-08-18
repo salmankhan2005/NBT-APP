@@ -20,8 +20,8 @@ const fleetCards: FleetCard[] = [
     vehicle: '12-Wheeler Open Body Truck',
     type: 'Open Body',
     units: 4,
-    image: '/images/truck-12-wheeler-1.jpeg',
-    images: ['/images/truck-12-wheeler-1.jpeg', '/images/truck-12-wheeler-2.jpeg'],
+    image: '/images/truck-12-wheeler-new-1.png',
+    images: ['/images/truck-12-wheeler-new-1.png', '/images/truck-12-wheeler-new-2.png'],
     icon: <Truck className="w-6 h-6" />,
   },
   {
@@ -29,7 +29,7 @@ const fleetCards: FleetCard[] = [
     vehicle: '14-Wheeler Open Body Truck',
     type: 'Open Body',
     units: 2,
-    image: '/images/truck-12-wheeler-2.jpeg',
+    image: '/images/truck-12-wheeler-new-2.png',
     icon: <Truck className="w-6 h-6" />,
   },
   {
