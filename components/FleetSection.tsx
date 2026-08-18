@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Truck, Container, Zap, X, ArrowRight } from 'lucide-react';
+import { Truck, Container, Zap, X, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface FleetCard {
   id: number;
@@ -10,6 +10,7 @@ interface FleetCard {
   type: string;
   units: number;
   image: string;
+  images?: string[];
   icon: React.ReactNode;
 }
 
@@ -20,6 +21,7 @@ const fleetCards: FleetCard[] = [
     type: 'Open Body',
     units: 4,
     image: '/images/truck-12-wheeler-1.jpeg',
+    images: ['/images/truck-12-wheeler-1.jpeg', '/images/truck-12-wheeler-2.jpeg'],
     icon: <Truck className="w-6 h-6" />,
   },
   {
@@ -51,6 +53,7 @@ const fleetCards: FleetCard[] = [
 export default function FleetSection() {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
   const [selectedFleet, setSelectedFleet] = useState<FleetCard | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   return (
     <section className="relative py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden">
@@ -180,7 +183,7 @@ export default function FleetSection() {
       {/* Detail View Modal */}
       {selectedFleet && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => setSelectedFleet(null)}
@@ -190,24 +193,77 @@ export default function FleetSection() {
             </button>
 
             {/* Detail Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8 lg:p-12">
-              {/* Left: Large Image */}
-              <div className="flex flex-col justify-center">
-                <div className="relative h-96 lg:h-full min-h-96 bg-slate-100 rounded-2xl overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-8 lg:p-12">
+              {/* Left: Image Carousel */}
+              <div className="lg:col-span-1.5 flex flex-col justify-center">
+                <div className="relative h-96 lg:h-full min-h-96 bg-slate-100 rounded-2xl overflow-hidden group">
                   <Image
-                    src={selectedFleet.image}
+                    src={selectedFleet.images?.[currentImageIndex] || selectedFleet.image}
                     alt={selectedFleet.vehicle}
                     fill
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-500"
                     priority
                   />
                   {/* Gradient Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent"></div>
+
+                  {/* Image Navigation - Show only if multiple images */}
+                  {selectedFleet.images && selectedFleet.images.length > 1 && (
+                    <>
+                      {/* Previous Button */}
+                      <button
+                        onClick={() =>
+                          setCurrentImageIndex(
+                            currentImageIndex === 0
+                              ? selectedFleet.images!.length - 1
+                              : currentImageIndex - 1
+                          )
+                        }
+                        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/90 hover:bg-white rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 shadow-lg"
+                      >
+                        <ChevronLeft className="w-6 h-6 text-slate-900" />
+                      </button>
+
+                      {/* Next Button */}
+                      <button
+                        onClick={() =>
+                          setCurrentImageIndex(
+                            currentImageIndex === selectedFleet.images!.length - 1
+                              ? 0
+                              : currentImageIndex + 1
+                          )
+                        }
+                        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/90 hover:bg-white rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 shadow-lg"
+                      >
+                        <ChevronRight className="w-6 h-6 text-slate-900" />
+                      </button>
+
+                      {/* Image Counter */}
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/75 text-white rounded-full text-sm font-semibold backdrop-blur-sm">
+                        {currentImageIndex + 1} / {selectedFleet.images.length}
+                      </div>
+
+                      {/* Thumbnail Navigation */}
+                      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-3">
+                        {selectedFleet.images.map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setCurrentImageIndex(idx)}
+                            className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                              idx === currentImageIndex
+                                ? 'bg-white w-8'
+                                : 'bg-white/50 hover:bg-white/75'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Right: Vehicle Details */}
-              <div className="flex flex-col justify-center space-y-6">
+              <div className="lg:col-span-1.5 flex flex-col justify-center space-y-6">
                 {/* Header */}
                 <div>
                   <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 rounded-full bg-blue-100">
