@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Truck, Container, Zap } from 'lucide-react';
+import { Truck, Container, Zap, X, ArrowRight } from 'lucide-react';
 
 interface FleetCard {
   id: number;
@@ -24,7 +24,7 @@ const fleetCards: FleetCard[] = [
   },
   {
     id: 2,
-    vehicle: '12-Wheeler Open Body Truck',
+    vehicle: '14-Wheeler Open Body Truck',
     type: 'Open Body',
     units: 2,
     image: '/images/truck-12-wheeler-2.jpeg',
@@ -50,6 +50,7 @@ const fleetCards: FleetCard[] = [
 
 export default function FleetSection() {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [selectedFleet, setSelectedFleet] = useState<FleetCard | null>(null);
 
   return (
     <section className="relative py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden">
@@ -144,7 +145,10 @@ export default function FleetSection() {
                     <button className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-teal-600 text-white font-semibold rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95">
                       Request Quote
                     </button>
-                    <button className="w-full px-4 py-2.5 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg transition-all duration-300 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700">
+                    <button 
+                      onClick={() => setSelectedFleet(card)}
+                      className="w-full px-4 py-2.5 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg transition-all duration-300 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
+                    >
                       View Details
                     </button>
                   </div>
@@ -172,6 +176,123 @@ export default function FleetSection() {
           </button>
         </div>
       </div>
+
+      {/* Detail View Modal */}
+      {selectedFleet && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Close Button */}
+            <button
+              onClick={() => setSelectedFleet(null)}
+              className="absolute top-6 right-6 z-10 p-2 bg-slate-100 hover:bg-red-100 rounded-full transition-all duration-300 hover:scale-110"
+            >
+              <X className="w-6 h-6 text-slate-700" />
+            </button>
+
+            {/* Detail Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8 lg:p-12">
+              {/* Left: Large Image */}
+              <div className="flex flex-col justify-center">
+                <div className="relative h-96 lg:h-full min-h-96 bg-slate-100 rounded-2xl overflow-hidden">
+                  <Image
+                    src={selectedFleet.image}
+                    alt={selectedFleet.vehicle}
+                    fill
+                    className="w-full h-full object-cover"
+                    priority
+                  />
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent"></div>
+                </div>
+              </div>
+
+              {/* Right: Vehicle Details */}
+              <div className="flex flex-col justify-center space-y-6">
+                {/* Header */}
+                <div>
+                  <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 rounded-full bg-blue-100">
+                    {selectedFleet.icon}
+                    <span className="text-sm font-semibold text-blue-700">{selectedFleet.type}</span>
+                  </div>
+                  <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 mb-3">
+                    {selectedFleet.vehicle}
+                  </h1>
+                  <p className="text-lg text-slate-600">Premium heavy-duty transport solution</p>
+                </div>
+
+                {/* Key Specs */}
+                <div className="space-y-4 py-6 border-y border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 font-medium">Vehicle Type:</span>
+                    <span className="text-xl font-bold text-slate-900">{selectedFleet.type}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 font-medium">Available Units:</span>
+                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-teal-500 text-white font-bold text-lg">
+                      {selectedFleet.units}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 font-medium">Status:</span>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-700 font-semibold">
+                      <div className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></div>
+                      Available for Booking
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">About this Vehicle</h3>
+                  <p className="text-slate-600 leading-relaxed">
+                    {selectedFleet.id === 1 && "Our 12-wheeler open body trucks are perfect for transporting construction materials, agricultural produce, and industrial goods across India. Equipped with modern safety features and GPS tracking."}
+                    {selectedFleet.id === 2 && "The 14-wheeler open body truck offers superior load capacity and stability for long-haul transportation. Ideal for heavy industrial cargo and bulk material movement with enhanced suspension systems."}
+                    {selectedFleet.id === 3 && "Our 16-wheeler open body trucks are designed for heavy-duty infrastructure hauling and oversized machinery transport. Maximum payload capacity with advanced braking and safety systems."}
+                    {selectedFleet.id === 4 && "The 10-wheeler 32 FT container truck is purpose-built for container logistics and FMCG distribution. Secure containerized transport with real-time tracking and climate control options."}
+                  </p>
+                </div>
+
+                {/* Features */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">Key Features</h3>
+                  <ul className="space-y-2">
+                    <li className="flex items-center gap-3 text-slate-700">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      GPS Tracking & Live Monitoring
+                    </li>
+                    <li className="flex items-center gap-3 text-slate-700">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      Professional & Experienced Drivers
+                    </li>
+                    <li className="flex items-center gap-3 text-slate-700">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      Regular Maintenance & Inspections
+                    </li>
+                    <li className="flex items-center gap-3 text-slate-700">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      Comprehensive Insurance Coverage
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4 pt-4">
+                  <button className="flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-teal-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
+                    Request Quote
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => setSelectedFleet(null)}
+                    className="flex-1 px-6 py-3.5 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:border-slate-400 transition-all duration-300"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
