@@ -230,8 +230,7 @@ export async function processDocumentOCR(
       logger: m => console.log('OCR Progress:', Math.round(m.progress * 100) + '%'),
     });
 
-    // Cleanup: terminate Tesseract worker when done
-    await Tesseract.terminate();
+    // Note: Tesseract.js v4+ does not expose a top-level terminate(); worker cleanup is automatic.
 
     const rawText = text.trim();
     
@@ -255,11 +254,11 @@ export async function processDocumentOCR(
     const dates = extractDates(rawText);
     const expiryDate = extractExpiryDate(rawText);
     const vehicleNumber = extractVehicleNumber(rawText);
-    const vehicleMatch = checkVehicleNumberMatch(vehicleNumber, expectedVehicleNumber);
+    const vehicleMatch = checkVehicleNumberMatch(vehicleNumber, expectedVehicleNumber ?? null);
 
-    const mismatch = documentType.type !== 'UNKNOWN' && 
-                     expectedDocType && 
-                     !expectedDocType.includes(documentType.type);
+    const mismatch: boolean = !!(documentType.type !== 'UNKNOWN' &&
+                     expectedDocType &&
+                     !expectedDocType.includes(documentType.type));
 
     const warnings: string[] = [];
     if (mismatch) {

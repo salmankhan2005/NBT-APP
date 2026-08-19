@@ -95,7 +95,7 @@ export async function mapsRoutes(app: FastifyInstance) {
 
       return reply.code(200).send({ predictions, status: 'OK' });
     } catch (err) {
-      app.log.error('Nominatim autocomplete error:', err);
+      app.log.error({ err }, 'Nominatim autocomplete error');
       return reply.code(500).send({ error: 'Geocoding service error', predictions: [] });
     }
   });
@@ -149,7 +149,7 @@ export async function mapsRoutes(app: FastifyInstance) {
 
       return reply.code(200).send({ result, status: 'OK' });
     } catch (err) {
-      app.log.error('Nominatim details error:', err);
+      app.log.error({ err }, 'Nominatim details error');
       return reply.code(500).send({ error: 'Geocoding service error' });
     }
   });
@@ -241,7 +241,7 @@ export async function mapsRoutes(app: FastifyInstance) {
 
       return reply.code(200).send({ routes, status: 'OK' });
     } catch (err) {
-      app.log.error('OSRM directions error:', err);
+      app.log.error({ err }, 'OSRM directions error');
       return reply.code(500).send({ error: 'Routing service error', routes: [] });
     }
   });
@@ -310,7 +310,7 @@ export async function mapsRoutes(app: FastifyInstance) {
 
       return reply.code(200).send({ results, status: 'OK' });
     } catch (err) {
-      app.log.error('Nominatim reverse geocode error:', err);
+      app.log.error({ err }, 'Nominatim reverse geocode error');
       return reply.code(500).send({ error: 'Geocoding service error', results: [] });
     }
   });
