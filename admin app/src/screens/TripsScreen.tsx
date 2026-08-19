@@ -921,13 +921,13 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                   <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: '#f0f4f8', padding: 10, borderRadius: 8 }}>
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Initial Odometer Photo (Driver Upload):</Text>
                     <Image
-                      source={{ uri: selectedTrip.odometerStartPhotoUri }}
+                      source={{ uri: normalizeImageUrl(selectedTrip.odometerStartPhotoUri) || selectedTrip.odometerStartPhotoUri }}
                       style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#e2e8f0' }}
                       resizeMode="contain"
                     />
                     <TouchableOpacity
                       style={{ marginTop: 6, alignSelf: 'flex-start' }}
-                      onPress={() => Linking.openURL(selectedTrip.odometerStartPhotoUri!)}
+                      onPress={() => Linking.openURL(normalizeImageUrl(selectedTrip.odometerStartPhotoUri) || selectedTrip.odometerStartPhotoUri!)}
                     >
                       <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
                     </TouchableOpacity>
@@ -965,13 +965,13 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                   <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: '#f0f4f8', padding: 10, borderRadius: 8 }}>
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 End Odometer Photo:</Text>
                     <Image
-                      source={{ uri: selectedTrip.odometerEndPhotoUri }}
+                      source={{ uri: normalizeImageUrl(selectedTrip.odometerEndPhotoUri) || selectedTrip.odometerEndPhotoUri }}
                       style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#e2e8f0' }}
                       resizeMode="contain"
                     />
                     <TouchableOpacity
                       style={{ marginTop: 6, alignSelf: 'flex-start' }}
-                      onPress={() => Linking.openURL(selectedTrip.odometerEndPhotoUri!)}
+                      onPress={() => Linking.openURL(normalizeImageUrl(selectedTrip.odometerEndPhotoUri) || selectedTrip.odometerEndPhotoUri!)}
                     >
                       <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
                     </TouchableOpacity>
@@ -1065,7 +1065,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                       <View style={{ marginBottom: 12 }}>
                         <Text style={[styles.podInfoText, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Delivery Photo / Invoice:</Text>
                         <Image
-                          source={{ uri: selectedTrip.podPhotoUri }}
+                          source={{ uri: normalizeImageUrl(selectedTrip.podPhotoUri) || selectedTrip.podPhotoUri }}
                           style={styles.podPhotoImage}
                           resizeMode="contain"
                         />
@@ -1073,9 +1073,9 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                           style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                           onPress={() => {
                             if (Platform.OS === 'web') {
-                              window.open(selectedTrip.podPhotoUri, '_blank');
+                              window.open(normalizeImageUrl(selectedTrip.podPhotoUri) || selectedTrip.podPhotoUri, '_blank');
                             } else {
-                              Linking.openURL(selectedTrip.podPhotoUri!).catch(() => {});
+                              Linking.openURL(normalizeImageUrl(selectedTrip.podPhotoUri) || selectedTrip.podPhotoUri!).catch(() => {});
                             }
                           }}
                         >

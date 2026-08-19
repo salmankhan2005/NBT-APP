@@ -189,13 +189,13 @@ export default function LiveStatusScreen() {
                 <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.outlineVariant }}>
                   <Text style={[styles.gridLabel, { marginBottom: 6 }]}>📸 INITIAL ODOMETER DASHBOARD PHOTO</Text>
                   <Image
-                    source={{ uri: driverTrip.odometerStartPhotoUri }}
+                    source={{ uri: normalizeImageUrl(driverTrip.odometerStartPhotoUri) || driverTrip.odometerStartPhotoUri }}
                     style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8 }}
                     resizeMode="cover"
                   />
                   <TouchableOpacity
                     style={{ marginTop: 6 }}
-                    onPress={() => Linking.openURL(driverTrip.odometerStartPhotoUri!)}
+                    onPress={() => Linking.openURL(normalizeImageUrl(driverTrip.odometerStartPhotoUri) || driverTrip.odometerStartPhotoUri!)}
                   >
                     <Text style={{ color: COLORS.secondary, fontSize: 11, fontWeight: 'bold' }}>VIEW FULL DASHBOARD IMAGE ↗</Text>
                   </TouchableOpacity>
@@ -256,7 +256,7 @@ export default function LiveStatusScreen() {
                     <View style={{ marginTop: 6 }}>
                       <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 6 }}>📸 Delivery Photo:</Text>
                       <Image
-                        source={{ uri: driverTrip.podPhotoUri }}
+                        source={{ uri: normalizeImageUrl(driverTrip.podPhotoUri) || driverTrip.podPhotoUri }}
                         style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant }}
                         resizeMode="contain"
                       />
@@ -264,9 +264,9 @@ export default function LiveStatusScreen() {
                         style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                         onPress={() => {
                           if (Platform.OS === 'web') {
-                            window.open(driverTrip.podPhotoUri, '_blank');
+                            window.open(normalizeImageUrl(driverTrip.podPhotoUri) || driverTrip.podPhotoUri, '_blank');
                           } else {
-                            Linking.openURL(driverTrip.podPhotoUri!).catch(() => {});
+                            Linking.openURL(normalizeImageUrl(driverTrip.podPhotoUri) || driverTrip.podPhotoUri!).catch(() => {});
                           }
                         }}
                       >
