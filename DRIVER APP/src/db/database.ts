@@ -4,14 +4,8 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { SHA256 } from 'crypto-js';
 
-// ── API Host Configuration (Resolves localhost to 10.0.2.2 on Android Emulators) ──
-const getApiHost = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001';
-  }
-  return 'http://localhost:3001';
-};
-const API_HOST = getApiHost();
+// ── API Host Configuration — Production: Render ──
+const API_HOST = 'https://nbt-app.onrender.com';
 
 // ── Secure storage helpers (Dual-write for robust persistence across reloads) ───
 const safeGetItem = async (key: string): Promise<string | null> => {

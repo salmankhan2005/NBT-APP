@@ -2,15 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+const RENDER_API = 'https://nbt-app.onrender.com';
+
 const getApiHost = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001';
-  }
-  // Web build: use EXPO_PUBLIC_API_URL env var if set, else localhost
+  // Web build: use EXPO_PUBLIC_API_URL env var if set, else Render production URL
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  return 'http://localhost:3001';
+  if (Platform.OS === 'android') {
+    return RENDER_API;
+  }
+  return RENDER_API;
 };
 const API_HOST = getApiHost();
 

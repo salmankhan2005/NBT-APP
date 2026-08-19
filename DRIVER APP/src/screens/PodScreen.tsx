@@ -21,7 +21,7 @@ import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, GPSLocation } from '../db/database';
 import { Platform } from 'react-native';
 
-const API_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:3001' : 'http://localhost:3001';
+const API_HOST = 'https://nbt-app.onrender.com';
 
 interface PodScreenProps {
   trip: Trip;

@@ -56,13 +56,7 @@ function isInIndia(lat: number, lng: number): boolean {
   return lat >= 6.5 && lat <= 37.1 && lng >= 68.1 && lng <= 97.4;
 }
 
-const getApiHost = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001';
-  }
-  return 'http://localhost:3001';
-};
-const PROXY_BASE = `${getApiHost()}/api/maps`;
+const PROXY_BASE = 'https://nbt-app.onrender.com/api/maps';
 
 export interface RouteInfo {
   distanceKm: number;

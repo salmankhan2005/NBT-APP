@@ -17,13 +17,7 @@ const getApiKey = (): string => {
 export const GOOGLE_MAPS_API_KEY = getApiKey();
 const BASE = 'https://maps.googleapis.com/maps/api';
 
-const getApiHost = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001';
-  }
-  return 'http://localhost:3001';
-};
-const PROXY_BASE = `${getApiHost()}/api/maps`;
+const PROXY_BASE = 'https://nbt-app.onrender.com/api/maps';
 
 export interface RouteInfo {
   distanceKm: number;
