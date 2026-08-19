@@ -195,19 +195,34 @@ export async function mapsRoutes(app: FastifyInstance) {
       const queryMatch = place_id.match(/^query_(.+)$/);
       if (queryMatch) {
         const query = decodeURIComponent(queryMatch[1]);
-        const coordinates = await resolveToCoords(query);
-        if (coordinates) {
-          return reply.code(200).send({
-            result: {
-              name: query,
-              formatted_address: `${query}, India`,
-              geometry: { location: coordinates },
-              place_id,
-              url: `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`,
-            },
-            status: 'OK',
+        try {
+          const searchUrl = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(query)}&format=json&limit=1&addressdetails=1&accept-language=en`;
+          const searchResponse = await fetch(searchUrl, {
+            headers: { 'User-Agent': USER_AGENT },
           });
+          const searchResults = await searchResponse.json() as any[];
+          const bestResult = chooseBestGeocodeResult(searchResults);
+          if (bestResult) {
+            const coordinates = {
+              lat: parseFloat(bestResult.lat),
+              lng: parseFloat(bestResult.lon),
+            };
+            return reply.code(200).send({
+              result: {
+                name: bestResult.name || query,
+                formatted_address: bestResult.display_name || query,
+                geometry: { location: coordinates },
+                place_id,
+                url: `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`,
+              },
+              status: 'OK',
+            });
+          }
+        } catch (queryError) {
+          app.log.warn({ err: queryError }, 'Arbitrary map query lookup failed');
         }
+
+        return reply.code(200).send({ result: null, status: 'ZERO_RESULTS' });
       }
 
       let url: string;
