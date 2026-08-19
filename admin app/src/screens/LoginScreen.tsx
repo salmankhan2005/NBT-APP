@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -67,9 +68,13 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           {/* Header Area */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <MaterialIcons name="admin-panel-settings" size={56} color={COLORS.onPrimary} />
+              <Image
+                source={require('../../assets/logo.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.title}>NBT + ARS</Text>
+            <Text style={styles.title}>New Balaji Transport</Text>
             <Text style={styles.subtitle}>Fleet Command Console</Text>
           </View>
 
@@ -206,14 +211,19 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logoContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.primary,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+    overflow: 'hidden',
     ...SHADOWS.medium,
+  },
+  logoImage: {
+    width: 104,
+    height: 104,
   },
   title: {
     fontSize: 28,

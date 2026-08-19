@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -21,6 +21,7 @@ import * as Sharing from 'expo-sharing';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, Expense, normalizeImageUrl } from '../db/database';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 export interface TripDocument {
   id: string;
@@ -126,10 +127,10 @@ export default function TripsScreen() {
     }
   };
 
-  // Background poll: 1.5 s when modal closed, modal handles its own 2 s loop
+  // Background poll: 6 s — in-flight dedup + short-term cache in db layer prevents thundering
   useEffect(() => {
     fetchTrips(true);
-    const interval = setInterval(() => fetchTrips(false), 1500);
+    const interval = setInterval(() => fetchTrips(false), 6000);
     return () => clearInterval(interval);
   }, []);
 
@@ -422,19 +423,23 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
     }
   };
 
-  // Filtered trips
-  const filteredTrips = trips.filter(t => {
-    const matchesSearch = t.id.toLowerCase().includes(search.toLowerCase()) ||
-      t.driverName.toLowerCase().includes(search.toLowerCase()) ||
-      t.vehicleNumber.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'ALL' || 
-      (statusFilter === 'STARTED' && ['STARTED', 'ON_THE_WAY'].includes(t.status)) ||
-      (statusFilter === 'ASSIGNED' && ['ASSIGNED', 'NOT STARTED'].includes(t.status)) ||
-      t.status === statusFilter;
+  // Filtered trips — memoized to avoid recomputing on every unrelated render
+  const filteredTrips = useMemo(() => {
+    const lowerSearch = search.toLowerCase();
+    return trips.filter(t => {
+      const matchesSearch = !lowerSearch ||
+        t.id.toLowerCase().includes(lowerSearch) ||
+        t.driverName.toLowerCase().includes(lowerSearch) ||
+        t.vehicleNumber.toLowerCase().includes(lowerSearch);
 
-    return matchesSearch && matchesStatus;
-  }).sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+      const matchesStatus = statusFilter === 'ALL' ||
+        (statusFilter === 'STARTED' && ['STARTED', 'ON_THE_WAY'].includes(t.status)) ||
+        (statusFilter === 'ASSIGNED' && ['ASSIGNED', 'NOT STARTED'].includes(t.status)) ||
+        t.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    }).sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+  }, [trips, search, statusFilter]);
 
   const catBadgeColor = (cat: string) => {
     const map: Record<string, string> = {
@@ -475,6 +480,11 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
   const [editStatus, setEditStatus] = useState<Trip['status']>('ASSIGNED');
   const [editDriverPin, setEditDriverPin] = useState('');
 
+  // Delete confirm modal state
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletingTripId, setDeletingTripId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleOpenEdit = (trip: Trip) => {
     setEditingTrip(trip);
     setEditDriverName(trip.driverName || '');
@@ -508,27 +518,25 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
   };
 
   const handleDeleteTrip = (tripId: string) => {
-    const executeDelete = async () => {
-      await db.deleteTrip(tripId);
-      if (selectedTrip?.id === tripId) {
+    setDeletingTripId(tripId);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDeleteTrip = async () => {
+    if (!deletingTripId) return;
+    setIsDeleting(true);
+    try {
+      await db.deleteTrip(deletingTripId);
+      if (selectedTrip?.id === deletingTripId) {
         handleCloseDetails();
       }
       await fetchTrips(false);
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Are you sure you want to permanently delete Trip ${tripId}?`)) {
-        executeDelete();
-      }
-    } else {
-      Alert.alert(
-        'Delete Trip',
-        `Are you sure you want to permanently delete Trip ${tripId}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: executeDelete },
-        ]
-      );
+    } catch (e) {
+      Alert.alert('Error', 'Failed to delete trip.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalVisible(false);
+      setDeletingTripId(null);
     }
   };
 
@@ -672,6 +680,10 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
           keyExtractor={(item) => item.id}
           renderItem={renderTripItem}
           contentContainerStyle={styles.listContent}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
         />
       )}
 
@@ -1317,6 +1329,17 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        visible={deleteModalVisible}
+        title="Delete Trip"
+        message="Are you sure you want to permanently delete this trip? This action cannot be undone."
+        itemLabel={deletingTripId ? `Trip ID: ${deletingTripId}` : undefined}
+        isDeleting={isDeleting}
+        onConfirm={confirmDeleteTrip}
+        onCancel={() => { setDeleteModalVisible(false); setDeletingTripId(null); }}
+      />
     </View>
   );
 }

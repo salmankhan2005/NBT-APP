@@ -10,6 +10,7 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
@@ -70,7 +71,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           {/* Header Area */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <MaterialIcons name="local-shipping" size={48} color={COLORS.onPrimary} />
+              <Image
+                source={require('../../assets/logo.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.title}>New Balaji Transport</Text>
             <Text style={styles.subtitle}>Driver Console</Text>
@@ -180,15 +185,23 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.stack * 1.5,
   },
   logoContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    backgroundColor: COLORS.primary,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 4px 10px rgba(4, 22, 50, 0.15)',
     elevation: 8,
+    shadowColor: '#041632',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
     marginBottom: SPACING.gutter,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: 104,
+    height: 104,
   },
   title: {
     fontFamily: 'System',

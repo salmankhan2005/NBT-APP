@@ -5,8 +5,8 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -15,60 +15,80 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({ onComplete }: SplashScreenProps) {
+  const [scaleAnim] = useState(new Animated.Value(0.8));
+  const [opacityAnim] = useState(new Animated.Value(0));
   const [pulseAnim] = useState(new Animated.Value(1));
   const [progressAnim] = useState(new Animated.Value(0));
-  const [statusMessage, setStatusMessage] = useState('Connecting to NBT Secure Gateway...');
+  const [statusMessage, setStatusMessage] = useState('Initializing NBT System...');
   const [progressPercent, setProgressPercent] = useState(0);
 
   useEffect(() => {
-    // Pulsing logo animation
+    // Logo scale-in and fade animation
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+
+    // Pulsing glow effect
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.15,
-          duration: 900,
+          toValue: 1.08,
+          duration: 1200,
           easing: Easing.ease,
           useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 900,
+          duration: 1200,
           easing: Easing.ease,
           useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     ).start();
 
-    // Progress bar animation (2.5 seconds total)
+    // Progress bar animation (3 seconds total)
     Animated.timing(progressAnim, {
       toValue: 100,
-      duration: 2500,
+      duration: 3000,
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: false,
     }).start();
 
-    // Listener for progress text & steps
+    // Listener for progress text & status steps
     const listenerId = progressAnim.addListener(({ value }) => {
       setProgressPercent(Math.round(value));
-      if (value > 66) {
-        setStatusMessage('Initializing Operations Dashboard...');
-      } else if (value > 33) {
-        setStatusMessage('Syncing Real-Time Fleet Telemetry & GPS...');
+      if (value > 75) {
+        setStatusMessage('Launching Admin Command Center...');
+      } else if (value > 50) {
+        setStatusMessage('Syncing Fleet Data & GPS Coordinates...');
+      } else if (value > 25) {
+        setStatusMessage('Connecting to Neon Postgres Database...');
       } else {
-        setStatusMessage('Connecting to NBT Secure Gateway...');
+        setStatusMessage('Initializing NBT System...');
       }
     });
 
-    // Auto complete after 2.6 seconds
+    // Auto complete after 3.2 seconds
     const timer = setTimeout(() => {
       onComplete();
-    }, 2600);
+    }, 3200);
 
     return () => {
       progressAnim.removeListener(listenerId);
       clearTimeout(timer);
     };
-  }, [onComplete]);
+  }, [onComplete, progressAnim]);
 
   const progressBarWidth = progressAnim.interpolate({
     inputRange: [0, 100],
@@ -77,33 +97,93 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
 
   return (
     <View style={styles.container}>
+      {/* Background Animation */}
+      <View style={styles.backgroundGradient} />
+
       <View style={styles.contentBox}>
-        {/* Pulsing Logo */}
-        <Animated.View style={[styles.logoContainer, { transform: [{ scale: pulseAnim }] }]}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>NBT</Text>
-          </View>
+        {/* Animated Logo */}
+        <Animated.View
+          style={[
+            styles.logoContainer,
+            {
+              opacity: opacityAnim,
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.logoBadge,
+              {
+                transform: [{ scale: pulseAnim }],
+              },
+            ]}
+          >
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+
+          {/* Animated Rings */}
+          <Animated.View style={[styles.glowRing, { transform: [{ scale: pulseAnim }] }]} />
         </Animated.View>
 
+        {/* Title */}
         <Text style={styles.appTitle}>NEW BALAJI TRANSPORT</Text>
-        <Text style={styles.appSubtitle}>Enterprise Logistics & Dispatch Suite</Text>
+        <Text style={styles.appSubtitle}>Enterprise Fleet Command Suite</Text>
 
-        {/* Progress Bar Container */}
+        {/* Animated Progress Container */}
         <View style={styles.progressContainer}>
+          {/* Gradient Progress Bar */}
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressBar, { width: progressBarWidth }]} />
+            <Animated.View
+              style={[
+                styles.progressGlow,
+                {
+                  width: progressBarWidth,
+                  opacity: opacityAnim,
+                },
+              ]}
+            />
           </View>
+
+          {/* Progress Metadata */}
           <View style={styles.progressMeta}>
             <Text style={styles.statusText}>{statusMessage}</Text>
             <Text style={styles.percentText}>{progressPercent}%</Text>
           </View>
+
+          {/* Loading Steps */}
+          <View style={styles.stepsContainer}>
+            <StepIndicator step={1} isActive={progressPercent >= 33} label="System Init" />
+            <StepIndicator step={2} isActive={progressPercent >= 66} label="Database" />
+            <StepIndicator step={3} isActive={progressPercent >= 90} label="Dashboard" />
+          </View>
         </View>
 
+        {/* System Info Footer */}
         <View style={styles.footerRow}>
-          <ActivityIndicator size="small" color="#38bdf8" />
-          <Text style={styles.footerText}>Secure TLS 1.3 • Neon Postgres Live</Text>
+          <View style={styles.systemTag}>
+            <View style={styles.activeDot} />
+            <Text style={styles.systemText}>System Online</Text>
+          </View>
+          <Text style={styles.securityText}>🔒 Secure TLS 1.3</Text>
         </View>
       </View>
+    </View>
+  );
+}
+
+function StepIndicator({ step, isActive, label }: { step: number; isActive: boolean; label: string }) {
+  return (
+    <View style={styles.stepItem}>
+      <View style={[styles.stepDot, isActive && styles.stepDotActive]}>
+        {isActive && <MaterialIcons name="check" size={12} color="#ffffff" />}
+      </View>
+      <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>{label}</Text>
     </View>
   );
 }
@@ -116,84 +196,163 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(56, 189, 248, 0.05)',
+  },
   contentBox: {
     alignItems: 'center',
     maxWidth: 420,
     width: '100%',
+    zIndex: 1,
   },
   logoContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoBadge: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: '#38bdf8',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#38bdf8',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 28,
+    elevation: 16,
+    overflow: 'hidden',
   },
-  logoText: {
-    color: '#050b29',
-    fontWeight: '900',
-    fontSize: 32,
-    letterSpacing: 2,
+  logoImage: {
+    width: 120,
+    height: 120,
+  },
+  glowRing: {
+    position: 'absolute',
+    width: 144,
+    height: 144,
+    borderRadius: 72,
+    borderWidth: 2,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
   },
   appTitle: {
     color: '#ffffff',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     textAlign: 'center',
+    marginBottom: 4,
   },
   appSubtitle: {
     color: '#94a3b8',
-    fontSize: 13,
-    marginTop: 6,
+    fontSize: 12,
     marginBottom: 36,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   progressContainer: {
     width: '100%',
     marginBottom: 32,
   },
   progressTrack: {
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 999,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 14,
+    position: 'relative',
   },
   progressBar: {
     height: '100%',
     backgroundColor: '#38bdf8',
     borderRadius: 999,
   },
+  progressGlow: {
+    position: 'absolute',
+    height: '100%',
+    backgroundColor: 'rgba(56, 189, 248, 0.3)',
+    right: 0,
+  },
   progressMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 14,
   },
   statusText: {
     color: '#cbd5e1',
     fontSize: 12,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   percentText: {
     color: '#38bdf8',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
+  },
+  stepsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  stepItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(148, 163, 184, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotActive: {
+    borderColor: '#38bdf8',
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+  },
+  stepLabel: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  stepLabelActive: {
+    color: '#38bdf8',
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148, 163, 184, 0.1)',
   },
-  footerText: {
+  systemTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4ade80',
+  },
+  systemText: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  securityText: {
     color: '#64748b',
     fontSize: 11,
     fontWeight: '500',

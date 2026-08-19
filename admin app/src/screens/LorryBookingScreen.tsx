@@ -123,7 +123,11 @@ function formatDisplayDate(value: string): string {
 }
 
 function getAdminToken(): string {
-  return db.getToken() || 'local-fallback-token';
+  const token = db.getToken();
+  if (!token) {
+    throw new Error('User not authenticated. Please log in to access this feature.');
+  }
+  return token;
 }
 
 export default function LorryBookingScreen() {

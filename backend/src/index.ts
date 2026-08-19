@@ -60,8 +60,46 @@ const app = Fastify({
   },
 });
 
+// ── Validate required environment variables ──────────────────────────────────
+function validateEnvironment() {
+  const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'NODE_ENV'];
+  const optionalEnvVars = ['GOOGLE_MAPS_API_KEY', 'WHATSAPP_API_KEY', 'WHATSAPP_API_URL'];
+
+  // Check required variables
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      throw new Error(`FATAL: Required environment variable missing: ${envVar}`);
+    }
+  }
+
+  // Validate JWT_SECRET length
+  if (process.env.JWT_SECRET!.length < 32) {
+    throw new Error('FATAL: JWT_SECRET must be at least 32 characters. Set it in your .env file.');
+  }
+
+  // Validate DATABASE_URL format
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl || !dbUrl.startsWith('postgresql')) {
+    throw new Error('FATAL: Invalid DATABASE_URL format (must start with postgresql)');
+  }
+
+  // Log optional variables
+  for (const envVar of optionalEnvVars) {
+    if (process.env[envVar]) {
+      app.log.info(`✓ ${envVar} configured`);
+    } else {
+      app.log.warn(`⚠ ${envVar} not configured — feature disabled`);
+    }
+  }
+
+  app.log.info('✅ All required environment variables validated');
+}
+
 async function bootstrap() {
   try {
+    // Validate environment first, before any operations
+    validateEnvironment();
+
     await pingDatabase();
     // Auto-migrate: expenses table location columns
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS latitude NUMERIC`;
@@ -195,12 +233,8 @@ async function bootstrap() {
   });
 
   // ── JWT ───────────────────────────────────────────────────────────────────
-  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-    throw new Error('JWT_SECRET must be at least 32 characters. Set it in your .env file.');
-  }
-
   await app.register(jwt, {
-    secret: process.env.JWT_SECRET,
+    secret: process.env.JWT_SECRET!,
     sign: { algorithm: 'HS256' },
   });
 

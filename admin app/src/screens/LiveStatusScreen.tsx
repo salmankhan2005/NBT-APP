@@ -46,7 +46,7 @@ export default function LiveStatusScreen() {
 
   useEffect(() => {
     fetchLiveStatus();
-    const interval = setInterval(fetchLiveStatus, 3000); // Polling every 3 seconds for real-time changes
+    const interval = setInterval(fetchLiveStatus, 6000); // Polling every 6s — db layer short-circuits repeated calls
     return () => clearInterval(interval);
   }, [searchId]);
 

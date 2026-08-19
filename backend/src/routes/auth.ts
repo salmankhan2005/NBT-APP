@@ -144,17 +144,7 @@ export async function authRoutes(app: FastifyInstance) {
         }
       }
     } catch {
-      // Fall through to dev fallback
-    }
-
-    // Default dev credentials fallback (for 'admin' / '9999')
-    if (username === 'admin' && pin === '9999') {
-      const jti = `adm-dev-${Date.now()}`;
-      const token = app.jwt.sign(
-        { jti, adminId: 'ADM-001', username: 'admin', role: 'admin' },
-        { expiresIn: '24h' }
-      );
-      return reply.code(200).send({ token, username: 'admin', name: 'Administrator', role: 'admin' });
+      // Fall through to error response
     }
 
     // Generic — do NOT reveal whether the username exists

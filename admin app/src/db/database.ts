@@ -734,6 +734,29 @@ class AdminDatabase {
   private mockActivityLogs: ActivityLog[] = [];
   private mockExpenses: Expense[] = [];
 
+  // In-flight request caching & deduplication to eliminate thundering herd requests
+  private _inFlightTrips: Promise<Trip[]> | null = null;
+  private _inFlightFleet: Promise<FleetVehicle[]> | null = null;
+  private _inFlightGcs: Promise<GcNote[]> | null = null;
+  private _inFlightMemos: Promise<MemoDocument[]> | null = null;
+  private _inFlightLogs: Promise<ActivityLog[]> | null = null;
+  private _inFlightManagedVehicles: Promise<ManagedVehicle[]> | null = null;
+
+  private _lastTripsFetchTime = 0;
+  private _lastFleetFetchTime = 0;
+  private _lastGcsFetchTime = 0;
+  private _lastMemosFetchTime = 0;
+  private _lastLogsFetchTime = 0;
+  private _lastManagedVehiclesFetchTime = 0;
+
+  // Cached JSON strings to avoid unnecessary AsyncStorage.setItem writes on disk
+  private _lastSavedTripsJson = '';
+  private _lastSavedFleetJson = '';
+  private _lastSavedVehiclesJson = '';
+  private _lastSavedDocsJson = '';
+  private _lastSavedGcsJson = '';
+  private _lastSavedMemosJson = '';
+
   constructor() {
     this.loadSession();
     this.loadGcNotes();
@@ -759,8 +782,12 @@ class AdminDatabase {
       const savedTrips = await AsyncStorage.getItem('nbt_trips_cache');
       if (savedTrips) {
         const parsed = JSON.parse(savedTrips);
-        if (Array.isArray(parsed) && parsed.length > 0) this.mockTrips = parsed;
-        else this.mockTrips = [...INITIAL_SEED_TRIPS];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.mockTrips = parsed;
+          this._lastSavedTripsJson = savedTrips;
+        } else {
+          this.mockTrips = [...INITIAL_SEED_TRIPS];
+        }
       } else {
         this.mockTrips = [...INITIAL_SEED_TRIPS];
         await this.saveTrips();
@@ -769,8 +796,12 @@ class AdminDatabase {
       const savedVehicles = await AsyncStorage.getItem('nbt_managed_vehicles');
       if (savedVehicles) {
         const parsed = JSON.parse(savedVehicles);
-        if (Array.isArray(parsed) && parsed.length > 0) this.managedVehicles = parsed;
-        else this.managedVehicles = [...INITIAL_SEED_MANAGED_VEHICLES];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.managedVehicles = parsed;
+          this._lastSavedVehiclesJson = savedVehicles;
+        } else {
+          this.managedVehicles = [...INITIAL_SEED_MANAGED_VEHICLES];
+        }
       } else {
         this.managedVehicles = [...INITIAL_SEED_MANAGED_VEHICLES];
         await this.saveVehicles();
@@ -779,7 +810,10 @@ class AdminDatabase {
       const savedDocs = await AsyncStorage.getItem('nbt_vehicle_documents');
       if (savedDocs) {
         const parsed = JSON.parse(savedDocs);
-        if (Array.isArray(parsed) && parsed.length > 0) this.vehicleDocuments = parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.vehicleDocuments = parsed;
+          this._lastSavedDocsJson = savedDocs;
+        }
       }
 
       const savedDrivers = await AsyncStorage.getItem('nbt_drivers_cache');
@@ -804,7 +838,10 @@ class AdminDatabase {
 
   private async saveTrips() {
     try {
-      await AsyncStorage.setItem('nbt_trips_cache', JSON.stringify(this.mockTrips));
+      const json = JSON.stringify(this.mockTrips);
+      if (json === this._lastSavedTripsJson) return;
+      this._lastSavedTripsJson = json;
+      await AsyncStorage.setItem('nbt_trips_cache', json);
     } catch (e) {
       console.warn('Failed to save trips cache', e);
     }
@@ -828,7 +865,10 @@ class AdminDatabase {
 
   private async saveVehicles() {
     try {
-      await AsyncStorage.setItem('nbt_managed_vehicles', JSON.stringify(this.managedVehicles));
+      const json = JSON.stringify(this.managedVehicles);
+      if (json === this._lastSavedVehiclesJson) return;
+      this._lastSavedVehiclesJson = json;
+      await AsyncStorage.setItem('nbt_managed_vehicles', json);
     } catch (e) {
       console.warn('Failed to save managed vehicles', e);
     }
@@ -836,7 +876,10 @@ class AdminDatabase {
 
   private async saveDocuments() {
     try {
-      await AsyncStorage.setItem('nbt_vehicle_documents', JSON.stringify(this.vehicleDocuments));
+      const json = JSON.stringify(this.vehicleDocuments);
+      if (json === this._lastSavedDocsJson) return;
+      this._lastSavedDocsJson = json;
+      await AsyncStorage.setItem('nbt_vehicle_documents', json);
     } catch (e) {
       console.warn('Failed to save vehicle documents', e);
     }
@@ -879,18 +922,8 @@ class AdminDatabase {
         }
       }
     } catch (networkErr) {
-      // Backend offline — apply strict local fallback matching env credentials only
-      console.warn('[AdminDB] Backend offline — local auth fallback');
-      if (username === 'admin' && pin === '9999') {
-        this.token = 'local-fallback-token';
-        this.currentUsername = 'admin';
-        try {
-          await SecureStore.setItemAsync('admin_session_token', this.token);
-          await SecureStore.setItemAsync('admin_username', this.currentUsername);
-        } catch (e) {}
-        this.notify();
-        return true;
-      }
+      // Backend offline — cannot authenticate without server
+      console.warn('[AdminDB] Backend offline — authentication failed');
     }
     return false;
   }
@@ -952,6 +985,19 @@ class AdminDatabase {
     return this.token;
   }
 
+  private async fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 3500): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return res;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  }
+
   async authFetch(url: string, options: RequestInit = {}): Promise<Response> {
     let token = await this.getValidToken();
     const headers: Record<string, string> = {
@@ -960,115 +1006,130 @@ class AdminDatabase {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    let res = await fetch(url, { ...options, headers });
+    let res = await this.fetchWithTimeout(url, { ...options, headers });
     if (res.status === 401) {
       // Clear stale token and re-login once
       this.token = null;
       const success = await this.login(this.currentUsername || 'admin', '9999');
       if (success && this.token) {
         headers['Authorization'] = `Bearer ${this.token}`;
-        res = await fetch(url, { ...options, headers });
+        res = await this.fetchWithTimeout(url, { ...options, headers });
       }
     }
     return res;
   }
 
-  // Trips GET — Live Backend Fetch with Fallback
-  async getTrips(): Promise<Trip[]> {
-    try {
-      const res = await this.authFetch(`${API_HOST}/api/admin/trips`);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Admin trips request failed (${res.status}): ${errorText}`);
-      }
-
-      const apiTrips = await res.json();
-      if (!Array.isArray(apiTrips)) {
-        throw new Error('Admin trips response is not an array.');
-      }
-
-      const mappedBackendTrips: Trip[] = apiTrips.map((bt: any) => ({
-        id: bt.id,
-        driverId: bt.driver_id || 'DRV-UNKNOWN',
-        driverPin: bt.driver_pin || '1234',
-        driverName: bt.driver_name || 'Assigned Driver',
-        trackingId: bt.tracking_id || bt.id,
-        status: (() => {
-          const s = String(bt.status || '').toUpperCase().replace(/ /g, '_');
-          if (s === 'IN_TRANSIT') return 'STARTED';
-          if (s === 'STARTED') return 'STARTED';
-          if (s === 'ON_THE_WAY') return 'ON_THE_WAY';
-          if (s === 'REACHED_DESTINATION') return 'REACHED_DESTINATION';
-          if (s === 'COMPLETED') return 'COMPLETED';
-          if (s === 'ASSIGNED') return 'ASSIGNED';
-          return 'NOT STARTED';
-        })(),
-        customerCompany: 'NBT Client',
-        loaderName: bt.driver_name || 'Loader',
-        loaderPhone: '',
-        startingPoint: bt.starting_point || 'Depot',
-        startingAddress: bt.starting_point || 'Depot',
-        startingLat: bt.current_gps?.latitude ? Number(bt.current_gps.latitude) : 11.6643,
-        startingLng: bt.current_gps?.longitude ? Number(bt.current_gps.longitude) : 78.1460,
-        startingPlaceId: 'DEPOT-001',
-        startingMapsUrl: `https://maps.google.com/?q=${bt.starting_point}`,
-        destination: bt.destination || 'Destination',
-        destinationAddress: bt.destination || 'Destination',
-        destinationLat: 12.9716,
-        destinationLng: 77.5946,
-        destinationPlaceId: 'DEST-001',
-        destinationMapsUrl: `https://maps.google.com/?q=${bt.destination}`,
-        distanceKm: Number(bt.distance_km || 0),
-        estimatedTravelTime: bt.estimated_travel_time || '',
-        recommendedRoute: bt.recommended_route || 'via NH44',
-        tollsCount: Number(bt.tolls_count || 0),
-        estimatedTollCost: Number(bt.estimated_toll_cost || 0),
-        tollPlazas: bt.toll_plazas || [],
-        vehicleNumber: bt.vehicle_number || 'TN 38 AB 1234',
-        vehicleType: bt.vehicle_type || '12 Wheel',
-        agreedFreight: bt.agreed_freight != null ? Number(bt.agreed_freight) : 0,
-        isPinned: Boolean(bt.is_pinned),
-        odometerStart: bt.odometer_start ? Number(bt.odometer_start) : undefined,
-        odometerEnd: bt.odometer_end ? Number(bt.odometer_end) : undefined,
-        odometerStartPhotoUri: normalizeImageUrl(bt.odometer_start_url),
-        odometerEndPhotoUri: normalizeImageUrl(bt.odometer_end_url),
-        dieselStart: bt.diesel_start || undefined,
-        dieselEnd: bt.diesel_end || undefined,
-        startDate: bt.start_date ? new Date(bt.start_date).toLocaleDateString() : '',
-        startTime: bt.start_date ? new Date(bt.start_date).toLocaleTimeString() : '',
-        endDate: bt.end_date ? new Date(bt.end_date).toLocaleDateString() : '',
-        endTime: bt.end_date ? new Date(bt.end_date).toLocaleTimeString() : '',
-        podPhotoUri: normalizeImageUrl(bt.pod_photo_url),
-        podSignature: bt.pod_signature && bt.pod_signature.trim() ? bt.pod_signature.trim() : undefined,
-        podNotes: bt.pod_notes && bt.pod_notes.trim() ? bt.pod_notes.trim() : undefined,
-        podSubmitted: !!(
-          (bt.pod_photo_url && bt.pod_photo_url.trim() && bt.pod_photo_url.trim() !== 'mock-pod-uri') ||
-          (bt.pod_signature && bt.pod_signature.trim()) ||
-          (bt.pod_notes && bt.pod_notes.trim()) ||
-          ['REACHED_DESTINATION', 'COMPLETED'].includes(String(bt.status).toUpperCase())
-        ),
-        driverPayment: bt.driver_payment ? Number(bt.driver_payment) : undefined,
-        profitOrLoss: bt.profit_or_loss ? Number(bt.profit_or_loss) : undefined,
-        lastUpdatedDate: bt.updated_at ? new Date(bt.updated_at).toLocaleDateString() : '',
-        lastUpdatedTime: bt.updated_at ? new Date(bt.updated_at).toLocaleTimeString() : '',
-        lastKnownLocation: bt.current_gps?.address || bt.starting_point || 'En Route',
-        locationIsGps: Boolean(bt.current_gps),
-        expenses: (bt.expenses || []).map((e: any) => ({
-          ...e,
-          receiptUri: normalizeImageUrl(e.receiptUri || e.receipt_url),
-        })),
-        createdAt: bt.created_at || new Date().toISOString(),
-      }));
-
-      // Replace cache with backend data (don't merge — deleted items must disappear)
-      this.mockTrips = mappedBackendTrips;
-      await this.saveTrips();
-    } catch (err) {
-      console.warn('[AdminDB] Live getTrips sync error, falling back to cached state:', err);
+  // Trips GET — Live Backend Fetch with Fallback and In-Flight Request Deduplication
+  async getTrips(forceRefresh = false): Promise<Trip[]> {
+    const now = Date.now();
+    if (!forceRefresh && this._lastTripsFetchTime && now - this._lastTripsFetchTime < 1500 && this.mockTrips.length > 0) {
+      return [...this.mockTrips];
     }
 
-    return Promise.resolve([...this.mockTrips]);
+    if (this._inFlightTrips) {
+      return this._inFlightTrips;
+    }
+
+    this._inFlightTrips = (async () => {
+      try {
+        const res = await this.authFetch(`${API_HOST}/api/admin/trips`);
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`Admin trips request failed (${res.status}): ${errorText}`);
+        }
+
+        const apiTrips = await res.json();
+        if (!Array.isArray(apiTrips)) {
+          throw new Error('Admin trips response is not an array.');
+        }
+
+        const mappedBackendTrips: Trip[] = apiTrips.map((bt: any) => ({
+          id: bt.id,
+          driverId: bt.driver_id || 'DRV-UNKNOWN',
+          driverPin: bt.driver_pin || '1234',
+          driverName: bt.driver_name || 'Assigned Driver',
+          trackingId: bt.tracking_id || bt.id,
+          status: (() => {
+            const s = String(bt.status || '').toUpperCase().replace(/ /g, '_');
+            if (s === 'IN_TRANSIT') return 'STARTED';
+            if (s === 'STARTED') return 'STARTED';
+            if (s === 'ON_THE_WAY') return 'ON_THE_WAY';
+            if (s === 'REACHED_DESTINATION') return 'REACHED_DESTINATION';
+            if (s === 'COMPLETED') return 'COMPLETED';
+            if (s === 'ASSIGNED') return 'ASSIGNED';
+            return 'NOT STARTED';
+          })(),
+          customerCompany: 'NBT Client',
+          loaderName: bt.driver_name || 'Loader',
+          loaderPhone: '',
+          startingPoint: bt.starting_point || 'Depot',
+          startingAddress: bt.starting_point || 'Depot',
+          startingLat: bt.current_gps?.latitude ? Number(bt.current_gps.latitude) : 11.6643,
+          startingLng: bt.current_gps?.longitude ? Number(bt.current_gps.longitude) : 78.1460,
+          startingPlaceId: 'DEPOT-001',
+          startingMapsUrl: `https://maps.google.com/?q=${bt.starting_point}`,
+          destination: bt.destination || 'Destination',
+          destinationAddress: bt.destination || 'Destination',
+          destinationLat: 12.9716,
+          destinationLng: 77.5946,
+          destinationPlaceId: 'DEST-001',
+          destinationMapsUrl: `https://maps.google.com/?q=${bt.destination}`,
+          distanceKm: Number(bt.distance_km || 0),
+          estimatedTravelTime: bt.estimated_travel_time || '',
+          recommendedRoute: bt.recommended_route || 'via NH44',
+          tollsCount: Number(bt.tolls_count || 0),
+          estimatedTollCost: Number(bt.estimated_toll_cost || 0),
+          tollPlazas: bt.toll_plazas || [],
+          vehicleNumber: bt.vehicle_number || 'TN 38 AB 1234',
+          vehicleType: bt.vehicle_type || '12 Wheel',
+          agreedFreight: bt.agreed_freight != null ? Number(bt.agreed_freight) : 0,
+          isPinned: Boolean(bt.is_pinned),
+          odometerStart: bt.odometer_start ? Number(bt.odometer_start) : undefined,
+          odometerEnd: bt.odometer_end ? Number(bt.odometer_end) : undefined,
+          odometerStartPhotoUri: normalizeImageUrl(bt.odometer_start_url),
+          odometerEndPhotoUri: normalizeImageUrl(bt.odometer_end_url),
+          dieselStart: bt.diesel_start || undefined,
+          dieselEnd: bt.diesel_end || undefined,
+          startDate: bt.start_date ? new Date(bt.start_date).toLocaleDateString() : '',
+          startTime: bt.start_date ? new Date(bt.start_date).toLocaleTimeString() : '',
+          endDate: bt.end_date ? new Date(bt.end_date).toLocaleDateString() : '',
+          endTime: bt.end_date ? new Date(bt.end_date).toLocaleTimeString() : '',
+          podPhotoUri: normalizeImageUrl(bt.pod_photo_url),
+          podSignature: bt.pod_signature && bt.pod_signature.trim() ? bt.pod_signature.trim() : undefined,
+          podNotes: bt.pod_notes && bt.pod_notes.trim() ? bt.pod_notes.trim() : undefined,
+          podSubmitted: !!(
+            (bt.pod_photo_url && bt.pod_photo_url.trim() && bt.pod_photo_url.trim() !== 'mock-pod-uri') ||
+            (bt.pod_signature && bt.pod_signature.trim()) ||
+            (bt.pod_notes && bt.pod_notes.trim()) ||
+            ['REACHED_DESTINATION', 'COMPLETED'].includes(String(bt.status).toUpperCase())
+          ),
+          driverPayment: bt.driver_payment ? Number(bt.driver_payment) : undefined,
+          profitOrLoss: bt.profit_or_loss ? Number(bt.profit_or_loss) : undefined,
+          lastUpdatedDate: bt.updated_at ? new Date(bt.updated_at).toLocaleDateString() : '',
+          lastUpdatedTime: bt.updated_at ? new Date(bt.updated_at).toLocaleTimeString() : '',
+          lastKnownLocation: bt.current_gps?.address || bt.starting_point || 'En Route',
+          locationIsGps: Boolean(bt.current_gps),
+          expenses: (bt.expenses || []).map((e: any) => ({
+            ...e,
+            receiptUri: normalizeImageUrl(e.receiptUri || e.receipt_url),
+          })),
+          createdAt: bt.created_at || new Date().toISOString(),
+        }));
+
+        // Replace cache with backend data (don't merge — deleted items must disappear)
+        this.mockTrips = mappedBackendTrips;
+        this._lastTripsFetchTime = Date.now();
+        await this.saveTrips();
+      } catch (err) {
+        // Fallback to cache without blocking
+      } finally {
+        this._inFlightTrips = null;
+      }
+      return [...this.mockTrips];
+    })();
+
+    return this._inFlightTrips;
   }
 
   // ─── COMPLETE TRIP CREATION ENGINE ───────────────────────────────────────────
@@ -1418,46 +1479,62 @@ class AdminDatabase {
 
   // ─── MANAGED VEHICLES ────────────────────────────────────────────────────────
 
-  async getManagedVehicles(): Promise<ManagedVehicle[]> {
-    try {
-      const res = await this.authFetch(`${API_HOST}/api/admin/vehicles`);
-      if (res.ok) {
-        const apiVehicles = await res.json();
-        if (Array.isArray(apiVehicles) && apiVehicles.length > 0) {
-          const mapped: ManagedVehicle[] = apiVehicles.map((v: any) => ({
-            vehicle_id: v.vehicle_id || v.id,
-            vehicleNumber: v.vehicle_number,
-            vehicleType: v.vehicle_type || '12 Wheel',
-            wheelType: v.wheel_type || '12 Wheel',
-            vehicleMake: v.vehicle_make || '',
-            vehicleModel: v.vehicle_model || '',
-            ownerName: v.owner_name || '',
-            ownerPhone: v.owner_phone || '',
-            rcNumber: v.rc_number || '',
-            engineNumber: v.engine_number || '',
-            chassisNumber: v.chassis_number || '',
-            yearOfManufacture: v.year_of_manufacture || '',
-            status: v.status || 'AVAILABLE',
-            insuranceExpiryDate: v.insurance_expiry_date || undefined,
-            pollutionExpiryDate: v.pollution_expiry_date || undefined,
-            permitExpiryDate: v.permit_expiry_date || undefined,
-            fcExpiryDate: v.fc_expiry_date || undefined,
-            insuranceUrl: v.insurance_url || undefined,
-            pollutionUrl: v.pollution_url || undefined,
-            permitUrl: v.permit_url || undefined,
-            fcUrl: v.fc_url || undefined,
-            createdAt: v.created_at || new Date().toISOString(),
-            updatedAt: v.updated_at || new Date().toISOString(),
-          }));
-          // Replace cache with backend data
-          this.managedVehicles = mapped;
-          await this.saveVehicles();
-        }
-      }
-    } catch (err) {
-      console.warn('[AdminDB] Error fetching managed vehicles from API:', err);
+  async getManagedVehicles(forceRefresh = false): Promise<ManagedVehicle[]> {
+    const now = Date.now();
+    if (!forceRefresh && this._lastManagedVehiclesFetchTime && now - this._lastManagedVehiclesFetchTime < 2000 && this.managedVehicles.length > 0) {
+      return [...this.managedVehicles];
     }
-    return Promise.resolve([...this.managedVehicles]);
+
+    if (this._inFlightManagedVehicles) {
+      return this._inFlightManagedVehicles;
+    }
+
+    this._inFlightManagedVehicles = (async () => {
+      try {
+        const res = await this.authFetch(`${API_HOST}/api/admin/vehicles`);
+        if (res.ok) {
+          const apiVehicles = await res.json();
+          if (Array.isArray(apiVehicles)) {
+            const mapped: ManagedVehicle[] = apiVehicles.map((v: any) => ({
+              vehicle_id: v.vehicle_id || v.id,
+              vehicleNumber: v.vehicle_number,
+              vehicleType: v.vehicle_type || '12 Wheel',
+              wheelType: v.wheel_type || '12 Wheel',
+              vehicleMake: v.vehicle_make || '',
+              vehicleModel: v.vehicle_model || '',
+              ownerName: v.owner_name || '',
+              ownerPhone: v.owner_phone || '',
+              rcNumber: v.rc_number || '',
+              engineNumber: v.engine_number || '',
+              chassisNumber: v.chassis_number || '',
+              yearOfManufacture: v.year_of_manufacture || '',
+              status: v.status || 'AVAILABLE',
+              insuranceExpiryDate: v.insurance_expiry_date || undefined,
+              pollutionExpiryDate: v.pollution_expiry_date || undefined,
+              permitExpiryDate: v.permit_expiry_date || undefined,
+              fcExpiryDate: v.fc_expiry_date || undefined,
+              insuranceUrl: v.insurance_url || undefined,
+              pollutionUrl: v.pollution_url || undefined,
+              permitUrl: v.permit_url || undefined,
+              fcUrl: v.fc_url || undefined,
+              createdAt: v.created_at || new Date().toISOString(),
+              updatedAt: v.updated_at || new Date().toISOString(),
+            }));
+            // Replace cache with backend data
+            this.managedVehicles = mapped;
+            this._lastManagedVehiclesFetchTime = Date.now();
+            await this.saveVehicles();
+          }
+        }
+      } catch (err) {
+        // Fallback to cache without blocking
+      } finally {
+        this._inFlightManagedVehicles = null;
+      }
+      return [...this.managedVehicles];
+    })();
+
+    return this._inFlightManagedVehicles;
   }
 
   async togglePinVehicle(vehicle_id: string): Promise<boolean> {
@@ -1867,77 +1944,109 @@ class AdminDatabase {
     return alerts.sort((a, b) => (a.daysLeft ?? Number.MAX_SAFE_INTEGER) - (b.daysLeft ?? Number.MAX_SAFE_INTEGER));
   }
 
-  async getFleetVehicles(): Promise<FleetVehicle[]> {
-    try {
-      const res = await this.authFetch(`${API_HOST}/api/admin/fleet`);
-      if (res.ok) {
-        const apiRows = await res.json();
-        if (Array.isArray(apiRows) && apiRows.length > 0) {
-          const mapped: FleetVehicle[] = apiRows.map((f: any) => ({
-            id: f.id,
-            vehicleNumber: f.vehicle_number,
-            vehicleType: f.vehicle_type || '',
-            vehicleMake: f.vehicle_make || '',
-            vehicleModel: f.vehicle_model || '',
-            ownerName: f.owner_name || '',
-            gpsProvider: f.gps_provider || 'Jio GPS',
-            gpsDeviceBrand: f.gps_device_brand || '',
-            gpsDeviceModel: f.gps_device_model || '',
-            gpsDeviceId: f.gps_device_id || '',
-            imeiNumber: f.imei_number || '',
-            gpsDeviceStatus: f.gps_device_status || 'Connected',
-            vehicleStatus: f.vehicle_status || 'Active',
-            registrationDate: f.registration_date || '',
-            simNumber: f.sim_number || '',
-            externalGpsDeviceId: f.external_gps_device_id || '',
-            gpsInstallationDate: f.gps_installation_date || '',
-            lastKnownLatitude: f.last_known_lat ? Number(f.last_known_lat) : undefined,
-            lastKnownLongitude: f.last_known_lng ? Number(f.last_known_lng) : undefined,
-            lastKnownCity: f.last_known_city || undefined,
-            lastKnownAddress: f.last_known_address || undefined,
-            gpsHistory: [],
-            createdAt: f.created_at || new Date().toISOString(),
-            updatedAt: f.updated_at || new Date().toISOString(),
-          }));
-          this.mockFleetVehicles = mapped;
-        }
-      }
-    } catch (err) {
-      console.warn('[AdminDB] Error fetching fleet vehicles:', err);
+  async getFleetVehicles(forceRefresh = false): Promise<FleetVehicle[]> {
+    const now = Date.now();
+    if (!forceRefresh && this._lastFleetFetchTime && now - this._lastFleetFetchTime < 2000 && this.mockFleetVehicles.length > 0) {
+      return [...this.mockFleetVehicles];
     }
-    return Promise.resolve([...this.mockFleetVehicles]);
+
+    if (this._inFlightFleet) {
+      return this._inFlightFleet;
+    }
+
+    this._inFlightFleet = (async () => {
+      try {
+        const res = await this.authFetch(`${API_HOST}/api/admin/fleet`);
+        if (res.ok) {
+          const apiRows = await res.json();
+          if (Array.isArray(apiRows)) {
+            const mapped: FleetVehicle[] = apiRows.map((f: any) => ({
+              id: f.id,
+              vehicleNumber: f.vehicle_number,
+              vehicleType: f.vehicle_type || '',
+              vehicleMake: f.vehicle_make || '',
+              vehicleModel: f.vehicle_model || '',
+              ownerName: f.owner_name || '',
+              gpsProvider: f.gps_provider || 'Jio GPS',
+              gpsDeviceBrand: f.gps_device_brand || '',
+              gpsDeviceModel: f.gps_device_model || '',
+              gpsDeviceId: f.gps_device_id || '',
+              imeiNumber: f.imei_number || '',
+              gpsDeviceStatus: f.gps_device_status || 'Connected',
+              vehicleStatus: f.vehicle_status || 'Active',
+              registrationDate: f.registration_date || '',
+              simNumber: f.sim_number || '',
+              externalGpsDeviceId: f.external_gps_device_id || '',
+              gpsInstallationDate: f.gps_installation_date || '',
+              lastKnownLatitude: f.last_known_lat ? Number(f.last_known_lat) : undefined,
+              lastKnownLongitude: f.last_known_lng ? Number(f.last_known_lng) : undefined,
+              lastKnownCity: f.last_known_city || undefined,
+              lastKnownAddress: f.last_known_address || undefined,
+              gpsHistory: [],
+              createdAt: f.created_at || new Date().toISOString(),
+              updatedAt: f.updated_at || new Date().toISOString(),
+            }));
+            this.mockFleetVehicles = mapped;
+            this._lastFleetFetchTime = Date.now();
+          }
+        }
+      } catch (err) {
+        // Fallback to cache without blocking
+      } finally {
+        this._inFlightFleet = null;
+      }
+      return [...this.mockFleetVehicles];
+    })();
+
+    return this._inFlightFleet;
   }
 
-  async getActivityLogs(): Promise<ActivityLog[]> {
-    try {
-      const res = await this.authFetch(`${API_HOST}/api/admin/activity-logs`);
-      if (res.ok) {
-        const apiRows = await res.json();
-        if (Array.isArray(apiRows) && apiRows.length > 0) {
-          const mapped: ActivityLog[] = apiRows.map((a: any) => ({
-            id: a.id,
-            tripId: a.trip_id,
-            driverId: a.driver_id,
-            driverName: a.driver_name,
-            vehicleNumber: a.vehicle_number,
-            action: a.action,
-            timestamp: new Date(a.timestamp).toLocaleString('en-IN'),
-            date: new Date(a.timestamp).toLocaleDateString('en-IN'),
-            time: new Date(a.timestamp).toLocaleTimeString('en-IN'),
-            details: a.details,
-            startingPoint: a.starting_point || '',
-            destination: a.destination || '',
-            currentLocation: a.current_location || '',
-            statusLabel: a.status_label || '',
-            isGpsLocation: a.is_gps_location || false,
-          }));
-          this.mockActivityLogs = mapped;
-        }
-      }
-    } catch (err) {
-      console.warn('[AdminDB] Error fetching activity logs:', err);
+  async getActivityLogs(forceRefresh = false): Promise<ActivityLog[]> {
+    const now = Date.now();
+    if (!forceRefresh && this._lastLogsFetchTime && now - this._lastLogsFetchTime < 2000 && this.mockActivityLogs.length > 0) {
+      return [...this.mockActivityLogs];
     }
-    return Promise.resolve([...this.mockActivityLogs]);
+
+    if (this._inFlightLogs) {
+      return this._inFlightLogs;
+    }
+
+    this._inFlightLogs = (async () => {
+      try {
+        const res = await this.authFetch(`${API_HOST}/api/admin/activity-logs`);
+        if (res.ok) {
+          const apiRows = await res.json();
+          if (Array.isArray(apiRows)) {
+            const mapped: ActivityLog[] = apiRows.map((a: any) => ({
+              id: a.id,
+              tripId: a.trip_id,
+              driverId: a.driver_id,
+              driverName: a.driver_name,
+              vehicleNumber: a.vehicle_number,
+              action: a.action,
+              timestamp: new Date(a.timestamp).toLocaleString('en-IN'),
+              date: new Date(a.timestamp).toLocaleDateString('en-IN'),
+              time: new Date(a.timestamp).toLocaleTimeString('en-IN'),
+              details: a.details,
+              startingPoint: a.starting_point || '',
+              destination: a.destination || '',
+              currentLocation: a.current_location || '',
+              statusLabel: a.status_label || '',
+              isGpsLocation: a.is_gps_location || false,
+            }));
+            this.mockActivityLogs = mapped;
+            this._lastLogsFetchTime = Date.now();
+          }
+        }
+      } catch (err) {
+        // Fallback to cache without blocking
+      } finally {
+        this._inFlightLogs = null;
+      }
+      return [...this.mockActivityLogs];
+    })();
+
+    return this._inFlightLogs;
   }
 
   async createDriver(driverData: {
@@ -2057,30 +2166,46 @@ class AdminDatabase {
     }
   }
 
-  async getGcNotes(month?: string): Promise<GcNote[]> {
-    try {
-      const res = await this.authFetch(`${API_HOST}/api/gc`);
-      if (res.ok) {
-        const rows = await res.json();
-        if (Array.isArray(rows) && rows.length > 0) {
-          this.mockGcNotes = rows.map((r: any) => ({
-            ...(r.raw_data || {}),
-            id: r.id,
-            noteNumber: r.gc_number || r.id,
-            date: r.date,
-            freight: Number(r.freight_amount || 0),
-            total: Number(r.total_amount || 0),
-            lessAdvance: Number(r.advance_amount || 0),
-            balance: Number(r.balance_amount || 0),
-            createdAt: r.created_at
-          }));
-          await this.persistGcNotes();
-        }
-      }
-    } catch (err) {
-      console.warn('[AdminDB] getGcNotes API error:', err);
+  async getGcNotes(month?: string, forceRefresh = false): Promise<GcNote[]> {
+    const now = Date.now();
+    if (!forceRefresh && this._lastGcsFetchTime && now - this._lastGcsFetchTime < 2000 && this.mockGcNotes.length > 0) {
+      return [...this.mockGcNotes];
     }
-    return Promise.resolve([...this.mockGcNotes]);
+
+    if (this._inFlightGcs) {
+      return this._inFlightGcs;
+    }
+
+    this._inFlightGcs = (async () => {
+      try {
+        const res = await this.authFetch(`${API_HOST}/api/gc`);
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows)) {
+            this.mockGcNotes = rows.map((r: any) => ({
+              ...(r.raw_data || {}),
+              id: r.id,
+              noteNumber: r.gc_number || r.id,
+              date: r.date,
+              freight: Number(r.freight_amount || 0),
+              total: Number(r.total_amount || 0),
+              lessAdvance: Number(r.advance_amount || 0),
+              balance: Number(r.balance_amount || 0),
+              createdAt: r.created_at
+            }));
+            this._lastGcsFetchTime = Date.now();
+            await this.persistGcNotes();
+          }
+        }
+      } catch (err) {
+        // Fallback to cached state
+      } finally {
+        this._inFlightGcs = null;
+      }
+      return [...this.mockGcNotes];
+    })();
+
+    return this._inFlightGcs;
   }
 
   async createGcNote(gcData: any): Promise<{ success: boolean; gcNote?: GcNote; error?: string }> {
@@ -2170,35 +2295,54 @@ class AdminDatabase {
 
   private async persistMemoDocuments() {
     try {
-      await AsyncStorage.setItem(this.memoStorageKey, JSON.stringify(this.mockMemoDocuments));
+      const json = JSON.stringify(this.mockMemoDocuments);
+      if (json === this._lastSavedMemosJson) return;
+      this._lastSavedMemosJson = json;
+      await AsyncStorage.setItem(this.memoStorageKey, json);
     } catch (e) {
       console.warn('Failed to persist memo documents:', e);
     }
   }
 
-  async getMemoDocuments(): Promise<MemoDocument[]> {
-    try {
-      const res = await this.authFetch(`${API_HOST}/api/memos`);
-      if (res.ok) {
-        const rows = await res.json();
-        if (Array.isArray(rows) && rows.length > 0) {
-          this.mockMemoDocuments = rows.map((r: any) => ({
-            id: r.id,
-            memoId: r.id,
-            date: r.date,
-            contentHtml: r.content_html || '',
-            createdBy: r.created_by || 'Admin',
-            status: r.status || 'SAVED',
-            createdAt: r.created_at,
-            updatedAt: r.updated_at
-          }));
-          await this.persistMemoDocuments();
-        }
-      }
-    } catch (err) {
-      console.warn('[AdminDB] getMemoDocuments API error:', err);
+  async getMemoDocuments(forceRefresh = false): Promise<MemoDocument[]> {
+    const now = Date.now();
+    if (!forceRefresh && this._lastMemosFetchTime && now - this._lastMemosFetchTime < 2000 && this.mockMemoDocuments.length > 0) {
+      return [...this.mockMemoDocuments];
     }
-    return Promise.resolve([...this.mockMemoDocuments]);
+
+    if (this._inFlightMemos) {
+      return this._inFlightMemos;
+    }
+
+    this._inFlightMemos = (async () => {
+      try {
+        const res = await this.authFetch(`${API_HOST}/api/memos`);
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows)) {
+            this.mockMemoDocuments = rows.map((r: any) => ({
+              id: r.id,
+              memoId: r.id,
+              date: r.date,
+              contentHtml: r.content_html || '',
+              createdBy: r.created_by || 'Admin',
+              status: r.status || 'SAVED',
+              createdAt: r.created_at,
+              updatedAt: r.updated_at
+            }));
+            this._lastMemosFetchTime = Date.now();
+            await this.persistMemoDocuments();
+          }
+        }
+      } catch (err) {
+        // Fallback to cached state
+      } finally {
+        this._inFlightMemos = null;
+      }
+      return [...this.mockMemoDocuments];
+    })();
+
+    return this._inFlightMemos;
   }
 
   async getMemoDocumentById(memoId: string): Promise<MemoDocument | null> {
@@ -2471,6 +2615,106 @@ class AdminDatabase {
     console.log('[AdminDB] Reset success:', result);
     this.notify();
     return true;
+  }
+
+  async extractAllDatabaseData(): Promise<{
+    extractedAt: string;
+    version: string;
+    stats: {
+      totalRecords: number;
+      tripsCount: number;
+      vehiclesCount: number;
+      vehicleDocumentsCount: number;
+      driversCount: number;
+      gcNotesCount: number;
+      memoDocumentsCount: number;
+      activityLogsCount: number;
+      fleetCount: number;
+      lorryBookingsCount: number;
+    };
+    data: {
+      trips: Trip[];
+      managedVehicles: ManagedVehicle[];
+      vehicleDocuments: VehicleDocument[];
+      fleetVehicles: FleetVehicle[];
+      drivers: Driver[];
+      gcNotes: GcNote[];
+      memoDocuments: MemoDocument[];
+      activityLogs: ActivityLog[];
+      lorryBookings: any[];
+    };
+  }> {
+    await this.loadSession();
+
+    let lorryBookings: any[] = [];
+    try {
+      const res = await this.authFetch(`${API_HOST}/api/lorry-bookings/all`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.entries)) {
+          lorryBookings = json.entries;
+        }
+      }
+    } catch {}
+
+    const [
+      trips,
+      managedVehicles,
+      vehicleDocuments,
+      fleetVehicles,
+      drivers,
+      gcNotes,
+      memoDocuments,
+      activityLogs,
+    ] = await Promise.all([
+      this.getTrips(true),
+      this.getManagedVehicles(true),
+      this.getAllVehicleDocuments(),
+      this.getFleetVehicles(true),
+      this.getDrivers(),
+      this.getGcNotes(undefined, true),
+      this.getMemoDocuments(true),
+      this.getActivityLogs(true),
+    ]);
+
+    const totalRecords =
+      trips.length +
+      managedVehicles.length +
+      vehicleDocuments.length +
+      fleetVehicles.length +
+      drivers.length +
+      gcNotes.length +
+      memoDocuments.length +
+      activityLogs.length +
+      lorryBookings.length;
+
+    return {
+      extractedAt: new Date().toISOString(),
+      version: '2.4.1',
+      stats: {
+        totalRecords,
+        tripsCount: trips.length,
+        vehiclesCount: managedVehicles.length,
+        vehicleDocumentsCount: vehicleDocuments.length,
+        driversCount: drivers.length,
+        gcNotesCount: gcNotes.length,
+        memoDocumentsCount: memoDocuments.length,
+        activityLogsCount: activityLogs.length,
+        fleetCount: fleetVehicles.length,
+        lorryBookingsCount: lorryBookings.length,
+      },
+      data: {
+        trips,
+        managedVehicles,
+        vehicleDocuments,
+        fleetVehicles,
+        drivers,
+        gcNotes,
+        memoDocuments,
+        activityLogs,
+        lorryBookings,
+      },
+    };
   }
 }
 

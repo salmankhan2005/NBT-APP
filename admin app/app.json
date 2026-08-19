@@ -22,13 +22,22 @@
     "android": {
       "predictiveBackGestureEnabled": false,
       "package": "com.nbtars.admindashboard",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "VIBRATE",
+        "SYSTEM_ALERT_WINDOW"
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCRQ3QPWMeXqYFOBtayGkScl7lXynWqNus"
         }
       }
     },
-
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
@@ -48,11 +57,11 @@
         }
       ]
     ],
+    "owner": "vahith",
     "extra": {
       "eas": {
-        "projectId": "d74ad885-d1e2-4925-a67e-c46bf4fa6510"
+        "projectId": "7a1490cc-c033-4c86-adc3-52269560bf5c"
       }
-    },
-    "owner": "krithickpranav"
+    }
   }
 }

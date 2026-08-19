@@ -21,6 +21,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import nbtAuthorisedSignatureBase64 from '../nbtSignatureBase64';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { db, GcNote, GcItem } from '../db/database';
 
 export default function GcScreen() {
@@ -89,6 +90,11 @@ export default function GcScreen() {
   const [lorryOwner, setLorryOwner] = useState('');
   const [bankDetails, setBankDetails] = useState('');
   const [terms, setTerms] = useState('');
+
+  // Delete modal state
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletingGcId, setDeletingGcId] = useState<{ id: string; label?: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
@@ -899,22 +905,23 @@ export default function GcScreen() {
   };
 
   const handleDeleteGcNote = (id: string, noteNumber?: string) => {
-    showConfirmDialog(
-      'Delete GC Note',
-      `Are you sure you want to permanently delete ${noteNumber || id}? This cannot be undone.`,
-      async () => {
-        setConfirmModal(prev => ({ ...prev, visible: false }));
-        try {
-          await db.deleteGcNote(id);
-          await fetchGcNotes();
-        } catch (e) {
-          showConfirmDialog('Error', 'Failed to delete GC note.', undefined, 'danger', 'OK');
-        }
-      },
-      'danger',
-      'Yes, Delete',
-      'Cancel'
-    );
+    setDeletingGcId({ id, label: noteNumber ? `GC Note #${noteNumber}` : `GC ID: ${id}` });
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDeleteGcNote = async () => {
+    if (!deletingGcId) return;
+    setIsDeleting(true);
+    try {
+      await db.deleteGcNote(deletingGcId.id);
+      await fetchGcNotes();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to delete GC note.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalVisible(false);
+      setDeletingGcId(null);
+    }
   };
 
   // Get unique months from noteNumber (format: JUL-26-01 → JUL-26)
@@ -1539,6 +1546,20 @@ export default function GcScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        visible={deleteModalVisible}
+        title="Delete GC Note"
+        message="Are you sure you want to permanently delete this GC note? This action cannot be undone."
+        itemLabel={deletingGcId?.label}
+        isDeleting={isDeleting}
+        onConfirm={confirmDeleteGcNote}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setDeletingGcId(null);
+        }}
+      />
     </View>
   );
 }

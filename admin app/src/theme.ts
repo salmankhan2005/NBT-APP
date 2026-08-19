@@ -16,6 +16,7 @@ export const COLORS = {
   success: '#15803d',
   textDark: '#1b1b1e',
   textMuted: '#44474e',
+  'electric-orange': '#fc7728', // Alias for secondary accent color
 };
 
 export const SPACING = {

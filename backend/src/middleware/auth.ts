@@ -13,11 +13,7 @@ export async function authenticate(
   try {
     const rawToken = request.headers.authorization?.replace('Bearer ', '').trim();
 
-    if (rawToken === 'local-fallback-token' || rawToken === 'mock-admin-token') {
-      request.user = { role: 'admin', username: 'admin', adminId: 'ADM-001' };
-      return;
-    }
-
+    // Verify JWT token (no hardcoded fallback tokens)
     await request.jwtVerify();
 
     // Check server-side denylist for revoked tokens (logout invalidation)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -123,10 +123,10 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
       fetchData(false);
     });
 
-    // Real-Time Polling fallback every 3 seconds
+    // Real-Time Polling fallback every 8 seconds (db layer caches prevent duplicate requests)
     const interval = setInterval(() => {
       fetchData(false);
-    }, 3000);
+    }, 8000);
 
     return () => {
       unsubscribe();
@@ -139,131 +139,77 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
     fetchData(false);
   };
 
-  // ─── 1. TOTAL NO. OF VEHICLES ────────────────────────────────────────────────
-  // Total registered vehicles count in system
-  const totalVehiclesCount = fleetVehicles.length;
+  // ─── MEMOIZED DASHBOARD METRICS ─────────────────────────────────────────────
+  const dashboardMetrics = useMemo(() => {
+    const totalVehiclesCount = fleetVehicles.length;
+    const activeTripsList = trips.filter(t => t.status !== 'COMPLETED');
+    const activeTripsCount = activeTripsList.length;
+    const startedCount = activeTripsList.filter(t => t.status === 'STARTED').length;
+    const inTransitCount = activeTripsList.filter(t => t.status === 'ON_THE_WAY').length;
+    const reachedDestinationCount = activeTripsList.filter(t => t.status === 'REACHED_DESTINATION').length;
+    const podPendingCount = activeTripsList.filter(t => t.status === 'REACHED_DESTINATION' && !t.podPhotoUri).length;
 
-  // ─── 2. ACTIVE TRIPS ────────────────────────────────────────────────────────
-  // Active trips: status !== 'COMPLETED' (ASSIGNED, STARTED, ON_THE_WAY, REACHED_DESTINATION)
-  const activeTripsList = trips.filter(t => t.status !== 'COMPLETED');
-  const activeTripsCount = activeTripsList.length;
+    const activeTripVehicleNumbers = new Set(activeTripsList.map(t => t.vehicleNumber.trim().toLowerCase()));
+    const availableVehiclesList = fleetVehicles.filter(fv =>
+      fv.vehicleStatus === 'Active' &&
+      !activeTripVehicleNumbers.has(fv.vehicleNumber.trim().toLowerCase())
+    );
+    const availableVehiclesCount = availableVehiclesList.length;
 
-  // Breakdown of active trip statuses
-  const startedCount = activeTripsList.filter(t => t.status === 'STARTED').length;
-  const inTransitCount = activeTripsList.filter(t => t.status === 'ON_THE_WAY').length;
-  const reachedDestinationCount = activeTripsList.filter(t => t.status === 'REACHED_DESTINATION').length;
-  const podPendingCount = activeTripsList.filter(t => t.status === 'REACHED_DESTINATION' && !t.podPhotoUri).length;
+    const allCompletedTrips = trips.filter(t => t.status === 'COMPLETED');
+    const completedTripsCurrentMonthCount = allCompletedTrips.length;
+    const expiredCount = expiryAlerts.filter(item => item.status === 'EXPIRED').length;
+    const sevenDayCount = expiryAlerts.filter(item => item.status === 'EXPIRING_IN_7_DAYS').length;
+    const thirtyDayCount = expiryAlerts.filter(item => item.status === 'EXPIRING_SOON').length;
 
-  // ─── 3. AVAILABLE VEHICLES ──────────────────────────────────────────────────
-  // A vehicle is AVAILABLE when:
-  // - It is Active (vehicleStatus === 'Active')
-  // - It is NOT currently assigned to an active trip
-  // - It is NOT Under Maintenance (vehicleStatus !== 'Under Maintenance')
-  const activeTripVehicleNumbers = new Set(activeTripsList.map(t => t.vehicleNumber.trim().toLowerCase()));
-
-  const availableVehiclesList = fleetVehicles.filter(fv => {
-    const isStatusActive = fv.vehicleStatus === 'Active';
-    const isNotUnderMaintenance = fv.vehicleStatus !== 'Under Maintenance';
-    const isNotOnActiveTrip = !activeTripVehicleNumbers.has(fv.vehicleNumber.trim().toLowerCase());
-    return isStatusActive && isNotUnderMaintenance && isNotNotAssignedToTrip(isNotOnActiveTrip);
-  });
-  function isNotNotAssignedToTrip(val: boolean) { return val; }
-
-  const availableVehiclesCount = availableVehiclesList.length;
-
-  // ─── 4. COMPLETED TRIPS THIS MONTH ──────────────────────────────────────────
-  const isTripInMonthYear = (trip: Trip, targetMonthYear: string) => {
-    if (trip.status !== 'COMPLETED') return false;
-    const dateToCheck = trip.endDate || trip.startDate || trip.lastUpdatedDate || trip.createdAt || '';
-    if (!dateToCheck) return true;
-
-    try {
-      if (dateToCheck.toLowerCase().includes(targetMonthYear.toLowerCase())) return true;
-      const parsedDate = new Date(dateToCheck);
-      if (!isNaN(parsedDate.getTime())) {
-        const formatted = parsedDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-        if (formatted.toLowerCase() === targetMonthYear.toLowerCase()) return true;
+    const activeVehiclesTimeline = activeTripsList.map(trip => {
+      const fv = fleetVehicles.find(v => v.vehicleNumber.trim().toLowerCase() === trip.vehicleNumber.trim().toLowerCase());
+      let currentLocationName = trip.lastKnownLocation || trip.currentGPS?.city || trip.startingPoint;
+      let isGps = false;
+      if (fv && fv.gpsDeviceStatus === 'Connected' && (fv.lastKnownCity || trip.currentGPS?.city)) {
+        currentLocationName = fv.lastKnownCity || trip.currentGPS?.city || currentLocationName;
+        isGps = true;
+      } else if (trip.locationIsGps) {
+        isGps = true;
       }
-    } catch (e) {}
+      let driverDisplayName = trip.driverName;
+      if (!driverDisplayName.toLowerCase().startsWith('driver:')) driverDisplayName = `Driver: ${driverDisplayName}`;
+      let statusText = 'In Transit';
+      if (trip.status === 'ASSIGNED') statusText = 'Trip Assigned';
+      else if (trip.status === 'STARTED') statusText = 'Trip Started';
+      else if (trip.status === 'ON_THE_WAY') statusText = 'In Transit';
+      else if (trip.status === 'REACHED_DESTINATION') statusText = 'Reached Destination';
+      const dateStr = trip.lastUpdatedDate || trip.startDate || '';
+      const timeStr = trip.lastUpdatedTime || trip.startTime || '';
+      return { id: trip.id, vehicleNumber: trip.vehicleNumber, driverName: driverDisplayName, startingLocation: trip.startingPoint, destination: trip.destination, currentLocation: currentLocationName, status: statusText, date: dateStr, time: timeStr, lastUpdated: `${dateStr} | ${timeStr}`, isGps, trip };
+    }).sort((a, b) => b.id.localeCompare(a.id));
 
-    return true;
-  };
-
-  const allCompletedTrips = trips.filter(t => t.status === 'COMPLETED');
-  const completedTripsThisMonth = trips.filter(t => isTripInMonthYear(t, currentMonthYearStr));
-  const completedTripsCurrentMonthCount = allCompletedTrips.length;
-  const expiredCount = expiryAlerts.filter((item) => item.status === 'EXPIRED').length;
-  const sevenDayCount = expiryAlerts.filter((item) => item.status === 'EXPIRING_IN_7_DAYS').length;
-  const thirtyDayCount = expiryAlerts.filter((item) => item.status === 'EXPIRING_SOON').length;
-
-  // All completed trips for selected month (used in Monthly Report Modal)
-  const completedTripsSelectedMonth = allCompletedTrips;
-
-  // ─── LIVE FLEET ACTIVITY TIMELINE DATA ─────────────────────────────────────
-  // For every active vehicle, show current movement
-  // Active vehicles with trips + latest telemetry activities
-  const activeVehiclesTimeline = activeTripsList.map(trip => {
-    const fv = fleetVehicles.find(v => v.vehicleNumber.trim().toLowerCase() === trip.vehicleNumber.trim().toLowerCase());
-    
-    // Determine location: GPS if available, else manual driver location
-    let currentLocationName = trip.lastKnownLocation || trip.currentGPS?.city || trip.startingPoint;
-    let isGps = false;
-
-    if (fv && fv.gpsDeviceStatus === 'Connected' && (fv.lastKnownCity || trip.currentGPS?.city)) {
-      currentLocationName = fv.lastKnownCity || trip.currentGPS?.city || currentLocationName;
-      isGps = true;
-    } else if (trip.locationIsGps) {
-      isGps = true;
-    }
-
-    // Driver name format
-    let driverDisplayName = trip.driverName;
-    if (!driverDisplayName.toLowerCase().startsWith('driver:')) {
-      driverDisplayName = `Driver: ${driverDisplayName}`;
-    }
-
-    // Format status label
-    let statusText = 'In Transit';
-    if (trip.status === 'ASSIGNED') statusText = 'Trip Assigned';
-    else if (trip.status === 'STARTED') statusText = 'Trip Started';
-    else if (trip.status === 'ON_THE_WAY') statusText = 'In Transit';
-    else if (trip.status === 'REACHED_DESTINATION') statusText = 'Reached Destination';
-
-    const dateStr = trip.lastUpdatedDate || trip.startDate || '29 July 2026';
-    const timeStr = trip.lastUpdatedTime || trip.startTime || '10:45 AM';
+    const totalAgreedFreight = trips.reduce((sum, t) => sum + (Number(t.agreedFreight) || 0), 0);
+    const totalDriverLoggedExpenses = trips.reduce((sum, t) => sum + (t.expenses?.reduce((s, e) => s + (Number(e.amount) || 0), 0) || 0), 0);
+    const totalDriverPayments = trips.reduce((sum, t) => sum + (Number(t.driverPayment) || 0), 0);
+    const totalNetProfit = totalAgreedFreight - totalDriverLoggedExpenses - totalDriverPayments;
+    const runningVehiclesCount = activeTripsList.filter(t => ['STARTED', 'ON_THE_WAY'].includes(t.status)).length;
+    const underMaintenanceCount = fleetVehicles.filter(fv => fv.vehicleStatus === 'Under Maintenance').length;
+    const offlineGpsCount = fleetVehicles.filter(fv => ['Offline', 'Signal Lost', 'Not Configured', 'Device Error'].includes(fv.gpsDeviceStatus)).length;
 
     return {
-      id: trip.id,
-      vehicleNumber: trip.vehicleNumber,
-      driverName: driverDisplayName,
-      startingLocation: trip.startingPoint,
-      destination: trip.destination,
-      currentLocation: currentLocationName,
-      status: statusText,
-      date: dateStr,
-      time: timeStr,
-      lastUpdated: `${dateStr} | ${timeStr}`,
-      isGps,
-      trip
+      totalVehiclesCount, activeTripsList, activeTripsCount, startedCount, inTransitCount,
+      reachedDestinationCount, podPendingCount, availableVehiclesList, availableVehiclesCount,
+      allCompletedTrips, completedTripsCurrentMonthCount, expiredCount, sevenDayCount, thirtyDayCount,
+      activeVehiclesTimeline, totalAgreedFreight, totalDriverLoggedExpenses, totalDriverPayments,
+      totalNetProfit, runningVehiclesCount, underMaintenanceCount, offlineGpsCount,
+      completedTripsSelectedMonth: allCompletedTrips,
     };
-  });
+  }, [trips, fleetVehicles, expiryAlerts]);
 
-  // Sort timeline by most recent first
-  activeVehiclesTimeline.sort((a, b) => b.id.localeCompare(a.id));
-
-  // ─── FLEET FINANCIAL SUMMARY DATA ──────────────────────────────────────────
-  const totalAgreedFreight = trips.reduce((sum, t) => sum + (Number(t.agreedFreight) || 0), 0);
-  const totalDriverLoggedExpenses = trips.reduce(
-    (sum, t) => sum + (t.expenses?.reduce((s, e) => s + (Number(e.amount) || 0), 0) || 0),
-    0
-  );
-  const totalDriverPayments = trips.reduce((sum, t) => sum + (Number(t.driverPayment) || 0), 0);
-  const totalNetProfit = totalAgreedFreight - totalDriverLoggedExpenses - totalDriverPayments;
-
-  // ─── FLEET STATUS SUMMARY DATA ──────────────────────────────────────────────
-  const runningVehiclesCount = activeTripsList.filter(t => ['STARTED', 'ON_THE_WAY'].includes(t.status)).length;
-  const underMaintenanceCount = fleetVehicles.filter(fv => fv.vehicleStatus === 'Under Maintenance').length;
-  const offlineGpsCount = fleetVehicles.filter(fv => ['Offline', 'Signal Lost', 'Not Configured', 'Device Error'].includes(fv.gpsDeviceStatus)).length;
+  const {
+    totalVehiclesCount, activeTripsList, activeTripsCount, startedCount, inTransitCount,
+    reachedDestinationCount, podPendingCount, availableVehiclesList, availableVehiclesCount,
+    allCompletedTrips, completedTripsCurrentMonthCount, expiredCount, sevenDayCount, thirtyDayCount,
+    activeVehiclesTimeline, totalAgreedFreight, totalDriverLoggedExpenses, totalDriverPayments,
+    totalNetProfit, runningVehiclesCount, underMaintenanceCount, offlineGpsCount,
+    completedTripsSelectedMonth,
+  } = dashboardMetrics;
 
   // Simulator Handler
   const handleSimulateAction = async (

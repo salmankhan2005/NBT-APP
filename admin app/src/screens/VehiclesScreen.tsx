@@ -20,6 +20,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { OCRResultModal, OCRResult } from '../components/OCRResultModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { db, ManagedVehicle, ManagedVehicleStatus, VehicleDocument, DocType, VehicleDocumentHistory, DocumentExpiryStatus, Trip } from '../db/database';
 
 type VehicleFilter = 'ALL' | 'AVAILABLE' | 'ON TRIP' | 'UNDER MAINTENANCE' | 'INACTIVE';
@@ -58,6 +59,11 @@ export default function VehiclesScreen() {
   const [docActionModalVisible, setDocActionModalVisible] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<ManagedVehicle | null>(null);
   const [vehicleDocuments, setVehicleDocuments] = useState<VehicleDocument[]>([]);
+
+  // Delete modal state
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'VEHICLE' | 'DOCUMENT'; id: string; label?: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [activeDoc, setActiveDoc] = useState<VehicleDocument | null>(null);
   const [activeDocVehicleId, setActiveDocVehicleId] = useState<string | null>(null);
   const [docMetaNumber, setDocMetaNumber] = useState('');
@@ -822,56 +828,61 @@ export default function VehiclesScreen() {
   };
 
   const handleDeleteDocument = async (docId: string) => {
-    const executeDelete = async () => {
-      const result = await db.deleteVehicleDocument(docId);
-      if (result.success) {
-        if (selectedVehicle) {
-          const docs = await db.getAllDocumentsForVehicle(selectedVehicle.vehicle_id);
-          setVehicleDocuments(docs);
-        }
-        const documents = await db.getAllVehicleDocuments();
-        setAllVehicleDocuments(documents);
-        await fetchVehicles(false);
-        showFeedback('Document deleted successfully.', 'success');
-      } else {
-        Alert.alert('Error', result.error || 'Failed to delete document.');
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Remove this uploaded document?')) {
-        executeDelete();
-      }
-    } else {
-      Alert.alert('Delete Document', 'Remove this uploaded document?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: executeDelete },
-      ]);
-    }
+    const doc = vehicleDocuments.find(d => d.doc_id === docId);
+    setDeleteTarget({
+      type: 'DOCUMENT',
+      id: docId,
+      label: doc ? `${doc.docLabel || doc.docType}` : `Document #${docId}`,
+    });
+    setDeleteModalVisible(true);
   };
 
   const handleDeleteVehicle = (vehicle_id: string) => {
-    const executeDelete = async () => {
-      const res = await db.deleteManagedVehicle(vehicle_id);
-      if (res.success) {
-        if (selectedVehicle?.vehicle_id === vehicle_id) {
-          setDetailModalVisible(false);
-        }
-        await fetchVehicles(false);
-      } else {
-        Alert.alert('Error', res.error || 'Failed to delete vehicle.');
-      }
-    };
+    const v = vehicles.find(item => item.vehicle_id === vehicle_id);
+    setDeleteTarget({
+      type: 'VEHICLE',
+      id: vehicle_id,
+      label: v ? `${v.vehicleNumber} (${v.vehicleType})` : `Vehicle ID: ${vehicle_id}`,
+    });
+    setDeleteModalVisible(true);
+  };
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Are you sure you want to delete vehicle ${vehicle_id}?`)) {
-        executeDelete();
+  const confirmDeleteAction = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      if (deleteTarget.type === 'DOCUMENT') {
+        const result = await db.deleteVehicleDocument(deleteTarget.id);
+        if (result.success) {
+          if (selectedVehicle) {
+            const docs = await db.getAllDocumentsForVehicle(selectedVehicle.vehicle_id);
+            setVehicleDocuments(docs);
+          }
+          const documents = await db.getAllVehicleDocuments();
+          setAllVehicleDocuments(documents);
+          await fetchVehicles(false);
+          showFeedback('Document deleted successfully.', 'success');
+        } else {
+          Alert.alert('Error', result.error || 'Failed to delete document.');
+        }
+      } else if (deleteTarget.type === 'VEHICLE') {
+        const res = await db.deleteManagedVehicle(deleteTarget.id);
+        if (res.success) {
+          if (selectedVehicle?.vehicle_id === deleteTarget.id) {
+            setDetailModalVisible(false);
+          }
+          await fetchVehicles(false);
+          showFeedback('Vehicle deleted successfully.', 'success');
+        } else {
+          Alert.alert('Error', res.error || 'Failed to delete vehicle.');
+        }
       }
-    } else {
-      Alert.alert('Delete Vehicle', 'Are you sure you want to permanently delete this vehicle?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: executeDelete },
-      ]);
+    } catch {
+      Alert.alert('Error', 'Failed to perform delete operation.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalVisible(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -1316,6 +1327,24 @@ export default function VehiclesScreen() {
           setOcrLoading(false);
         }}
         onConfirm={handleOCRConfirm}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        visible={deleteModalVisible}
+        title={deleteTarget?.type === 'DOCUMENT' ? 'Delete Document' : 'Delete Vehicle'}
+        message={
+          deleteTarget?.type === 'DOCUMENT'
+            ? 'Are you sure you want to remove this uploaded vehicle document?'
+            : 'Are you sure you want to permanently delete this vehicle? This action cannot be undone.'
+        }
+        itemLabel={deleteTarget?.label}
+        isDeleting={isDeleting}
+        onConfirm={confirmDeleteAction}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setDeleteTarget(null);
+        }}
       />
     </View>
   );

@@ -23,6 +23,7 @@ export async function uploadRoutes(app: FastifyInstance) {
   app.post(
     '/',
     {
+      preHandler: [app.authenticate],
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     },
     async (req: FastifyRequest, reply: FastifyReply) => {

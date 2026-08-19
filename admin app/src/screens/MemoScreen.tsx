@@ -21,6 +21,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { COLORS, SHADOWS, SPACING } from '../theme';
 import nbtAuthorisedSignatureBase64 from '../nbtSignatureBase64';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { db, MemoDocument } from '../db/database';
 
 const A4_RATIO = 210 / 297;
@@ -293,6 +294,12 @@ const MemoScreen = () => {
   const [isWebReady, setIsWebReady] = useState(false);
   const [isWebTyping, setIsWebTyping] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
+
+  // Delete modal state
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletingMemo, setDeletingMemo] = useState<MemoDocument | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
     title: string;
@@ -607,27 +614,29 @@ const MemoScreen = () => {
   };
 
   const deleteMemo = (memo: MemoDocument) => {
-    showConfirmDialog(
-      'Delete Lorry Memo',
-      `Are you sure you want to delete Memo ${memo.memoId}? This action cannot be undone.`,
-      async () => {
-        setConfirmModal(prev => ({ ...prev, visible: false }));
-        try {
-          const success = await db.deleteMemoDocument(memo.memoId);
-          if (success) {
-            await loadMemoDocuments();
-            if (selectedMemoId === memo.memoId) {
-              createNewMemo();
-            }
-          }
-        } catch (err) {
-          console.error('Delete memo error:', err);
+    setDeletingMemo(memo);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDeleteMemo = async () => {
+    if (!deletingMemo) return;
+    setIsDeleting(true);
+    try {
+      const success = await db.deleteMemoDocument(deletingMemo.memoId);
+      if (success) {
+        await loadMemoDocuments();
+        if (selectedMemoId === deletingMemo.memoId) {
+          createNewMemo();
         }
-      },
-      'danger',
-      'Yes, Delete',
-      'Cancel'
-    );
+      }
+    } catch (err) {
+      console.error('Delete memo error:', err);
+      Alert.alert('Error', 'Failed to delete memo.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalVisible(false);
+      setDeletingMemo(null);
+    }
   };
 
   const downloadExistingMemo = async (memo: MemoDocument) => {
@@ -1028,6 +1037,20 @@ const MemoScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        visible={deleteModalVisible}
+        title="Delete Lorry Memo"
+        message="Are you sure you want to permanently delete this memo? This action cannot be undone."
+        itemLabel={deletingMemo ? `Memo ID: ${deletingMemo.memoId} (${deletingMemo.date})` : undefined}
+        isDeleting={isDeleting}
+        onConfirm={confirmDeleteMemo}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setDeletingMemo(null);
+        }}
+      />
     </SafeAreaView>
   );
 };

@@ -936,7 +936,10 @@ class DatabaseService {
       if (!this.currentToken) {
         await this.checkLoginStatus();
       }
-      const token = this.currentToken || 'local-fallback-token';
+      if (!this.currentToken) {
+        throw new Error('Driver not authenticated. Please log in to upload files.');
+      }
+      const token = this.currentToken;
 
       const response = await fetch(`${API_HOST}/api/upload`, {
         method: 'POST',

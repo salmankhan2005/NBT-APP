@@ -1487,7 +1487,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
 
             {tollPlazas.map((plaza, i) => (
               <View key={i} style={styles.tollEditRow}>
-                <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={styles.tollNameCol}>
                   <TextInput
                     style={styles.tollInputName}
                     value={plaza.name}
@@ -1496,7 +1496,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
                     placeholderTextColor="#94a3b8"
                   />
                 </View>
-                <View style={{ width: 100, marginRight: 8, flexDirection: 'row', alignItems: 'center' }}>
+                <View style={styles.tollCostBox}>
                   <Text style={styles.tollCurrencyPrefix}>₹</Text>
                   <TextInput
                     style={styles.tollInputCost}
@@ -1508,7 +1508,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
                   />
                 </View>
                 <TouchableOpacity onPress={() => handleDeletePlaza(i)} style={styles.tollDeleteBtn} activeOpacity={0.7}>
-                  <MaterialIcons name="delete-outline" size={20} color="#ef4444" />
+                  <MaterialIcons name="delete-outline" size={18} color="#dc2626" />
                 </TouchableOpacity>
               </View>
             ))}
@@ -2138,44 +2138,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderRadius: 8,
-    padding: 8,
+    padding: 6,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    gap: 8,
+  },
+  tollNameCol: {
+    flex: 1,
+    minWidth: 0,
   },
   tollInputName: {
-    fontSize: 12,
-    color: '#334155',
+    width: '100%',
+    minWidth: 0,
+    fontSize: 13,
+    color: '#1e293b',
     fontWeight: '500',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: '#ffffff',
-    borderRadius: 4,
+    height: 40,
+    paddingHorizontal: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#cbd5e1',
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : {}),
+  },
+  tollCostBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 100,
+    height: 40,
+    backgroundColor: '#f8fafc',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingHorizontal: 8,
+    overflow: 'hidden',
+    flexShrink: 0,
   },
   tollCurrencyPrefix: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#b45309',
-    marginRight: 4,
+    marginRight: 2,
+    flexShrink: 0,
   },
   tollInputCost: {
     flex: 1,
-    fontSize: 12,
+    minWidth: 0,
+    maxWidth: 70,
+    fontSize: 13,
     fontWeight: '700',
     color: '#b45309',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: '#ffffff',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
+    padding: 0,
     textAlign: 'right',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : {}),
   },
   tollDeleteBtn: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   tollAddBtn: {
     flexDirection: 'row',
