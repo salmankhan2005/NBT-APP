@@ -413,6 +413,28 @@ function extractSearchQuery(candidateUrls: string[]): string | null {
 }
 
 async function geocodeAddress(address: string): Promise<PlaceDetails | null> {
+  // 1. Try Backend Proxy
+  try {
+    const headers = await getAuthHeaders();
+    const proxyUrl = `${PROXY_BASE}/places/autocomplete?input=${encodeURIComponent(address)}`;
+    const res = await fetch(proxyUrl, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.predictions && data.predictions.length > 0) {
+        const first = data.predictions[0];
+        return await getPlaceDetails(first.place_id, 'session');
+      }
+    }
+  } catch (proxyErr) {
+    console.warn('[OSMMaps] Proxy geocode address failed:', proxyErr);
+  }
+
+  // 2. Direct Nominatim fallback (Disabled on Web to prevent CORS error)
+  if (isWeb) {
+    console.warn('[OSMMaps] Direct Nominatim geocode address skipped on Web (CORS).');
+    return null;
+  }
+
   try {
     const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(address)}&format=json&addressdetails=1&limit=1&accept-language=en`;
     const res = await fetch(url, {
@@ -451,6 +473,36 @@ function buildFallbackPlaceFromCoordinates(lat: number, lng: number, sourceUrl: 
  * Reverse geocode lat/lng to a full place using Nominatim.
  */
 export async function reverseGeocode(lat: number, lng: number): Promise<PlaceDetails | null> {
+  // 1. Try Backend Proxy
+  try {
+    const headers = await getAuthHeaders();
+    const proxyUrl = `${PROXY_BASE}/geocode?latlng=${lat},${lng}`;
+    const res = await fetch(proxyUrl, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const item = data.results[0];
+        const shortName = item.formatted_address?.split(',')[0]?.trim() || '';
+        return {
+          placeName: shortName || extractShortName(item.formatted_address || ''),
+          formattedAddress: item.formatted_address || '',
+          latitude: lat,
+          longitude: lng,
+          placeId: item.place_id || `GEO-${lat.toFixed(6)}-${lng.toFixed(6)}`,
+          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+        };
+      }
+    }
+  } catch (proxyErr) {
+    console.warn('[OSMMaps] Proxy reverse geocode failed:', proxyErr);
+  }
+
+  // 2. Direct Nominatim fallback (Disabled on Web to prevent CORS error)
+  if (isWeb) {
+    console.warn('[OSMMaps] Direct Nominatim reverse geocode skipped on Web (CORS).');
+    return null;
+  }
+
   try {
     const url = `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`;
     const res = await fetch(url, {
