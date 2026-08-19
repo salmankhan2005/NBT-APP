@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, SHADOWS } from '../theme';
-import { db, Trip, ActivityLog, FleetVehicle, Vehicle, DocumentExpiryStatus } from '../db/database';
+import { db, Trip, ActivityLog, FleetVehicle, Vehicle, DocumentExpiryStatus, API_HOST } from '../db/database';
 
 interface DashboardScreenProps {
   onCreateTripPress: () => void;
@@ -89,10 +89,10 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
         const token = db.getToken();
         if (token) {
           const [profitRes, entriesRes] = await Promise.all([
-            fetch(`http://localhost:3001/api/lorry-booking/profit?fromDate=${today}&toDate=${today}`, {
+            fetch(`${API_HOST}/api/lorry-booking/profit?fromDate=${today}&toDate=${today}`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
-            fetch(`http://localhost:3001/api/lorry-booking/entries?limit=5`, {
+            fetch(`${API_HOST}/api/lorry-booking/entries?limit=5`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
           ]);

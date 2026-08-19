@@ -21,7 +21,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { OCRResultModal, OCRResult } from '../components/OCRResultModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
-import { db, ManagedVehicle, ManagedVehicleStatus, VehicleDocument, DocType, VehicleDocumentHistory, DocumentExpiryStatus, Trip } from '../db/database';
+import { db, ManagedVehicle, ManagedVehicleStatus, VehicleDocument, DocType, VehicleDocumentHistory, DocumentExpiryStatus, Trip, API_HOST } from '../db/database';
 
 type VehicleFilter = 'ALL' | 'AVAILABLE' | 'ON TRIP' | 'UNDER MAINTENANCE' | 'INACTIVE';
 type DocumentFilter = 'ALL' | 'VALID' | 'EXPIRING_SOON' | 'EXPIRED' | 'MISSING';
@@ -139,7 +139,7 @@ export default function VehiclesScreen() {
       setOcrPendingFileUri(fileUri);
 
       // Get API host
-      const apiHost = Platform.OS === 'android' ? 'http://10.0.2.2:3001' : 'http://localhost:3001';
+      const apiHost = API_HOST;
 
       // Read file and convert to base64
       let imageBase64 = '';

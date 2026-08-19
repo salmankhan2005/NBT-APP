@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SHADOWS, SPACING } from '../theme';
-import { db } from '../db/database';
+import { db, API_HOST } from '../db/database';
 
 type BookingEntry = {
   id: string;
@@ -47,14 +47,7 @@ type ProfitSummaryState = {
   totalProfit: number;
 };
 
-const getApiHost = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001';
-  }
-  return 'http://localhost:3001';
-};
 
-const API_HOST = getApiHost();
 
 const createEmptyForm = (): BookingFormState => ({
   fromPoint: '',

@@ -4,17 +4,13 @@ import { Platform } from 'react-native';
 
 const RENDER_API = 'https://nbt-app.onrender.com';
 
-const getApiHost = (): string => {
-  // Web build: use EXPO_PUBLIC_API_URL env var if set, else Render production URL
+export const getApiHost = (): string => {
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-  if (Platform.OS === 'android') {
-    return RENDER_API;
-  }
   return RENDER_API;
 };
-const API_HOST = getApiHost();
+export const API_HOST = getApiHost();
 
 export const normalizeImageUrl = (url?: string | null): string | undefined => {
   if (!url || typeof url !== 'string' || !url.trim()) return undefined;

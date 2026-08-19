@@ -62,13 +62,9 @@ const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 const OSRM_BASE = 'https://router.project-osrm.org';
 const USER_AGENT = 'NBT-ARS-FleetTransit-AdminApp/1.0';
 
-const getApiHost = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001';
-  }
-  return 'http://localhost:3001';
-};
-const PROXY_BASE = `${getApiHost()}/api/maps`;
+import { API_HOST } from '../db/database';
+
+const PROXY_BASE = `${API_HOST}/api/maps`;
 
 // OpenStreetMap services are always available — no API key needed
 export const isApiKeyConfigured = () => true;

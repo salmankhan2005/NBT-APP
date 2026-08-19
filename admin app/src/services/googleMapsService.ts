@@ -84,15 +84,10 @@ const isWeb = Platform.OS === 'web';
 
 // ─── API ENDPOINTS ────────────────────────────────────────────────────────────
 
-const BASE = 'https://maps.googleapis.com/maps/api';
+import { API_HOST } from '../db/database';
 
-const getApiHost = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3001';
-  }
-  return 'http://localhost:3001';
-};
-const PROXY_BASE = `${getApiHost()}/api/maps`;
+const BASE = 'https://maps.googleapis.com/maps/api';
+const PROXY_BASE = `${API_HOST}/api/maps`;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
