@@ -331,8 +331,10 @@ async function bootstrap() {
 
   // ── Start ─────────────────────────────────────────────────────────────────
   const port = Number(process.env.PORT ?? 3001);
-  const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+  // Always bind to 0.0.0.0 — required by cloud hosts (Render, Railway, etc.)
+  const host = '0.0.0.0';
 
+  app.log.info(`⏳  Attempting to bind on ${host}:${port}...`);
   await app.listen({ port, host });
   app.log.info(`🚀  NBT-ARS Backend running at http://${host}:${port}`);
   app.log.info(`🔒  JWT auth + token revocation enabled | CORS: ${allowedOrigins.join(', ')}`);
