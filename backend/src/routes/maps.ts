@@ -196,6 +196,28 @@ export async function mapsRoutes(app: FastifyInstance) {
       if (queryMatch) {
         const query = decodeURIComponent(queryMatch[1]);
         try {
+          const googleApiKey = process.env.GOOGLE_MAPS_API_KEY;
+          if (googleApiKey) {
+            const googleResponse = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${googleApiKey}`,
+            );
+            const googleData = await googleResponse.json() as any;
+            const googleResult = googleData.results?.[0];
+            const googleLocation = googleResult?.geometry?.location;
+            if (googleData.status === 'OK' && googleLocation) {
+              return reply.code(200).send({
+                result: {
+                  name: googleResult.formatted_address?.split(',')[0] || query,
+                  formatted_address: googleResult.formatted_address || query,
+                  geometry: { location: googleLocation },
+                  place_id,
+                  url: `https://www.google.com/maps/search/?api=1&query=${googleLocation.lat},${googleLocation.lng}`,
+                },
+                status: 'OK',
+              });
+            }
+          }
+
           const searchUrl = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(query)}&format=json&limit=1&addressdetails=1&accept-language=en`;
           const searchResponse = await fetch(searchUrl, {
             headers: { 'User-Agent': USER_AGENT },
