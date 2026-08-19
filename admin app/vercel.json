@@ -1,4 +1,5 @@
 {
+  "name": "nbt-admin-dashboard",
   "buildCommand": "npx expo export --platform web",
   "outputDirectory": "dist",
   "rewrites": [
