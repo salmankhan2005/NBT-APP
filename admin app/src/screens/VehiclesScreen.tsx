@@ -21,7 +21,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { OCRResultModal, OCRResult } from '../components/OCRResultModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
-import { db, ManagedVehicle, ManagedVehicleStatus, VehicleDocument, DocType, VehicleDocumentHistory, DocumentExpiryStatus, Trip, API_HOST } from '../db/database';
+import { db, ManagedVehicle, ManagedVehicleStatus, VehicleDocument, DocType, VehicleDocumentHistory, DocumentExpiryStatus, Trip, API_HOST, normalizeImageUrl } from '../db/database';
 
 type VehicleFilter = 'ALL' | 'AVAILABLE' | 'ON TRIP' | 'UNDER MAINTENANCE' | 'INACTIVE';
 type DocumentFilter = 'ALL' | 'VALID' | 'EXPIRING_SOON' | 'EXPIRED' | 'MISSING';
@@ -607,12 +607,13 @@ export default function VehiclesScreen() {
         if (createdVehicleId) {
           const selectedDocEntries = Object.entries(pendingDocuments) as Array<[DocType, PendingDocumentSelection | null]>;
           const expiryDateByDocType: Partial<Record<DocType, string>> = {};
+          const uploadedUriByDocType: Partial<Record<DocType, string>> = {};
           for (const [docType, selection] of selectedDocEntries) {
             if (!selection) continue;
             const expiryDate = selection.extractedExpiryDate || documentExpiryEdits[docType] || '';
             expiryDateByDocType[docType as DocType] = expiryDate;
             try {
-              await db.addVehicleDocument({
+              const savedDocument = await db.addVehicleDocument({
                 vehicle_id: createdVehicleId,
                 docType,
                 docLabel: DOC_TYPES.find((item) => item.key === docType)?.label || 'Document',
@@ -624,22 +625,25 @@ export default function VehiclesScreen() {
                 fileType: selection.mimeType,
                 uploadedBy: 'Admin',
               });
+              if (savedDocument.doc?.fileUri) {
+                uploadedUriByDocType[docType] = savedDocument.doc.fileUri;
+              }
             } catch (docError) {
               console.error('Document save failed', docError);
             }
           }
-          if (expiryDateByDocType.INSURANCE || expiryDateByDocType.POLLUTION || expiryDateByDocType.PERMIT || expiryDateByDocType.FC) {
+          if (Object.keys(uploadedUriByDocType).length > 0 || Object.keys(expiryDateByDocType).length > 0) {
             await db.updateManagedVehicle(createdVehicleId, {
               insuranceExpiryDate: expiryDateByDocType.INSURANCE || optimisticVehicle.insuranceExpiryDate,
               pollutionExpiryDate: expiryDateByDocType.POLLUTION || optimisticVehicle.pollutionExpiryDate,
               permitExpiryDate: expiryDateByDocType.PERMIT || optimisticVehicle.permitExpiryDate,
               fcExpiryDate: expiryDateByDocType.FC || optimisticVehicle.fcExpiryDate,
-              rcFrontUrl: pendingDocuments.RC_FRONT ? pendingDocuments.RC_FRONT.uri : optimisticVehicle.rcFrontUrl,
-              rcBackUrl: pendingDocuments.RC_BACK ? pendingDocuments.RC_BACK.uri : optimisticVehicle.rcBackUrl,
-              insuranceUrl: pendingDocuments.INSURANCE ? pendingDocuments.INSURANCE.uri : optimisticVehicle.insuranceUrl,
-              pollutionUrl: pendingDocuments.POLLUTION ? pendingDocuments.POLLUTION.uri : optimisticVehicle.pollutionUrl,
-              permitUrl: pendingDocuments.PERMIT ? pendingDocuments.PERMIT.uri : optimisticVehicle.permitUrl,
-              fcUrl: pendingDocuments.FC ? pendingDocuments.FC.uri : optimisticVehicle.fcUrl,
+              rcFrontUrl: uploadedUriByDocType.RC_FRONT || optimisticVehicle.rcFrontUrl,
+              rcBackUrl: uploadedUriByDocType.RC_BACK || optimisticVehicle.rcBackUrl,
+              insuranceUrl: uploadedUriByDocType.INSURANCE || optimisticVehicle.insuranceUrl,
+              pollutionUrl: uploadedUriByDocType.POLLUTION || optimisticVehicle.pollutionUrl,
+              permitUrl: uploadedUriByDocType.PERMIT || optimisticVehicle.permitUrl,
+              fcUrl: uploadedUriByDocType.FC || optimisticVehicle.fcUrl,
             });
           }
         }
@@ -1122,6 +1126,13 @@ export default function VehiclesScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.docUploadLabel}>{docType.label}</Text>
                         <Text style={styles.docUploadValue}>{selection ? selection.name : 'Not selected'}</Text>
+                        {selection && isImageUri(selection.uri, selection.mimeType) ? (
+                          <Image
+                            source={{ uri: normalizeImageUrl(selection.uri) || selection.uri }}
+                            style={styles.docPreview}
+                            resizeMode="cover"
+                          />
+                        ) : null}
                         {selection && (selection.extractedDocNumber || selection.extractedIssueDate) ? (
                           <View style={{ marginTop: 6 }}>
                             {selection.extractedDocNumber ? <Text style={styles.docUploadValue}>Detected Document #: {selection.extractedDocNumber}</Text> : null}

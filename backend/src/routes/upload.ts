@@ -51,8 +51,11 @@ export async function uploadRoutes(app: FastifyInstance) {
         // Stream file to disk
         await pipeline(data.file, fs.createWriteStream(savePath));
 
-        // Build the public URL — always use localhost so admin browser can load it
-        const host = (process.env.PUBLIC_HOST || `http://localhost:${process.env.PORT || 3001}`)
+        // Prefer the configured public host, then derive the host from the request in production.
+        const forwardedProto = req.headers['x-forwarded-proto'];
+        const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || 'http';
+        const requestHost = `${protocol}://${req.headers.host || `localhost:${process.env.PORT || 3001}`}`;
+        const host = (process.env.PUBLIC_HOST || requestHost)
           .replace('10.0.2.2', 'localhost')
           .replace('127.0.0.1', 'localhost');
         const publicUrl = `${host}/uploads/${safeName}`;

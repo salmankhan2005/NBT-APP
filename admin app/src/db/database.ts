@@ -43,6 +43,9 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     cleaned = `${API_HOST}/${cleaned}`;
   }
 
+  // Rewrite legacy localhost URLs so existing uploaded documents remain previewable after deployment.
+  cleaned = cleaned.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1|10\.0\.2\.2)(?::\d+)?(?=\/)/i, API_HOST);
+
   // Normalize emulator/localhost routing so image links work on both web and Android emulator.
   if (Platform.OS === 'android' && (cleaned.includes('localhost:3001') || cleaned.includes('127.0.0.1:3001'))) {
     cleaned = cleaned.replace(/localhost:3001|127\.0\.0\.1:3001/g, '10.0.2.2:3001');
@@ -1755,16 +1758,24 @@ class AdminDatabase {
         if (json.url) {
           return normalizeImageUrl(json.url) || json.url;
         }
+        throw new Error('Upload response did not contain a file URL');
       }
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`Upload failed (${response.status})${errorText ? `: ${errorText}` : ''}`);
     } catch (err) {
       console.warn('[AdminDB] uploadLocalFile failed:', err);
+      throw err;
     }
-    return localUri;
   }
 
   async addVehicleDocument(data: Omit<VehicleDocument, 'doc_id' | 'uploadedAt' | 'isActive' | 'history'>): Promise<{ success: boolean; doc?: VehicleDocument; error?: string }> {
     const now = new Date().toISOString();
-    const uploadedUri = await this.uploadLocalFile(data.fileUri, data.fileType, data.fileName);
+    let uploadedUri: string;
+    try {
+      uploadedUri = await this.uploadLocalFile(data.fileUri, data.fileType, data.fileName);
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Unable to upload document file.' };
+    }
     const doc: VehicleDocument = {
       ...data,
       fileUri: uploadedUri,
