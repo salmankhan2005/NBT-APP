@@ -79,7 +79,7 @@ export interface DirectionsResult {
 }
 
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const isWeb = Platform.OS === 'web';
 
 // ─── API ENDPOINTS ────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ const PROXY_BASE = `${API_HOST}/api/maps`;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
-    const token = await SecureStore.getItemAsync('admin_session_token');
+    const token = await AsyncStorage.getItem('admin_session_token');
     return token ? { Authorization: `Bearer ${token}` } : {};
   } catch {
     return {};

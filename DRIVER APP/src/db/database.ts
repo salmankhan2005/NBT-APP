@@ -1,6 +1,5 @@
 // NBT-ARS DatabaseService v3.2 — Open Auth Mode (Accepts Any Credentials)
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { SHA256 } from 'crypto-js';
 
@@ -9,34 +8,15 @@ const API_HOST = 'https://nbt-app.onrender.com';
 
 // ── Secure storage helpers (Dual-write for robust persistence across reloads) ───
 const safeGetItem = async (key: string): Promise<string | null> => {
-  if (Platform.OS === 'web') return AsyncStorage.getItem(key);
-  try {
-    const secureVal = await SecureStore.getItemAsync(key);
-    if (secureVal !== null) return secureVal;
-  } catch (e) {
-    console.warn(`[DriverDB] SecureStore read failed for key ${key}:`, e);
-  }
   return AsyncStorage.getItem(key);
 };
 
 const safeSetItem = async (key: string, value: string): Promise<void> => {
   try { await AsyncStorage.setItem(key, value); } catch {}
-  if (Platform.OS === 'web') return;
-  try {
-    await SecureStore.setItemAsync(key, value);
-  } catch (e) {
-    console.warn(`[DriverDB] SecureStore write failed for key ${key}:`, e);
-  }
 };
 
 const safeDeleteItem = async (key: string): Promise<void> => {
   try { await AsyncStorage.removeItem(key); } catch {}
-  if (Platform.OS === 'web') return;
-  try {
-    await SecureStore.deleteItemAsync(key);
-  } catch (e) {
-    console.warn(`[DriverDB] SecureStore delete failed for key ${key}:`, e);
-  }
 };
 
 // SHA256 for PIN hashing (no server required)
@@ -173,6 +153,8 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
   } else if (cleaned.startsWith('uploads/')) {
     cleaned = `${API_HOST}/${cleaned}`;
   }
+
+  cleaned = cleaned.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1|10\.0\.2\.2)(?::\d+)?(?=\/)/i, API_HOST);
 
   return cleaned;
 };
@@ -946,8 +928,9 @@ class DatabaseService {
       if (response.ok) {
         const json = await response.json();
         if (json.url) {
-          console.log('[DriverDB] Image uploaded successfully:', json.url);
-          return json.url;
+          const hostedUrl = normalizeImageUrl(json.url) || json.url;
+          console.log('[DriverDB] Image uploaded successfully:', hostedUrl);
+          return hostedUrl;
         }
       }
       console.warn('[DriverDB] Image upload returned unexpected response:', response.status);

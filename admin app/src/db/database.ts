@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const RENDER_API = 'https://nbt-app.onrender.com';
@@ -766,8 +765,8 @@ class AdminDatabase {
 
   async loadSession() {
     try {
-      const token = await SecureStore.getItemAsync('admin_session_token');
-      const username = await SecureStore.getItemAsync('admin_username');
+      const token = await AsyncStorage.getItem('admin_session_token');
+      const username = await AsyncStorage.getItem('admin_username');
       this.token = token;
       this.currentUsername = username;
     } catch (e) {
@@ -911,8 +910,8 @@ class AdminDatabase {
           this.token = data.token;
           this.currentUsername = data.username || username;
           try {
-            await SecureStore.setItemAsync('admin_session_token', this.token!);
-            await SecureStore.setItemAsync('admin_username', this.currentUsername!);
+            await AsyncStorage.setItem('admin_session_token', this.token!);
+            await AsyncStorage.setItem('admin_username', this.currentUsername!);
           } catch {
             // Web fallback
             await AsyncStorage.setItem('admin_session_token_web', this.token!);
@@ -933,8 +932,8 @@ class AdminDatabase {
     this.token = null;
     this.currentUsername = null;
     try {
-      await SecureStore.deleteItemAsync('admin_session_token');
-      await SecureStore.deleteItemAsync('admin_username');
+      await AsyncStorage.removeItem('admin_session_token');
+      await AsyncStorage.removeItem('admin_username');
     } catch {}
     try {
       await AsyncStorage.removeItem('admin_session_token_web');
@@ -973,8 +972,8 @@ class AdminDatabase {
           this.token = data.token;
           this.currentUsername = data.username || this.currentUsername || 'admin';
           try {
-            await SecureStore.setItemAsync('admin_session_token', this.token!);
-            await SecureStore.setItemAsync('admin_username', this.currentUsername!);
+            await AsyncStorage.setItem('admin_session_token', this.token!);
+            await AsyncStorage.setItem('admin_username', this.currentUsername!);
           } catch {
             await AsyncStorage.setItem('admin_session_token_web', this.token!);
             await AsyncStorage.setItem('admin_username_web', this.currentUsername!);
@@ -1012,7 +1011,7 @@ class AdminDatabase {
       // Never retry protected requests with a hardcoded credential. Force a fresh login.
       this.token = null;
       try {
-        await SecureStore.deleteItemAsync('admin_session_token');
+        await AsyncStorage.removeItem('admin_session_token');
         await AsyncStorage.removeItem('admin_session_token_web');
       } catch {
         // Continue to the login screen even if local cleanup is unavailable.
@@ -2594,7 +2593,7 @@ class AdminDatabase {
           if (loginData.token) {
             authToken = loginData.token;
             this.token = loginData.token;
-            try { await SecureStore.setItemAsync('admin_session_token', loginData.token); } catch {
+            try { await AsyncStorage.setItem('admin_session_token', loginData.token); } catch {
               await AsyncStorage.setItem('admin_session_token_web', loginData.token);
             }
             console.log('[AdminDB] Got fresh JWT for reset');

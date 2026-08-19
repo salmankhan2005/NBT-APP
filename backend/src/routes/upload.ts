@@ -54,8 +54,11 @@ export async function uploadRoutes(app: FastifyInstance) {
         // Prefer the configured public host, then derive the host from the request in production.
         const forwardedProto = req.headers['x-forwarded-proto'];
         const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || 'http';
-        const requestHost = `${protocol}://${req.headers.host || `localhost:${process.env.PORT || 3001}`}`;
-        const host = (process.env.PUBLIC_HOST || requestHost)
+        const forwardedHost = req.headers['x-forwarded-host'];
+        const requestHostName = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.headers.host || `localhost:${process.env.PORT || 3001}`;
+        const requestHost = `${protocol}://${requestHostName}`;
+        const configuredHost = process.env.PUBLIC_HOST?.trim();
+        const host = (configuredHost && !/localhost|127\.0\.0\.1|10\.0\.2\.2/i.test(configuredHost) ? configuredHost : requestHost)
           .replace('10.0.2.2', 'localhost')
           .replace('127.0.0.1', 'localhost');
         const publicUrl = `${host}/uploads/${safeName}`;
