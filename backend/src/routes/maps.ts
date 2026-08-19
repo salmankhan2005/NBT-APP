@@ -218,6 +218,34 @@ export async function mapsRoutes(app: FastifyInstance) {
               status: 'OK',
             });
           }
+
+          const photonResponse = await fetch(
+            `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`,
+            { headers: { 'User-Agent': USER_AGENT } },
+          );
+          const photonData = await photonResponse.json() as any;
+          const photonFeature = photonData.features?.[0];
+          const photonCoordinates = photonFeature?.geometry?.coordinates;
+          if (Array.isArray(photonCoordinates) && photonCoordinates.length >= 2) {
+            const coordinates = {
+              lat: Number(photonCoordinates[1]),
+              lng: Number(photonCoordinates[0]),
+            };
+            const properties = photonFeature.properties || {};
+            const displayName = [properties.name, properties.city, properties.country]
+              .filter(Boolean)
+              .join(', ') || query;
+            return reply.code(200).send({
+              result: {
+                name: properties.name || query,
+                formatted_address: displayName,
+                geometry: { location: coordinates },
+                place_id,
+                url: `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`,
+              },
+              status: 'OK',
+            });
+          }
         } catch (queryError) {
           app.log.warn({ err: queryError }, 'Arbitrary map query lookup failed');
         }
