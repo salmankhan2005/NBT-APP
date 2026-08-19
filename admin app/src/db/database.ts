@@ -1006,12 +1006,16 @@ class AdminDatabase {
     }
     let res = await this.fetchWithTimeout(url, { ...options, headers });
     if (res.status === 401) {
-      // Clear stale token and re-login once
+      // Never retry protected requests with a hardcoded credential. Force a fresh login.
       this.token = null;
-      const success = await this.login(this.currentUsername || 'admin', '9999');
-      if (success && this.token) {
-        headers['Authorization'] = `Bearer ${this.token}`;
-        res = await this.fetchWithTimeout(url, { ...options, headers });
+      try {
+        await SecureStore.deleteItemAsync('admin_session_token');
+        await AsyncStorage.removeItem('admin_session_token_web');
+      } catch {
+        // Continue to the login screen even if local cleanup is unavailable.
+      }
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.reload();
       }
     }
     return res;
