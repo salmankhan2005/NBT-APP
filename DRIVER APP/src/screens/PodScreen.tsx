@@ -33,6 +33,7 @@ export default function PodScreen({
   onCancel,
 }: PodScreenProps) {
   const [podPhoto, setPodPhoto] = useState<string | null>(trip.podPhotoUri || null);
+  const [podPhotoPreview, setPodPhotoPreview] = useState<string | null>(trip.podPhotoUri || null);
   const [signaturePaths, setSignaturePaths] = useState<string[]>([]);
   const [isSigned, setIsSigned] = useState(!!trip.podSignature);
   const [notes, setNotes] = useState(trip.podNotes || '');
@@ -113,10 +114,10 @@ export default function PodScreen({
             {/* Proof of Delivery Section */}
             <Text style={styles.sectionHeader}>2. PROOF OF DELIVERY</Text>
             <View style={styles.proofGrid}>
-              {podPhoto && (
+              {podPhotoPreview && (
                 <View style={styles.proofPicContainer}>
                   <Text style={styles.proofLabel}>Uploaded POD Invoice:</Text>
-                  <Image source={{ uri: podPhoto }} style={styles.proofImage} />
+                  <Image source={{ uri: podPhotoPreview }} style={styles.proofImage} />
                 </View>
               )}
               
@@ -216,15 +217,19 @@ export default function PodScreen({
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const localUri = result.assets[0].uri;
-      setPodPhoto(localUri);
+      setPodPhotoPreview(null);
+      setPodPhoto(null);
       setPodUploadStatus('uploading');
       setPodHostedUrl(null);
       try {
         const hostedUrl = await db.uploadPodPhoto(localUri);
         if (hostedUrl) {
           setPodHostedUrl(hostedUrl);
+          setPodPhoto(hostedUrl);
+          setPodPhotoPreview(hostedUrl);
           setPodUploadStatus('success');
         } else {
+          setPodPhoto(null);
           setPodUploadStatus('failed');
         }
       } catch {
@@ -268,7 +273,8 @@ export default function PodScreen({
         }
 
         // Upload POD detail — use already-hosted URL if available, else local URI
-        const uploaded = await db.uploadPOD(trip.id, podHostedUrl || podPhoto || 'mock-pod-uri', isSigned ? 'Receiver Signature Captured' : 'Signed', notes, gps);
+        if (!podHostedUrl && !podPhoto) throw new Error('POD photo is not uploaded');
+        const uploaded = await db.uploadPOD(trip.id, (podHostedUrl || podPhoto)!, isSigned ? 'Receiver Signature Captured' : 'Signed', notes, gps);
         if (!uploaded) throw new Error('POD photo upload failed');
       } catch (err) {
         Alert.alert('Error', 'Failed to update destination status.');
@@ -281,7 +287,7 @@ export default function PodScreen({
     }
 
     // Otherwise, we are in REACHED_DESTINATION, performing final Complete Trip
-    if (!podPhoto) {
+    if (!podHostedUrl && !podPhoto) {
       Alert.alert('POD Required', 'Proof of Delivery (POD) photo must be uploaded before completing the trip.');
       return;
     }
@@ -308,7 +314,7 @@ export default function PodScreen({
     setLoading(true);
     try {
       // Re-send POD data in case Stage 1 was skipped or photo was updated
-      if (podPhoto) {
+      if (podHostedUrl || podPhoto) {
         let gps: GPSLocation = {
           latitude: 12.9716, longitude: 77.5946,
           city: 'Destination', address: 'Destination',
@@ -333,7 +339,7 @@ export default function PodScreen({
         } catch {}
         const uploaded = await db.uploadPOD(
           trip.id,
-          podHostedUrl || podPhoto,
+          podHostedUrl || podPhoto!,
           isSigned ? 'Receiver Signature Captured' : 'Signed',
           notes,
           gps

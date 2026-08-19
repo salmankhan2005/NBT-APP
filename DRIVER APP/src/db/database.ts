@@ -1107,8 +1107,10 @@ class DatabaseService {
     // Upload end odometer photo if provided
     let hostedEndPhotoUrl: string | undefined;
     if (odometerEndPhotoUri) {
-      const raw = await this.uploadLocalImage(odometerEndPhotoUri);
-      hostedEndPhotoUrl = (raw.startsWith('http://') || raw.startsWith('https://')) ? raw : undefined;
+      hostedEndPhotoUrl = await this.uploadPodPhoto(odometerEndPhotoUri) || undefined;
+      if (!hostedEndPhotoUrl) {
+        throw new Error('Ending odometer photo upload failed');
+      }
     }
 
     trip.status              = 'completed';
