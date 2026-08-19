@@ -62,6 +62,21 @@ function getKnownPlacePredictions(input: string) {
     }));
 }
 
+function getFallbackPredictions(input: string) {
+  const knownPredictions = getKnownPlacePredictions(input);
+  if (knownPredictions.length > 0) return knownPredictions;
+
+  const encodedQuery = encodeURIComponent(input.trim());
+  return [{
+    place_id: `query_${encodedQuery}`,
+    description: `${input.trim()}, India`,
+    structured_formatting: {
+      main_text: input.trim(),
+      secondary_text: 'Search exact location',
+    },
+  }];
+}
+
 export async function mapsRoutes(app: FastifyInstance) {
   const authHook = {
     preHandler: [
@@ -107,19 +122,19 @@ export async function mapsRoutes(app: FastifyInstance) {
 
       if (!res.ok) {
         return reply.code(200).send({
-          predictions: getKnownPlacePredictions(input),
+          predictions: getFallbackPredictions(input),
           status: 'OK',
         });
       }
 
       const data = await res.json();
       if (!Array.isArray(data)) {
-        return reply.code(200).send({ predictions: [], status: 'OK' });
+        return reply.code(200).send({ predictions: getFallbackPredictions(input), status: 'OK' });
       }
 
       if (data.length === 0) {
         return reply.code(200).send({
-          predictions: getKnownPlacePredictions(input),
+          predictions: getFallbackPredictions(input),
           status: 'OK',
         });
       }
@@ -146,7 +161,7 @@ export async function mapsRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error({ err }, 'Autocomplete error fallback');
       return reply.code(200).send({
-        predictions: getKnownPlacePredictions(input),
+        predictions: getFallbackPredictions(input),
         status: 'OK',
       });
     }
@@ -168,6 +183,24 @@ export async function mapsRoutes(app: FastifyInstance) {
             result: {
               name: knownName.replace(/\b\w/g, (letter) => letter.toUpperCase()),
               formatted_address: `${knownName}, India`,
+              geometry: { location: coordinates },
+              place_id,
+              url: `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`,
+            },
+            status: 'OK',
+          });
+        }
+      }
+
+      const queryMatch = place_id.match(/^query_(.+)$/);
+      if (queryMatch) {
+        const query = decodeURIComponent(queryMatch[1]);
+        const coordinates = await resolveToCoords(query);
+        if (coordinates) {
+          return reply.code(200).send({
+            result: {
+              name: query,
+              formatted_address: `${query}, India`,
               geometry: { location: coordinates },
               place_id,
               url: `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`,
