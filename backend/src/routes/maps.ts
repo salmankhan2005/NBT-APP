@@ -106,7 +106,7 @@ export async function mapsRoutes(app: FastifyInstance) {
           const gRes = await fetch(googleUrl);
           if (gRes.ok) {
             const gData = await gRes.json();
-            if (gData.status === 'OK' && Array.isArray(gData.predictions)) {
+            if (gData.status === 'OK' && Array.isArray(gData.predictions) && gData.predictions.length > 0) {
               return reply.code(200).send(gData);
             }
           }
