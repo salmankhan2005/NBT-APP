@@ -940,6 +940,14 @@ class DatabaseService {
     return localUri;
   }
 
+  async uploadPodPhoto(localUri: string): Promise<string | null> {
+    const uploadedUri = await this.uploadLocalImage(localUri);
+    if (uploadedUri.startsWith('http://') || uploadedUri.startsWith('https://')) {
+      return normalizeImageUrl(uploadedUri) || uploadedUri;
+    }
+    return null;
+  }
+
   async addExpense(tripId: string, expense: Omit<Expense, 'id' | 'timestamp'>): Promise<Expense | null> {
     await this.init();
     const trip = this.cache.find(t => t.id === tripId);
@@ -1011,7 +1019,14 @@ class DatabaseService {
     if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
 
     // Upload POD photo to backend first to get a hosted URL
-    const hostedPodUrl = podPhotoUri && !podPhotoUri.startsWith('mock') ? await this.uploadLocalImage(podPhotoUri) : '';
+    const isHostedPhoto = podPhotoUri.startsWith('http://') || podPhotoUri.startsWith('https://');
+    const hostedPodUrl = podPhotoUri && !podPhotoUri.startsWith('mock') && !isHostedPhoto
+      ? await this.uploadPodPhoto(podPhotoUri)
+      : podPhotoUri;
+    if (podPhotoUri && !podPhotoUri.startsWith('mock') && !hostedPodUrl) {
+      console.warn('[DriverDB] POD upload failed; refusing to sync an unusable local URI.');
+      return false;
+    }
     const finalPhotoUrl = hostedPodUrl || podPhotoUri || '';
 
     trip.podPhotoUri  = finalPhotoUrl ? sanitizeInput(finalPhotoUrl) : undefined;

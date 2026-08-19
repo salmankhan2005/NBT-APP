@@ -21,8 +21,6 @@ import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, GPSLocation } from '../db/database';
 import { Platform } from 'react-native';
 
-const API_HOST = 'https://nbt-app.onrender.com';
-
 interface PodScreenProps {
   trip: Trip;
   onTripCompleted: () => void;
@@ -222,27 +220,10 @@ export default function PodScreen({
       setPodUploadStatus('uploading');
       setPodHostedUrl(null);
       try {
-        const filename = `pod_${Date.now()}.jpg`;
-        const formData = new FormData();
-        if (Platform.OS === 'web') {
-          const res = await fetch(localUri);
-          const blob = await res.blob();
-          formData.append('file', blob, filename);
-        } else {
-          formData.append('file', { uri: localUri, name: filename, type: 'image/jpeg' } as any);
-        }
-        const res = await fetch(`${API_HOST}/api/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.url && (json.url.startsWith('http://') || json.url.startsWith('https://'))) {
-            setPodHostedUrl(json.url);
-            setPodUploadStatus('success');
-          } else {
-            setPodUploadStatus('failed');
-          }
+        const hostedUrl = await db.uploadPodPhoto(localUri);
+        if (hostedUrl) {
+          setPodHostedUrl(hostedUrl);
+          setPodUploadStatus('success');
         } else {
           setPodUploadStatus('failed');
         }
@@ -287,7 +268,8 @@ export default function PodScreen({
         }
 
         // Upload POD detail — use already-hosted URL if available, else local URI
-        await db.uploadPOD(trip.id, podHostedUrl || podPhoto || 'mock-pod-uri', isSigned ? 'Receiver Signature Captured' : 'Signed', notes, gps);
+        const uploaded = await db.uploadPOD(trip.id, podHostedUrl || podPhoto || 'mock-pod-uri', isSigned ? 'Receiver Signature Captured' : 'Signed', notes, gps);
+        if (!uploaded) throw new Error('POD photo upload failed');
       } catch (err) {
         Alert.alert('Error', 'Failed to update destination status.');
         setLoading(false);
@@ -349,13 +331,14 @@ export default function PodScreen({
             }
           }
         } catch {}
-        await db.uploadPOD(
+        const uploaded = await db.uploadPOD(
           trip.id,
           podHostedUrl || podPhoto,
           isSigned ? 'Receiver Signature Captured' : 'Signed',
           notes,
           gps
         );
+        if (!uploaded) throw new Error('POD photo upload failed');
       }
 
       await db.completeTrip(trip.id, odoEndVal, dieselEnd, odometerEndPhotoUri || undefined);
