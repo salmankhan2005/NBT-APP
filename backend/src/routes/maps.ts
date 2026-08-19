@@ -92,15 +92,15 @@ export async function mapsRoutes(app: FastifyInstance) {
     ],
   };
 
-  // GET /api/maps/places/autocomplete?input=...&sessiontoken=...
-  // Uses Google Maps Places API if GOOGLE_MAPS_API_KEY is configured, else Nominatim search
+  // GET /api/maps/places/autocomplete?input=...&sessiontoken=...&provider=osm
+  // Uses OSM providers when requested; Google remains available for the Google Maps service.
   app.get('/places/autocomplete', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
-    const { input } = req.query as { input?: string; sessiontoken?: string };
+    const { input, provider } = req.query as { input?: string; sessiontoken?: string; provider?: string };
     if (!input || !input.trim()) return reply.code(200).send({ predictions: [], status: 'OK' });
 
     try {
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (apiKey) {
+      if (provider !== 'osm' && apiKey) {
         try {
           const googleUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${apiKey}&components=country:in`;
           const gRes = await fetch(googleUrl);
@@ -133,8 +133,34 @@ export async function mapsRoutes(app: FastifyInstance) {
       }
 
       if (data.length === 0) {
+        const photonResponse = await fetch(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}&limit=8`,
+          { headers: { 'User-Agent': USER_AGENT } },
+        );
+        const photonData = await photonResponse.json() as any;
+        const photonPredictions = (photonData.features || []).map((feature: any) => {
+          const properties = feature.properties || {};
+          const coordinates = feature.geometry?.coordinates;
+          const description = [
+            properties.name,
+            properties.city || properties.town || properties.village,
+            properties.state,
+            properties.country,
+          ].filter(Boolean).join(', ');
+          return {
+            place_id: `query_${encodeURIComponent(description || input)}`,
+            description: description || input,
+            structured_formatting: {
+              main_text: properties.name || input,
+              secondary_text: [properties.city || properties.town, properties.state, properties.country]
+                .filter(Boolean).join(', '),
+            },
+            _photon: { coordinates },
+          };
+        });
+
         return reply.code(200).send({
-          predictions: getFallbackPredictions(input),
+          predictions: photonPredictions.length > 0 ? photonPredictions : getFallbackPredictions(input),
           status: 'OK',
         });
       }
@@ -170,7 +196,7 @@ export async function mapsRoutes(app: FastifyInstance) {
   // GET /api/maps/places/details?place_id=...
   // Uses Nominatim lookup / search by OSM ID
   app.get('/places/details', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
-    const { place_id } = req.query as { place_id?: string };
+    const { place_id, provider } = req.query as { place_id?: string; provider?: string };
     if (!place_id) return reply.code(400).send({ error: 'place_id query param required' });
 
     try {
@@ -197,7 +223,7 @@ export async function mapsRoutes(app: FastifyInstance) {
         const query = decodeURIComponent(queryMatch[1]);
         try {
           const googleApiKey = process.env.GOOGLE_MAPS_API_KEY;
-          if (googleApiKey) {
+          if (provider !== 'osm' && googleApiKey) {
             const googleResponse = await fetch(
               `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${googleApiKey}`,
             );

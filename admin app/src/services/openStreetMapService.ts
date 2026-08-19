@@ -192,7 +192,7 @@ export async function searchPlacesAutocomplete(
   // 1. Try Backend Proxy (uses Nominatim internally, bypasses CORS)
   try {
     const headers = await getAuthHeaders();
-    const proxyUrl = `${PROXY_BASE}/places/autocomplete?input=${encodeURIComponent(query)}&sessiontoken=${encodeURIComponent(sessionToken)}`;
+    const proxyUrl = `${PROXY_BASE}/places/autocomplete?input=${encodeURIComponent(query)}&sessiontoken=${encodeURIComponent(sessionToken)}&provider=osm`;
     const res = await fetch(proxyUrl, { headers });
     if (res.ok) {
       const data = await res.json();
@@ -253,7 +253,7 @@ export async function getPlaceDetails(
   // 1. Try Backend Proxy
   try {
     const headers = await getAuthHeaders();
-    const proxyUrl = `${PROXY_BASE}/places/details?place_id=${encodeURIComponent(placeId)}`;
+    const proxyUrl = `${PROXY_BASE}/places/details?place_id=${encodeURIComponent(placeId)}&provider=osm`;
     const res = await fetch(proxyUrl, { headers });
     if (res.ok) {
       const data = await res.json();
