@@ -910,6 +910,14 @@ export default function VehiclesScreen() {
     }
   };
 
+  const getDocumentIcon = (docType: DocType): keyof typeof MaterialIcons.glyphMap => {
+    if (docType === 'INSURANCE') return 'verified-user';
+    if (docType === 'POLLUTION') return 'air';
+    if (docType === 'PERMIT') return 'fact-check';
+    if (docType === 'FC') return 'build-circle';
+    return 'description';
+  };
+
   const renderVehicleItem = ({ item }: { item: ManagedVehicle }) => {
     const docs = allVehicleDocuments.filter((doc) => doc.vehicle_id === item.vehicle_id);
     const docStatus = getDocumentSummaryStatus(docs);
@@ -1116,6 +1124,7 @@ export default function VehiclesScreen() {
               <View style={styles.inputGroup}><Text style={styles.label}>YEAR OF MANUFACTURE</Text><TextInput style={styles.formInput} value={yearOfManufacture} onChangeText={setYearOfManufacture} placeholder="2022" /></View>
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>DOCUMENTS UPLOAD (OPTIONAL)</Text>
+                <Text style={styles.uploadSectionHint}>Add clear scans or photos. Each file is linked to this vehicle record.</Text>
                 {DOC_TYPES.map((docType) => {
                   const selection = pendingDocuments[docType.key];
                   const extractionState = documentExtractionState[docType.key];
@@ -1123,7 +1132,11 @@ export default function VehiclesScreen() {
                   const shouldShowExpiry = ['INSURANCE', 'POLLUTION', 'PERMIT', 'FC'].includes(docType.key);
                   return (
                     <View key={docType.key} style={styles.docUploadRow}>
-                      <View style={{ flex: 1 }}>
+                      <View style={styles.docUploadIdentity}>
+                        <View style={styles.docUploadIcon}>
+                          <MaterialIcons name={getDocumentIcon(docType.key)} size={18} color={COLORS.secondary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
                         <Text style={styles.docUploadLabel}>{docType.label}</Text>
                         <Text style={styles.docUploadValue}>{selection ? selection.name : 'Not selected'}</Text>
                         {selection && isImageUri(selection.uri, selection.mimeType) ? (
@@ -1153,8 +1166,10 @@ export default function VehiclesScreen() {
                             />
                           </View>
                         ) : null}
+                        </View>
                       </View>
                       <TouchableOpacity style={styles.smallBtn} onPress={() => handlePickDocument(docType.key)}>
+                        <MaterialIcons name={selection ? 'sync' : 'file-upload'} size={15} color={COLORS.primary} />
                         <Text style={styles.smallBtnText}>{selection ? 'CHANGE' : 'UPLOAD'}</Text>
                       </TouchableOpacity>
                     </View>
@@ -1244,7 +1259,15 @@ export default function VehiclesScreen() {
                   </View>
                 )}
                 <View style={styles.formCard}>
-                <Text style={styles.sectionTitle}>VEHICLE DOCUMENTS</Text>
+                    <View style={styles.documentsSectionHeader}>
+                      <View>
+                        <Text style={styles.sectionTitle}>VEHICLE DOCUMENTS</Text>
+                        <Text style={styles.sectionHint}>Current files, expiry dates, and document actions</Text>
+                      </View>
+                      <View style={styles.documentCountBadge}>
+                        <Text style={styles.documentCountText}>{vehicleDocuments.length} FILES</Text>
+                      </View>
+                    </View>
                 {DOC_TYPES.map((docType) => {
                   const docs = vehicleDocuments.filter((doc) => doc.docType === docType.key);
                   const latest = docs[0];
@@ -1253,7 +1276,15 @@ export default function VehiclesScreen() {
                   return (
                     <View key={docType.key} style={styles.docCard}>
                       <View style={styles.docCardHeader}>
-                        <Text style={styles.docType}>{docType.label}</Text>
+                        <View style={styles.docIdentity}>
+                          <View style={styles.docIcon}>
+                            <MaterialIcons name={getDocumentIcon(docType.key)} size={19} color={COLORS.secondary} />
+                          </View>
+                          <View>
+                            <Text style={styles.docType}>{docType.label}</Text>
+                            <Text style={styles.docSubline}>{latest ? latest.fileName || 'Uploaded file' : 'No file on record'}</Text>
+                          </View>
+                        </View>
                         {docStatus ? (
                           <View style={[styles.docStatusBadge, { backgroundColor: `${docStatus.color}15` }]}>
                             <Text style={[styles.docStatusText, { color: docStatus.color }]}>{docStatus.label}</Text>
@@ -1297,20 +1328,25 @@ export default function VehiclesScreen() {
                         {latest ? (
                           <>
                             <TouchableOpacity style={styles.actionBtn} onPress={() => handleViewDocument(latest.fileUri)}>
+                              <MaterialIcons name="visibility" size={16} color={COLORS.primary} />
                               <Text style={styles.actionBtnText}>VIEW</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.actionBtn} onPress={() => openDocActions(latest, selectedVehicle.vehicle_id)}>
+                              <MaterialIcons name="edit" size={16} color={COLORS.primary} />
                               <Text style={styles.actionBtnText}>UPDATE</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.actionBtn} onPress={() => handleReplaceDocument(latest)}>
+                              <MaterialIcons name="sync" size={16} color={COLORS.primary} />
                               <Text style={styles.actionBtnText}>REPLACE</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteDocument(latest.doc_id)}>
+                              <MaterialIcons name="delete-outline" size={16} color={COLORS.error} />
                               <Text style={styles.actionBtnText}>DELETE</Text>
                             </TouchableOpacity>
                           </>
                         ) : (
                           <TouchableOpacity style={styles.uploadBtn} onPress={() => pickDocument(selectedVehicle.vehicle_id, docType.key)}>
+                            <MaterialIcons name="file-upload" size={17} color="#ffffff" />
                             <Text style={styles.uploadBtnText}>UPLOAD</Text>
                           </TouchableOpacity>
                         )}
@@ -1412,6 +1448,8 @@ const styles = StyleSheet.create({
   modalContent: { padding: SPACING.gutter, paddingBottom: 48 },
   formCard: { backgroundColor: '#ffffff', borderRadius: 10, borderWidth: 1, borderColor: COLORS.outlineVariant, padding: 16, marginBottom: 10, ...SHADOWS.light },
   sectionTitle: { fontSize: 14, fontWeight: '900', color: COLORS.primary, marginBottom: 10 },
+  sectionHint: { fontSize: 11, color: COLORS.textMuted, marginTop: -5, marginBottom: 12 },
+  uploadSectionHint: { fontSize: 11, color: COLORS.textMuted, lineHeight: 16, marginTop: -3, marginBottom: 8 },
   inputGroup: { marginBottom: 12 },
   label: { fontSize: 10, fontWeight: '800', color: COLORS.textMuted, marginBottom: 6, letterSpacing: 0.5 },
   formInput: { borderWidth: 1, borderColor: COLORS.outlineVariant, borderRadius: 6, height: 46, backgroundColor: COLORS.surfaceContainerLow, paddingHorizontal: 12, fontSize: 14, color: COLORS.textDark },
@@ -1431,8 +1469,14 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, gap: 8 },
   detailLabel: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted, textTransform: 'uppercase' },
   detailValue: { fontSize: 12, color: COLORS.textDark, flex: 1, textAlign: 'right' },
-  docCard: { backgroundColor: '#ffffff', borderRadius: 14, borderWidth: 1, borderColor: COLORS.outlineVariant, padding: 16, marginBottom: 12, ...SHADOWS.light },
+  docCard: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 12, borderWidth: 1, borderColor: COLORS.outlineVariant, padding: 14, marginBottom: 10 },
   docCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  documentsSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 },
+  documentCountBadge: { backgroundColor: COLORS.primary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
+  documentCountText: { color: '#ffffff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  docIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  docIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.secondaryContainer, borderWidth: 1, borderColor: '#ffc4a8' },
+  docSubline: { fontSize: 10, color: COLORS.textMuted, marginTop: 3, maxWidth: 190 },
   docCardInfo: { marginTop: 12 },
   docRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: COLORS.surfaceContainerLow },
   docLabel: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted },
@@ -1441,14 +1485,16 @@ const styles = StyleSheet.create({
   docValue: { fontSize: 12, color: COLORS.textDark, marginTop: 2 },
   docMeta: { fontSize: 11, color: COLORS.textMuted, marginTop: 8 },
   docActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: COLORS.surfaceContainerLow, minWidth: 80, alignItems: 'center' },
+  actionBtn: { flexDirection: 'row', gap: 5, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 7, backgroundColor: '#ffffff', borderWidth: 1, borderColor: COLORS.outlineVariant, minWidth: 80, alignItems: 'center', justifyContent: 'center' },
   actionBtnText: { fontSize: 11, fontWeight: '800', color: COLORS.primary },
-  uploadBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: COLORS.secondary, minWidth: 100, alignItems: 'center' },
+  uploadBtn: { flexDirection: 'row', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 7, backgroundColor: COLORS.secondary, minWidth: 100, alignItems: 'center', justifyContent: 'center' },
   uploadBtnText: { fontSize: 11, fontWeight: '800', color: '#ffffff' },
-  docUploadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant },
+  docUploadRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.outlineVariant },
+  docUploadIdentity: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  docUploadIcon: { width: 32, height: 32, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.secondaryContainer },
   docUploadLabel: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
   docUploadValue: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
-  smallBtn: { backgroundColor: COLORS.surfaceContainerLow, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginTop: 2 },
+  smallBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ffffff', borderWidth: 1, borderColor: COLORS.outlineVariant, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 6, marginTop: 2 },
   smallBtnText: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
   docStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, marginTop: 6 },
   docStatusText: { fontSize: 10, fontWeight: '800' },
