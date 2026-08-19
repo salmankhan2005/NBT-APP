@@ -47,6 +47,21 @@ function resolveKnownPlaceCoordinates(query: string): { lat: number; lng: number
   return null;
 }
 
+function getKnownPlacePredictions(input: string) {
+  const normalizedInput = input.trim().toLowerCase();
+  return Object.entries(KNOWN_PLACE_COORDS)
+    .filter(([name]) => name.includes(normalizedInput) || normalizedInput.includes(name))
+    .map(([name, coordinates]) => ({
+      place_id: `known_${name.replace(/\s+/g, '_')}`,
+      description: `${name}, India`,
+      structured_formatting: {
+        main_text: name.replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        secondary_text: 'India',
+      },
+      _known: coordinates,
+    }));
+}
+
 export async function mapsRoutes(app: FastifyInstance) {
   const authHook = {
     preHandler: [
@@ -91,12 +106,22 @@ export async function mapsRoutes(app: FastifyInstance) {
       });
 
       if (!res.ok) {
-        return reply.code(200).send({ predictions: [], status: 'OK' });
+        return reply.code(200).send({
+          predictions: getKnownPlacePredictions(input),
+          status: 'OK',
+        });
       }
 
       const data = await res.json();
       if (!Array.isArray(data)) {
         return reply.code(200).send({ predictions: [], status: 'OK' });
+      }
+
+      if (data.length === 0) {
+        return reply.code(200).send({
+          predictions: getKnownPlacePredictions(input),
+          status: 'OK',
+        });
       }
 
       // Transform Nominatim results to Google Places Autocomplete format
@@ -120,7 +145,10 @@ export async function mapsRoutes(app: FastifyInstance) {
       return reply.code(200).send({ predictions, status: 'OK' });
     } catch (err) {
       app.log.error({ err }, 'Autocomplete error fallback');
-      return reply.code(200).send({ predictions: [], status: 'OK' });
+      return reply.code(200).send({
+        predictions: getKnownPlacePredictions(input),
+        status: 'OK',
+      });
     }
   });
 
@@ -131,6 +159,24 @@ export async function mapsRoutes(app: FastifyInstance) {
     if (!place_id) return reply.code(400).send({ error: 'place_id query param required' });
 
     try {
+      const knownPlaceMatch = place_id.match(/^known_(.+)$/);
+      if (knownPlaceMatch) {
+        const knownName = knownPlaceMatch[1].replace(/_/g, ' ');
+        const coordinates = KNOWN_PLACE_COORDS[knownName];
+        if (coordinates) {
+          return reply.code(200).send({
+            result: {
+              name: knownName.replace(/\b\w/g, (letter) => letter.toUpperCase()),
+              formatted_address: `${knownName}, India`,
+              geometry: { location: coordinates },
+              place_id,
+              url: `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`,
+            },
+            status: 'OK',
+          });
+        }
+      }
+
       let url: string;
       // Parse osm_type and osm_id from our custom place_id format: osm_<type>_<id>
       const osmMatch = place_id.match(/^osm_(node|way|relation)_(\d+)$/);

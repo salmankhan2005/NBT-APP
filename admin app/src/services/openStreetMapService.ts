@@ -196,7 +196,7 @@ export async function searchPlacesAutocomplete(
     const res = await fetch(proxyUrl, { headers });
     if (res.ok) {
       const data = await res.json();
-      if (data.predictions) {
+      if (Array.isArray(data.predictions) && data.predictions.length > 0) {
         return (data.predictions || []).map((p: any): PlaceAutocompleteResult => ({
           placeId: p.place_id,
           mainText: p.structured_formatting?.main_text || p.description,
