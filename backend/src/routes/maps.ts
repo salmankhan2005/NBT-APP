@@ -63,20 +63,44 @@ export async function mapsRoutes(app: FastifyInstance) {
   };
 
   // GET /api/maps/places/autocomplete?input=...&sessiontoken=...
-  // Uses Nominatim search — returns predictions in Google-like format
+  // Uses Google Maps Places API if GOOGLE_MAPS_API_KEY is configured, else Nominatim search
   app.get('/places/autocomplete', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
     const { input } = req.query as { input?: string; sessiontoken?: string };
-    if (!input) return reply.code(400).send({ error: 'input query param required' });
+    if (!input || !input.trim()) return reply.code(200).send({ predictions: [], status: 'OK' });
 
     try {
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        try {
+          const googleUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${apiKey}&components=country:in`;
+          const gRes = await fetch(googleUrl);
+          if (gRes.ok) {
+            const gData = await gRes.json();
+            if (gData.status === 'OK' && Array.isArray(gData.predictions)) {
+              return reply.code(200).send(gData);
+            }
+          }
+        } catch (gErr) {
+          app.log.warn({ err: gErr }, 'Google Maps autocomplete fallback to Nominatim');
+        }
+      }
+
       const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(input)}&format=json&addressdetails=1&limit=8&countrycodes=in&accept-language=en`;
       const res = await fetch(url, {
         headers: { 'User-Agent': USER_AGENT },
       });
+
+      if (!res.ok) {
+        return reply.code(200).send({ predictions: [], status: 'OK' });
+      }
+
       const data = await res.json();
+      if (!Array.isArray(data)) {
+        return reply.code(200).send({ predictions: [], status: 'OK' });
+      }
 
       // Transform Nominatim results to Google Places Autocomplete format
-      const predictions = (data as any[]).map((item: any) => ({
+      const predictions = data.map((item: any) => ({
         place_id: `osm_${item.osm_type}_${item.osm_id}`,
         description: item.display_name,
         structured_formatting: {
@@ -95,8 +119,8 @@ export async function mapsRoutes(app: FastifyInstance) {
 
       return reply.code(200).send({ predictions, status: 'OK' });
     } catch (err) {
-      app.log.error({ err }, 'Nominatim autocomplete error');
-      return reply.code(500).send({ error: 'Geocoding service error', predictions: [] });
+      app.log.error({ err }, 'Autocomplete error fallback');
+      return reply.code(200).send({ predictions: [], status: 'OK' });
     }
   });
 
