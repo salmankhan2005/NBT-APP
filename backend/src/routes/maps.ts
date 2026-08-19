@@ -50,12 +50,12 @@ function resolveKnownPlaceCoordinates(query: string): { lat: number; lng: number
 export async function mapsRoutes(app: FastifyInstance) {
   const authHook = {
     preHandler: [
-      async (req: FastifyRequest, reply: FastifyReply) => {
+      async (req: FastifyRequest) => {
         if (req.headers.authorization) {
           try {
-            await app.authenticate(req, reply);
+            await req.jwtVerify();
           } catch {
-            // Soft auth for maps proxy
+            // Soft auth for maps proxy: ignore invalid token gracefully
           }
         }
       },
