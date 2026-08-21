@@ -992,7 +992,7 @@ export default function GcScreen() {
               <View style={[styles.gcHeader, !isDesktop && { flexDirection: 'column', alignItems: 'center', gap: 16 }]}>
                 <View style={[styles.gcHeaderBrand, !isDesktop && { borderRightWidth: 0, paddingRight: 0, alignItems: 'center' }]}>
                   <View style={styles.logoCircle}>
-                    <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+                    <Image source={require('../../assets/icon.png')} style={styles.logoImage} resizeMode="contain" />
                   </View>
                   <Text style={styles.brandTitle}>NEW BALAJI TRANSPORT</Text>
                   <Text style={styles.brandSubtitle}>(LORRY SUPPLIERS & COMMISSION AGENT)</Text>

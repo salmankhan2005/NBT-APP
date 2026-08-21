@@ -20,6 +20,10 @@
       }
     },
     "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/icon.png"
+      },
       "predictiveBackGestureEnabled": false,
       "package": "com.nbtars.admindashboard",
       "permissions": [

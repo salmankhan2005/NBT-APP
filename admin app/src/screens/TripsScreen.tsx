@@ -389,7 +389,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
       <div class="info-item"><span class="info-label">Notes</span><span class="info-value">${trip.podNotes || 'None'}</span></div>
       <div class="info-item"><span class="info-label">Signature</span><span class="info-value">${trip.podSignature ? 'Captured' : 'N/A'}</span></div>
     </div>
-    ${trip.podPhotoUri ? `<div style="margin-top:12px;"><span class="info-label" style="font-weight:700;display:block;margin-bottom:4px;">Delivery Photo:</span><img src="${trip.podPhotoUri}" style="max-width:280px;max-height:180px;border-radius:6px;border:1px solid #cbd5e1;" /></div>` : ''}
+    ${normalizeImageUrl(trip.podPhotoUri) ? `<div style="margin-top:12px;"><span class="info-label" style="font-weight:700;display:block;margin-bottom:4px;">Delivery Photo:</span><img src="${normalizeImageUrl(trip.podPhotoUri)}" style="max-width:280px;max-height:180px;border-radius:6px;border:1px solid #cbd5e1;" /></div>` : ''}
     ${trip.podSignature && (trip.podSignature.startsWith('data:image/') || trip.podSignature.startsWith('http') || trip.podSignature.startsWith('blob:') || trip.podSignature.startsWith('/uploads/')) ? `<div style="margin-top:10px;"><span class="info-label" style="font-weight:700;display:block;margin-bottom:4px;">Receiver Signature:</span><img src="${trip.podSignature}" style="max-width:220px;max-height:80px;border-radius:4px;border:1px solid #cbd5e1;background:#fff;" /></div>` : ''}
   </div>
 </div>` : ''}
@@ -1065,7 +1065,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                       <View style={{ marginBottom: 12 }}>
                         <Text style={[styles.podInfoText, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Delivery Photo / Invoice:</Text>
                         <Image
-                          source={{ uri: normalizeImageUrl(selectedTrip.podPhotoUri) || selectedTrip.podPhotoUri }}
+                          source={{ uri: normalizeImageUrl(selectedTrip.podPhotoUri) }}
                           style={styles.podPhotoImage}
                           resizeMode="contain"
                         />
@@ -1073,9 +1073,11 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                           style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                           onPress={() => {
                             if (Platform.OS === 'web') {
-                              window.open(normalizeImageUrl(selectedTrip.podPhotoUri) || selectedTrip.podPhotoUri, '_blank');
+                              const imageUrl = normalizeImageUrl(selectedTrip.podPhotoUri);
+                              if (imageUrl) window.open(imageUrl, '_blank');
                             } else {
-                              Linking.openURL(normalizeImageUrl(selectedTrip.podPhotoUri) || selectedTrip.podPhotoUri!).catch(() => {});
+                              const imageUrl = normalizeImageUrl(selectedTrip.podPhotoUri);
+                              if (imageUrl) Linking.openURL(imageUrl).catch(() => {});
                             }
                           }}
                         >
@@ -1098,7 +1100,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                         <View style={{ marginTop: 6, marginBottom: 10 }}>
                           <Text style={[styles.podInfoText, { fontWeight: 'bold', marginBottom: 6 }]}>✍️ Driver / Receiver Signature:</Text>
                           <Image
-                            source={{ uri: normalizeImageUrl(selectedTrip.podSignature) || selectedTrip.podSignature }}
+                            source={{ uri: normalizeImageUrl(selectedTrip.podSignature) }}
                             style={styles.podSignatureImage}
                             resizeMode="contain"
                           />

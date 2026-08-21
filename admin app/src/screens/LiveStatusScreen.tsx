@@ -264,9 +264,11 @@ export default function LiveStatusScreen() {
                         style={{ marginTop: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
                         onPress={() => {
                           if (Platform.OS === 'web') {
-                            window.open(normalizeImageUrl(driverTrip.podPhotoUri) || driverTrip.podPhotoUri, '_blank');
+                            const imageUrl = normalizeImageUrl(driverTrip.podPhotoUri);
+                            if (imageUrl) window.open(imageUrl, '_blank');
                           } else {
-                            Linking.openURL(normalizeImageUrl(driverTrip.podPhotoUri) || driverTrip.podPhotoUri!).catch(() => {});
+                            const imageUrl = normalizeImageUrl(driverTrip.podPhotoUri);
+                            if (imageUrl) Linking.openURL(imageUrl).catch(() => {});
                           }
                         }}
                       >
@@ -286,7 +288,7 @@ export default function LiveStatusScreen() {
                       <View style={{ marginTop: 6 }}>
                         <Text style={{ fontSize: 12, fontWeight: 'bold', color: COLORS.textDark, marginBottom: 4 }}>✍️ Driver / Receiver Signature:</Text>
                         <Image
-                          source={{ uri: normalizeImageUrl(driverTrip.podSignature) || driverTrip.podSignature }}
+                          source={{ uri: normalizeImageUrl(driverTrip.podSignature) }}
                           style={{ maxWidth: 220, width: '100%', aspectRatio: 220 / 75, borderRadius: 6, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#ffffff' }}
                           resizeMode="contain"
                         />

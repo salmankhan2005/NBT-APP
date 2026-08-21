@@ -24,7 +24,12 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     return undefined;
   }
 
-  // Preserve valid base64 data URIs, blob URIs, file:// and content:// URIs directly
+  // Native Image can read app-local URIs; browser Image cannot.
+  if ((cleaned.startsWith('file://') || cleaned.startsWith('content://')) && Platform.OS === 'web') {
+    return undefined;
+  }
+
+  // Preserve valid base64 data URIs, blob URIs, and native local URIs directly
   if (
     cleaned.startsWith('data:image/') ||
     cleaned.startsWith('data:application/') ||

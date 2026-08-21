@@ -150,16 +150,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               )}
             </TouchableOpacity>
 
-            {/* Open Auth Mode Helper Card */}
-            <View style={styles.helperCard}>
-              <Text style={styles.helperTitle}>Open Auth Mode Active</Text>
-              <Text style={styles.helperText}>
-                Any Tracking ID & PIN will be accepted for testing.
-              </Text>
-              <Text style={styles.helperSub}>
-                Default Trip: TRK-5566 (Senthil Rajesh)
-              </Text>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
