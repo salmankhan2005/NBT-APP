@@ -3,8 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { SHA256 } from 'crypto-js';
 
-// ── API Host Configuration — Production: Render ──
-const API_HOST = 'https://nbt-app.onrender.com';
+// ── API Host Configuration ──────────────────────────────────────────────────
+const DEFAULT_API_HOST = 'https://nbt-app.onrender.com';
+export const API_HOST = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL
+  ? process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, '')
+  : DEFAULT_API_HOST;
 
 // ── Secure storage helpers (Dual-write for robust persistence across reloads) ───
 const safeGetItem = async (key: string): Promise<string | null> => {
@@ -389,6 +392,7 @@ class DatabaseService {
   async login(trackingId: string, pin: string): Promise<string | null> {
     try {
       await this.init();
+      let serverUnavailable = false;
 
       // Safety net: ensure cache always has seed data with hashes
       const hasMissingHashes = this.cache.some(t => !t.driverPinHash);
@@ -508,10 +512,15 @@ class DatabaseService {
             await this.notify();
             return activeId;
           }
+        } else {
+          return null;
         }
       } catch (netErr) {
+        serverUnavailable = true;
         console.warn('[DB] Backend offline, evaluating local credentials securely:', netErr);
       }
+
+      if (!serverUnavailable) return null;
 
       // Strict Local Authentication (Offline Mode)
       const pinHash = sha256(cleanPin);
@@ -812,7 +821,7 @@ class DatabaseService {
     // Live API Sync to Neon Postgres Backend
     if (this.currentToken) {
       try {
-        await fetch(`${API_HOST}/api/trips/${tripId}/start`, {
+        const response = await fetch(`${API_HOST}/api/trips/${tripId}/start`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -821,7 +830,7 @@ class DatabaseService {
           body: JSON.stringify({
             driverName: trip.driverName,
             odometer,
-            odometerPhotoUrl: hostedPhotoUrl || undefined,
+            ...(hostedPhotoUrl ? { odometerPhotoUrl: hostedPhotoUrl } : {}),
             dieselLevel,
             gps: {
               latitude: gps.latitude,
@@ -831,8 +840,13 @@ class DatabaseService {
             }
           })
         });
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '');
+          throw new Error(`Start trip failed (${response.status})${errorBody ? `: ${errorBody}` : ''}`);
+        }
       } catch (err) {
         console.warn('[DriverDB] startTrip API sync error:', err);
+        return false;
       }
     }
 
@@ -956,7 +970,10 @@ class DatabaseService {
     // Upload receipt image to backend before saving locally
     let hostedReceiptUrl: string | undefined = undefined;
     if (expense.receiptUri) {
-      hostedReceiptUrl = await this.uploadLocalImage(expense.receiptUri);
+      const uploadedReceiptUrl = await this.uploadLocalImage(expense.receiptUri);
+      hostedReceiptUrl = uploadedReceiptUrl.startsWith('http://') || uploadedReceiptUrl.startsWith('https://')
+        ? uploadedReceiptUrl
+        : undefined;
     }
 
     const newExpense: Expense = {
@@ -978,12 +995,10 @@ class DatabaseService {
         : undefined,
     };
 
-    trip.expenses.push(newExpense);
-
     // Live API Sync to Neon Postgres Backend (include hosted receipt URL)
     if (this.currentToken) {
       try {
-        await fetch(`${API_HOST}/api/trips/${tripId}/expenses`, {
+        const response = await fetch(`${API_HOST}/api/trips/${tripId}/expenses`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -998,11 +1013,17 @@ class DatabaseService {
             receiptUrl: hostedReceiptUrl || undefined,
           })
         });
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '');
+          throw new Error(`Expense sync failed (${response.status})${errorBody ? `: ${errorBody}` : ''}`);
+        }
       } catch (err) {
         console.warn('[DriverDB] addExpense API sync error:', err);
+        return null;
       }
     }
 
+    trip.expenses.push(newExpense);
     await this.notify();
     return newExpense;
   }

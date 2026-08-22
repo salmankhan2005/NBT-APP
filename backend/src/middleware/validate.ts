@@ -30,7 +30,7 @@ export const LoginSchema = z.object({
 export const StartTripSchema = z.object({
   driverName: z.string().min(1).max(100).trim(),
   odometer: z.number().nonnegative(),
-  odometerPhotoUrl: z.string().max(2000).trim(),
+  odometerPhotoUrl: z.string().max(2000).trim().optional(),
   dieselLevel: z.enum(['EMPTY', '1/4', '1/2', '3/4', 'FULL']),
   gps: z.object({
     latitude: z.number().min(-90).max(90),

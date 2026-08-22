@@ -23,6 +23,8 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false          # paste your frontend URL after deploying the web app
+      - key: PUBLIC_HOST
+        sync: false          # set to the public HTTPS backend URL, e.g. https://nbt-app.onrender.com
       - key: AUTH_RATE_LIMIT_MAX
         value: "20"
       - key: AUTH_RATE_LIMIT_WINDOW_MS

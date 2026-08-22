@@ -16,6 +16,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as Speech from 'expo-speech';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, GPSLocation } from '../db/database';
@@ -26,6 +27,8 @@ interface StartTripScreenProps {
   onTripStarted: () => void;
   onCancel: () => void;
 }
+
+type VoiceLanguage = 'en-IN' | 'ta-IN';
 
 export default function StartTripScreen({
   trip,
@@ -39,6 +42,8 @@ export default function StartTripScreen({
   const [isListening, setIsListening] = useState(false);
   const [transcriptionText, setTranscriptionText] = useState('Driver Name will appear here...');
   const [isNameConfirmed, setIsNameConfirmed] = useState(false);
+  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>('ta-IN');
+  const [voiceError, setVoiceError] = useState('');
 
   // Step 2 states: Odometer & Diesel
   const [odometer, setOdometer] = useState('');
@@ -62,6 +67,16 @@ export default function StartTripScreen({
     }
   };
 
+  const handleChooseOdometerPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setOdometerPhotoUri(result.assets[0].uri);
+    }
+  };
+
   useEffect(() => {
     if (trip.driverName) {
       setDriverName(trip.driverName);
@@ -70,29 +85,64 @@ export default function StartTripScreen({
     }
   }, [trip]);
 
-  // Simulated Voice recognition
-  const handleVoiceInput = () => {
+  useSpeechRecognitionEvent('start', () => {
+    setIsListening(true);
+    setVoiceError('');
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results[0]?.transcript?.trim();
+    if (!transcript) return;
+    setDriverName(transcript);
+    setTranscriptionText(transcript);
+    setIsNameConfirmed(event.isFinal);
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    setIsListening(false);
+    if (event.error !== 'aborted') {
+      setVoiceError(event.error === 'no-speech'
+        ? 'No speech detected. Tap the microphone and speak again.'
+        : 'Voice input was not available. Allow microphone access and try again.');
+    }
+  });
+
+  const handleVoiceInput = async () => {
     if (isListening) {
-      setIsListening(false);
-      setTranscriptionText('Driver Name will appear here...');
-      setIsNameConfirmed(false);
+      ExpoSpeechRecognitionModule.stop();
       return;
     }
 
-    setIsListening(true);
+    setVoiceError('');
     setTranscriptionText('Listening... (Tamil/English)');
     setIsNameConfirmed(false);
+    try {
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        setVoiceError(Platform.OS === 'web'
+          ? 'Microphone is blocked for this local page. Allow it in browser site settings, then reload.'
+          : 'Microphone permission is blocked. Allow it in Android Settings, then try again.');
+        setTranscriptionText('Driver Name will appear here...');
+        return;
+      }
 
-    // Simulate speech-to-text
-    setTimeout(() => {
+      ExpoSpeechRecognitionModule.start({
+        lang: voiceLanguage,
+        interimResults: true,
+        continuous: false,
+        maxAlternatives: 3,
+        addsPunctuation: false,
+        contextualStrings: ['driver', 'name', 'Senthil', 'Rajesh', 'Ramesh', 'Karthik'],
+      });
+    } catch {
       setIsListening(false);
-      // Mock result
-      const mockNames = ['Ramesh Kumar', 'Rajesh Balaji', 'Srinivasan', 'Karthik Raja'];
-      const randomName = mockNames[Math.floor(Math.random() * mockNames.length)];
-      setDriverName(randomName);
-      setTranscriptionText(randomName);
-      setIsNameConfirmed(true);
-    }, 2000);
+      setVoiceError('Could not start voice input. Please try again.');
+      setTranscriptionText('Driver Name will appear here...');
+    }
   };
 
   const handleStep1Submit = () => {
@@ -160,7 +210,10 @@ export default function StartTripScreen({
       }
 
       // 2. Start Trip in database
-      await db.startTrip(trip.id, driverName, odoNum, dieselLevel, gps, odometerPhotoUri!);
+      const started = await db.startTrip(trip.id, driverName, odoNum, dieselLevel, gps, odometerPhotoUri!);
+      if (!started) {
+        throw new Error('The server did not accept the trip start request.');
+      }
       
       // Voice guidance announcement
       try {
@@ -207,6 +260,21 @@ export default function StartTripScreen({
 
               {/* Voice Interaction Hub */}
               <View style={styles.voiceHub}>
+                <View style={styles.voiceLanguageRow}>
+                  <Text style={styles.voiceLanguageLabel}>SPEAK IN</Text>
+                  {(['ta-IN', 'en-IN'] as VoiceLanguage[]).map((language) => (
+                    <TouchableOpacity
+                      key={language}
+                      style={[styles.voiceLanguageBtn, voiceLanguage === language && styles.voiceLanguageBtnActive]}
+                      onPress={() => setVoiceLanguage(language)}
+                      disabled={isListening}
+                    >
+                      <Text style={[styles.voiceLanguageText, voiceLanguage === language && styles.voiceLanguageTextActive]}>
+                        {language === 'ta-IN' ? 'TAMIL' : 'ENGLISH'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
                 <TouchableOpacity
                   style={[
                     styles.micBtn,
@@ -223,6 +291,7 @@ export default function StartTripScreen({
                 </TouchableOpacity>
                 <Text style={styles.micLabel}>Speak your name</Text>
                 <Text style={styles.micSubLabel}>(English / Tamil)</Text>
+                {voiceError ? <Text style={styles.voiceError}>{voiceError}</Text> : null}
               </View>
 
               {/* Transcription Output */}
@@ -287,6 +356,10 @@ export default function StartTripScreen({
                   <Text style={styles.photoBtnText}>
                     {odometerPhotoUri ? 'Retake Dashboard Photo' : 'Take Dashboard Photo'}
                   </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoBtn} onPress={handleChooseOdometerPhoto}>
+                  <MaterialIcons name="photo-library" size={24} color={COLORS.primary} />
+                  <Text style={styles.photoBtnText}>Choose Dashboard Photo</Text>
                 </TouchableOpacity>
                 {odometerPhotoUri && (
                   <Image source={{ uri: odometerPhotoUri }} style={styles.previewImage} resizeMode="cover" />
@@ -407,6 +480,45 @@ const styles = StyleSheet.create({
   voiceHub: {
     alignItems: 'center',
     marginBottom: SPACING.stack,
+  },
+  voiceLanguageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  voiceLanguageLabel: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '800',
+    marginRight: 2,
+  },
+  voiceLanguageBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    backgroundColor: COLORS.surface,
+  },
+  voiceLanguageBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  voiceLanguageText: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '800',
+  },
+  voiceLanguageTextActive: {
+    color: COLORS.onPrimary,
+  },
+  voiceError: {
+    maxWidth: 280,
+    fontSize: 11,
+    color: COLORS.error,
+    marginTop: 8,
+    textAlign: 'center',
   },
   micBtn: {
     width: 110,

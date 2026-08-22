@@ -704,14 +704,17 @@ export async function staticMapHandler(req: FastifyRequest, reply: FastifyReply)
     }
   }
 
-  reply.header('Content-Type', 'image/svg+xml');
   reply.header('Cache-Control', 'public, max-age=86400');
 
   const formattedLat = Math.abs(lat).toFixed(4) + (lat >= 0 ? '&#176; N' : '&#176; S');
   const formattedLng = Math.abs(lng).toFixed(4) + (lng >= 0 ? '&#176; E' : '&#176; W');
 
   if (tileBase64) {
-    // Rich SVG with base64 raster tile background + vector pin overlay
+    // React Native Image reliably decodes the raster tile; embedded SVG data
+    // is not consistently supported by Android release builds.
+    reply.header('Content-Type', 'image/png');
+    return reply.send(Buffer.from(tileBase64.slice('data:image/png;base64,'.length), 'base64'));
+    /* Rich SVG overlay retained as the fallback design reference.
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -754,7 +757,7 @@ export async function staticMapHandler(req: FastifyRequest, reply: FastifyReply)
   </g>
 </svg>`;
 
-    return reply.send(svg);
+  return reply.send(svg); */
   }
 
   // 3. Fallback Stylized Vector Map Preview (if offline or tile fetch blocked)
@@ -797,6 +800,7 @@ export async function staticMapHandler(req: FastifyRequest, reply: FastifyReply)
   </g>
 </svg>`;
 
+  reply.header('Content-Type', 'image/svg+xml');
   return reply.send(svgFallback);
 }
 

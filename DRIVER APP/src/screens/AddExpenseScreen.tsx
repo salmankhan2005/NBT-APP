@@ -16,6 +16,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as Speech from 'expo-speech';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import { db, Trip, Expense, GPSLocation } from '../db/database';
@@ -28,6 +29,7 @@ interface AddExpenseScreenProps {
 }
 
 type ExpenseCategory = 'FUEL' | 'TOLL' | 'RTO' | 'POLICE' | 'LORRY' | 'OTHER';
+type VoiceLanguage = 'en-IN' | 'ta-IN';
 
 export default function AddExpenseScreen({
   trip,
@@ -50,8 +52,33 @@ export default function AddExpenseScreen({
   const [bunkLocation, setBunkLocation] = useState('');
   const [pricePerLiter, setPricePerLiter] = useState('0.00');
 
-  // Voice recognition simulation states
+  // Voice recognition states
   const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState('');
+  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>('ta-IN');
+
+  useSpeechRecognitionEvent('start', () => {
+    setIsListening(true);
+    setVoiceError('');
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results[0]?.transcript?.trim();
+    if (transcript) setReason(transcript);
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    setIsListening(false);
+    if (event.error !== 'aborted') {
+      setVoiceError(event.error === 'no-speech'
+        ? 'No speech detected. Tap the microphone and speak again.'
+        : 'Voice input was not available. Please try again or type the note.');
+    }
+  });
 
   // Auto calculate price per liter for fuel
   useEffect(() => {
@@ -112,12 +139,11 @@ export default function AddExpenseScreen({
   };
 
   const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (permission.status !== 'granted') {
       Alert.alert('Permission Denied', 'Camera permission is required.');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: 'images',
       allowsEditing: true,
@@ -129,30 +155,50 @@ export default function AddExpenseScreen({
     }
   };
 
-  const handleVoiceInput = () => {
+  const handleChooseGalleryImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setReceiptImage(result.assets[0].uri);
+    }
+  };
+
+  const handleVoiceInput = async () => {
+    setVoiceError('');
     if (isListening) {
-      setIsListening(false);
+      ExpoSpeechRecognitionModule.stop();
       return;
     }
 
-    setIsListening(true);
-    // Simulate voice speech transcription
-    setTimeout(() => {
-      setIsListening(false);
-      
-      let mockReason = '';
-      if (selectedCategory === 'RTO') {
-        mockReason = 'RTO documents checking charges at checkpost';
-      } else if (selectedCategory === 'POLICE') {
-        mockReason = 'No entry line permit checking fine';
-      } else if (selectedCategory === 'LORRY') {
-        mockReason = 'Rear tyre puncture repair service charges';
-      } else {
-        mockReason = 'Miscellaneous driver food and parking fee';
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      setVoiceError('Voice input is not supported in this browser. Please type the note.');
+      return;
+    }
+
+    try {
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        setVoiceError(Platform.OS === 'web'
+          ? 'Microphone is blocked for this local page. Allow microphone access in the browser site settings, then reload.'
+          : 'Microphone permission is blocked. Allow microphone access in Android Settings, then try again.');
+        return;
       }
-      
-      setReason(mockReason);
-    }, 2000);
+
+      ExpoSpeechRecognitionModule.start({
+        lang: voiceLanguage,
+        interimResults: true,
+        continuous: false,
+        maxAlternatives: 3,
+        addsPunctuation: true,
+        contextualStrings: ['RTO', 'police', 'lorry', 'toll', 'parking', 'fuel', 'expense'],
+      });
+    } catch {
+      setIsListening(false);
+      setVoiceError('Could not start voice input. Please try again or type the note.');
+    }
   };
 
   const handleSaveExpense = async () => {
@@ -407,6 +453,21 @@ export default function AddExpenseScreen({
               {selectedCategory !== 'FUEL' && selectedCategory !== 'TOLL' ? (
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>REASON / REMARKS</Text>
+                  <View style={styles.voiceLanguageRow}>
+                    <Text style={styles.voiceLanguageLabel}>SPEAK IN</Text>
+                    {(['ta-IN', 'en-IN'] as VoiceLanguage[]).map((language) => (
+                      <TouchableOpacity
+                        key={language}
+                        style={[styles.voiceLanguageBtn, voiceLanguage === language && styles.voiceLanguageBtnActive]}
+                        onPress={() => setVoiceLanguage(language)}
+                        disabled={isListening}
+                      >
+                        <Text style={[styles.voiceLanguageText, voiceLanguage === language && styles.voiceLanguageTextActive]}>
+                          {language === 'ta-IN' ? 'TAMIL' : 'ENGLISH'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                   <View style={styles.voiceWrapper}>
                     <TextInput
                       style={[styles.input, styles.reasonInput]}
@@ -429,7 +490,8 @@ export default function AddExpenseScreen({
                       />
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.voiceTip}>Tamil/English microphone conversion supported</Text>
+                  <Text style={styles.voiceTip}>{isListening ? `Listening in ${voiceLanguage === 'ta-IN' ? 'Tamil' : 'English'}... speak clearly, then pause.` : `Tap the microphone to speak in ${voiceLanguage === 'ta-IN' ? 'Tamil' : 'English'}.`}</Text>
+                  {voiceError ? <Text style={styles.voiceError}>{voiceError}</Text> : null}
                 </View>
               ) : null}
 
@@ -481,6 +543,10 @@ export default function AddExpenseScreen({
                 <TouchableOpacity style={styles.uploadBtn} onPress={handlePickImage}>
                   <MaterialIcons name="photo-camera" size={24} color={COLORS.primary} />
                   <Text style={styles.uploadBtnText}>TAKE BILL PHOTO</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.uploadBtn} onPress={handleChooseGalleryImage}>
+                  <MaterialIcons name="photo-library" size={24} color={COLORS.primary} />
+                  <Text style={styles.uploadBtnText}>CHOOSE FROM GALLERY</Text>
                 </TouchableOpacity>
 
                 {receiptImage ? (
@@ -749,6 +815,38 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'flex-start',
   },
+  voiceLanguageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 7,
+  },
+  voiceLanguageLabel: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '800',
+    marginRight: 2,
+  },
+  voiceLanguageBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    backgroundColor: COLORS.surface,
+  },
+  voiceLanguageBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  voiceLanguageText: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '800',
+  },
+  voiceLanguageTextActive: {
+    color: COLORS.onPrimary,
+  },
   voiceMicBtn: {
     width: 48,
     height: 80,
@@ -767,6 +865,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
     fontStyle: 'italic',
+    marginTop: 4,
+  },
+  voiceError: {
+    fontSize: 11,
+    color: COLORS.error,
     marginTop: 4,
   },
   gpsCaptureContainer: {

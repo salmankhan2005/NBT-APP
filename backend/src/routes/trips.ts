@@ -233,7 +233,7 @@ export async function tripRoutes(app: FastifyInstance) {
         status             = 'STARTED',
         start_date         = now()
       WHERE id = ${id}
-        AND driver_id = ${user.driverId}
+        AND (driver_id = ${user.driverId} OR id = ${user.tripId})
     `;
 
     await sql`

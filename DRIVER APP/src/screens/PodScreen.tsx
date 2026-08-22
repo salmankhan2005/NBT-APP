@@ -202,6 +202,16 @@ export default function PodScreen({
     }
   };
 
+  const handleChooseEndOdometerPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setOdometerEndPhotoUri(result.assets[0].uri);
+    }
+  };
+
   const handlePickPodPhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -217,24 +227,41 @@ export default function PodScreen({
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const localUri = result.assets[0].uri;
-      setPodPhotoPreview(null);
-      setPodPhoto(null);
-      setPodUploadStatus('uploading');
+      setPodPhoto(localUri);
+      setPodPhotoPreview(localUri);
+      setPodUploadStatus('idle');
       setPodHostedUrl(null);
-      try {
-        const hostedUrl = await db.uploadPodPhoto(localUri);
-        if (hostedUrl) {
-          setPodHostedUrl(hostedUrl);
-          setPodPhoto(hostedUrl);
-          setPodPhotoPreview(hostedUrl);
-          setPodUploadStatus('success');
-        } else {
-          setPodPhoto(null);
-          setPodUploadStatus('failed');
-        }
-      } catch {
-        setPodUploadStatus('failed');
-      }
+    }
+  };
+
+  const handleChoosePodPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const localUri = result.assets[0].uri;
+      setPodPhoto(localUri);
+      setPodPhotoPreview(localUri);
+      setPodUploadStatus('idle');
+      setPodHostedUrl(null);
+    }
+  };
+
+  const handleUploadPodPhoto = async () => {
+    if (!podPhoto || podHostedUrl || podUploadStatus === 'uploading') return;
+
+    setPodUploadStatus('uploading');
+    try {
+      const hostedUrl = await db.uploadPodPhoto(podPhoto);
+      if (!hostedUrl) throw new Error('POD photo upload failed');
+      setPodHostedUrl(hostedUrl);
+      setPodPhoto(hostedUrl);
+      setPodPhotoPreview(hostedUrl);
+      setPodUploadStatus('success');
+    } catch {
+      setPodUploadStatus('failed');
     }
   };
 
@@ -411,12 +438,32 @@ export default function PodScreen({
                 
                 <TouchableOpacity style={styles.cameraBtn} onPress={handlePickPodPhoto}>
                   <MaterialIcons name="camera-alt" size={28} color={COLORS.primary} />
-                  <Text style={styles.cameraBtnText}>CAPTURE POD PHOTO</Text>
+                  <Text style={styles.cameraBtnText}>{podPhoto ? 'RETAKE POD PHOTO' : 'CAPTURE POD PHOTO'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.cameraBtn} onPress={handleChoosePodPhoto}>
+                  <MaterialIcons name="photo-library" size={28} color={COLORS.primary} />
+                  <Text style={styles.cameraBtnText}>CHOOSE POD FROM GALLERY</Text>
                 </TouchableOpacity>
 
                 {podPhoto ? (
                   <View style={styles.photoContainer}>
                     <Image source={{ uri: podPhoto }} style={styles.podPhotoPreview} resizeMode="cover" />
+                    {!podHostedUrl && (
+                      <TouchableOpacity
+                        style={[styles.uploadPhotoBtn, podUploadStatus === 'uploading' && styles.btnDisabled]}
+                        onPress={handleUploadPodPhoto}
+                        disabled={podUploadStatus === 'uploading'}
+                      >
+                        {podUploadStatus === 'uploading' ? (
+                          <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                        ) : (
+                          <MaterialIcons name="cloud-upload" size={20} color={COLORS.onPrimary} />
+                        )}
+                        <Text style={styles.uploadPhotoBtnText}>
+                          {podUploadStatus === 'failed' ? 'RETRY UPLOAD' : 'UPLOAD PHOTO'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                     {podUploadStatus === 'uploading' && (
                       <View style={styles.uploadStatusBadge}>
                         <ActivityIndicator size="small" color={COLORS.primary} />
@@ -506,6 +553,10 @@ export default function PodScreen({
                   <Text style={styles.cameraBtnText}>
                     {odometerEndPhotoUri ? 'Retake End Odometer Photo' : 'Take End Odometer Photo'}
                   </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.cameraBtn, { marginTop: 10 }]} onPress={handleChooseEndOdometerPhoto}>
+                  <MaterialIcons name="photo-library" size={22} color={COLORS.primary} />
+                  <Text style={styles.cameraBtnText}>Choose End Odometer Photo</Text>
                 </TouchableOpacity>
                 {odometerEndPhotoUri && (
                   <Image source={{ uri: odometerEndPhotoUri }} style={[styles.podPhotoPreview, { marginTop: 10 }]} resizeMode="cover" />
@@ -674,6 +725,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.textDark,
+  },
+  uploadPhotoBtn: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  uploadPhotoBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: COLORS.onPrimary,
   },
   photoContainer: {
     marginTop: 12,

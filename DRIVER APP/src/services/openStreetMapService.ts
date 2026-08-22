@@ -10,6 +10,7 @@
  */
 
 import { Platform } from 'react-native';
+import { API_HOST } from '../db/database';
 
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 const OSRM_BASE = 'https://router.project-osrm.org';
@@ -56,7 +57,7 @@ function isInIndia(lat: number, lng: number): boolean {
   return lat >= 6.5 && lat <= 37.1 && lng >= 68.1 && lng <= 97.4;
 }
 
-const PROXY_BASE = 'https://nbt-app.onrender.com/api/maps';
+const PROXY_BASE = `${API_HOST}/api/maps`;
 
 export interface RouteInfo {
   distanceKm: number;
