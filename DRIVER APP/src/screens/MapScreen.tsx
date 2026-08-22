@@ -41,7 +41,7 @@ export default function MapScreen({
       ? getStaticMapPreviewUrl(initialGps.latitude, initialGps.longitude)
       : null
   );
-  const lastPreviewCenterRef = useRef<string | null>(null);
+  const hasMapPreviewRef = useRef(Boolean(mapTileUrl));
   const lastGeocodeAtRef = useRef(0);
 
   useEffect(() => {
@@ -92,9 +92,10 @@ export default function MapScreen({
         async (loc) => {
           const lat = loc.coords.latitude;
           const lng = loc.coords.longitude;
-          const previewCenter = `${lat.toFixed(3)},${lng.toFixed(3)}`;
-          if (lastPreviewCenterRef.current !== previewCenter) {
-            lastPreviewCenterRef.current = previewCenter;
+          // Keep the preview mounted and stable. GPS telemetry is live, but
+          // replacing the image source on every callback causes visible reloads.
+          if (!hasMapPreviewRef.current) {
+            hasMapPreviewRef.current = true;
             setMapTileUrl(getStaticMapPreviewUrl(lat, lng));
           }
 
