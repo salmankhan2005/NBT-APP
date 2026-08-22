@@ -1,21 +1,26 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { pipeline } from 'stream/promises';
-import fs from 'fs';
 import path from 'path';
+import { sql } from '../db/client';
 
-// Directory where uploaded files are stored
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+const FILE_ID_PATTERN = /^[a-zA-Z0-9_-]{8,80}$/;
 
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+function getPublicHost(req: FastifyRequest): string {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || 'http';
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const requestHostName = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.headers.host || `localhost:${process.env.PORT || 3001}`;
+  const requestHost = `${protocol}://${requestHostName}`;
+  const configuredHost = process.env.PUBLIC_HOST?.trim();
+  return (configuredHost && !/localhost|127\.0\.0\.1|10\.0\.2\.2/i.test(configuredHost) ? configuredHost : requestHost)
+    .replace('10.0.2.2', 'localhost')
+    .replace('127.0.0.1', 'localhost');
 }
 
 export async function uploadRoutes(app: FastifyInstance) {
   /**
    * POST /api/upload
    * Accepts a multipart form file upload (field name: "file")
-   * Returns: { url: "http://localhost:3001/uploads/<filename>" }
+  * Returns a permanent database-backed URL: /api/files/<fileId>
    *
    * Used by Driver App to upload POD photos and expense receipt images.
    * The returned URL is stored in Neon Postgres and served to the Admin App.
@@ -43,33 +48,52 @@ export async function uploadRoutes(app: FastifyInstance) {
           });
         }
 
-        // Sanitize and build a safe unique filename
+        // Keep the original extension for content disposition and downloads.
         const ext = path.extname(data.filename || '.jpg').replace(/[^a-zA-Z0-9.]/g, '') || '.jpg';
         const safeName = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
-        const savePath = path.join(UPLOAD_DIR, safeName);
+        const fileId = `file_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+        const content = await data.toBuffer();
 
-        // Stream file to disk
-        await pipeline(data.file, fs.createWriteStream(savePath));
+        await sql`
+          INSERT INTO uploaded_files (file_id, file_name, mime_type, content, size_bytes)
+          VALUES (${fileId}, ${safeName}, ${data.mimetype}, ${content}, ${content.length})
+        `;
 
-        // Prefer the configured public host, then derive the host from the request in production.
-        const forwardedProto = req.headers['x-forwarded-proto'];
-        const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || 'http';
-        const forwardedHost = req.headers['x-forwarded-host'];
-        const requestHostName = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost) || req.headers.host || `localhost:${process.env.PORT || 3001}`;
-        const requestHost = `${protocol}://${requestHostName}`;
-        const configuredHost = process.env.PUBLIC_HOST?.trim();
-        const host = (configuredHost && !/localhost|127\.0\.0\.1|10\.0\.2\.2/i.test(configuredHost) ? configuredHost : requestHost)
-          .replace('10.0.2.2', 'localhost')
-          .replace('127.0.0.1', 'localhost');
-        const publicUrl = `${host}/uploads/${safeName}`;
+        const publicUrl = `${getPublicHost(req)}/api/files/${fileId}`;
+        app.log.info(`File uploaded to database: ${fileId}`);
 
-        app.log.info(`📸 File uploaded: ${safeName}`);
-
-        return reply.code(201).send({ url: publicUrl, filename: safeName });
+        return reply.code(201).send({ url: publicUrl, filename: safeName, fileId });
       } catch (err: any) {
         app.log.error('Upload error:', err);
         return reply.code(500).send({ error: 'Upload failed', message: err.message || 'Unknown error' });
       }
     }
   );
+}
+
+export async function fileRoutes(app: FastifyInstance) {
+  app.get('/:fileId', async (req: FastifyRequest, reply: FastifyReply) => {
+    const { fileId } = req.params as { fileId: string };
+    if (!FILE_ID_PATTERN.test(fileId)) {
+      return reply.code(404).send({ error: 'File not found' });
+    }
+
+    const rows = await sql`
+      SELECT file_name, mime_type, content
+      FROM uploaded_files
+      WHERE file_id = ${fileId}
+      LIMIT 1
+    `;
+    if (!rows.length) {
+      return reply.code(404).send({ error: 'File not found' });
+    }
+
+    const file = rows[0] as { file_name: string; mime_type: string; content: Uint8Array };
+    reply.header('Content-Type', file.mime_type);
+    reply.header('Content-Length', String(file.content.length));
+    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+    reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    reply.header('Content-Disposition', `inline; filename="${file.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
+    return reply.send(Buffer.from(file.content));
+  });
 }

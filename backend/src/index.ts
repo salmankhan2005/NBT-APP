@@ -14,7 +14,7 @@ import { tripRoutes } from './routes/trips';
 import { adminRoutes } from './routes/admin';
 import { docsRoutes } from './routes/docs';
 import { mapsRoutes } from './routes/maps';
-import { uploadRoutes } from './routes/upload';
+import { uploadRoutes, fileRoutes } from './routes/upload';
 import { lorryBookingRoutes } from './routes/lorryBooking';
 import { authenticate, requireAdmin } from './middleware/auth';
 
@@ -101,6 +101,16 @@ async function bootstrap() {
     validateEnvironment();
 
     await pingDatabase();
+    await sql`
+      CREATE TABLE IF NOT EXISTS uploaded_files (
+        file_id     TEXT PRIMARY KEY,
+        file_name   TEXT NOT NULL,
+        mime_type   TEXT NOT NULL,
+        content     BYTEA NOT NULL,
+        size_bytes  INTEGER NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
     // Auto-migrate: expenses table location columns
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS latitude NUMERIC`;
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS longitude NUMERIC`;
@@ -309,6 +319,7 @@ async function bootstrap() {
   });
   // ── Upload route ──────────────────────────────────────────────────────────
   app.register(uploadRoutes, { prefix: '/api/upload' });
+  app.register(fileRoutes, { prefix: '/api/files' });
 
   // ── Lorry Booking Agency routes ─────────────────────────────────────────
   app.register(lorryBookingRoutes, { prefix: '/api/lorry-booking' });

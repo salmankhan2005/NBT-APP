@@ -37,6 +37,19 @@ async function migrate() {
   `;
   console.log('  ✓ revoked_tokens (JWT denylist)');
 
+  // ── Database-backed uploaded files ──────────────────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS uploaded_files (
+      file_id     TEXT PRIMARY KEY,
+      file_name   TEXT NOT NULL,
+      mime_type   TEXT NOT NULL,
+      content     BYTEA NOT NULL,
+      size_bytes  INTEGER NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+  console.log('  ✓ uploaded_files');
+
   // ── Drivers ──────────────────────────────────────────────────────────────
   await sql`
     CREATE TABLE IF NOT EXISTS drivers (
