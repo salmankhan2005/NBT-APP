@@ -674,16 +674,16 @@ const MemoScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, !isDesktop && styles.headerRowMobile]}>
         <View>
           <Text style={styles.screenTitle}>Memo</Text>
           <Text style={styles.screenSubtitle}>Create, save and print A4 memo documents</Text>
         </View>
-        <View style={styles.tabRow}>
+        <View style={[styles.tabRow, !isDesktop && styles.tabRowMobile]}>
           {(['EDITOR', 'ARCHIVE'] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
-              style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
+              style={[styles.tabButton, !isDesktop && styles.tabButtonMobile, activeTab === tab && styles.tabButtonActive]}
               onPress={() => setActiveTab(tab)}
             >
               <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>{tab}</Text>
@@ -1058,10 +1058,13 @@ const MemoScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerRow: { paddingHorizontal: SPACING.gutter, paddingTop: SPACING.gutter, paddingBottom: SPACING.base, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerRowMobile: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
   screenTitle: { fontSize: 24, fontWeight: '900', color: COLORS.primary },
   screenSubtitle: { marginTop: 4, fontSize: 13, color: COLORS.textMuted },
   tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tabRowMobile: { width: '100%', flexWrap: 'nowrap' },
   tabButton: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: COLORS.surfaceContainerLow },
+  tabButtonMobile: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
   tabButtonActive: { backgroundColor: COLORS.primary },
   tabButtonText: { color: COLORS.textMuted, fontWeight: '700', fontSize: 12 },
   tabButtonTextActive: { color: '#ffffff' },
