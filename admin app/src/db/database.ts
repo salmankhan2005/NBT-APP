@@ -1791,21 +1791,25 @@ class AdminDatabase {
       isActive: true,
       history: [],
     };
-    this.vehicleDocuments.push(doc);
-    await this.saveDocuments();
-
     try {
-      await this.authFetch(`${API_HOST}/api/admin/vehicles/${data.vehicle_id}/documents`, {
+      const response = await this.authFetch(`${API_HOST}/api/admin/vehicles/${data.vehicle_id}/documents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(doc)
       });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        return { success: false, error: `Document record save failed (${response.status})${errorText ? `: ${errorText}` : ''}` };
+      }
     } catch (err) {
       console.warn('[AdminDB] addVehicleDocument API sync error:', err);
+      return { success: false, error: 'Document record could not be saved to the server.' };
     }
 
+    this.vehicleDocuments.push(doc);
+    await this.saveDocuments();
     this.notify();
     return { success: true, doc };
   }
@@ -1837,21 +1841,25 @@ class AdminDatabase {
       uploadedAt: new Date().toISOString(),
       history: [histEntry, ...current.history],
     };
-    this.vehicleDocuments[idx] = updatedDoc;
-    await this.saveDocuments();
-
     try {
-      await this.authFetch(`${API_HOST}/api/admin/vehicles/${current.vehicle_id}/documents/${doc_id}`, {
+      const response = await this.authFetch(`${API_HOST}/api/admin/vehicles/${current.vehicle_id}/documents/${doc_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updatedDoc),
       });
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        return { success: false, error: `Document update failed (${response.status})${errorText ? `: ${errorText}` : ''}` };
+      }
     } catch (err) {
       console.warn('[AdminDB] replaceVehicleDocument API sync error:', err);
+      return { success: false, error: 'Document update could not be saved to the server.' };
     }
 
+    this.vehicleDocuments[idx] = updatedDoc;
+    await this.saveDocuments();
     this.notify();
     return { success: true };
   }
