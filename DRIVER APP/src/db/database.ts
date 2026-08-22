@@ -1070,22 +1070,10 @@ class DatabaseService {
     }
     const finalPhotoUrl = hostedPodUrl || podPhotoUri || '';
 
-    trip.podPhotoUri  = finalPhotoUrl ? sanitizeInput(finalPhotoUrl) : undefined;
-    trip.podSignature = sanitizeInput(signature);
-    trip.podNotes     = sanitizeInput(notes);
-    trip.status       = 'REACHED_DESTINATION';
-    trip.currentGPS   = {
-      latitude:    gps.latitude,
-      longitude:   gps.longitude,
-      city:        sanitizeInput(gps.city),
-      address:     sanitizeInput(gps.address),
-      lastUpdated: new Date().toLocaleTimeString(),
-    };
-
     // Live API Sync to Neon Postgres Backend (with hosted URL, not local URI)
     if (this.currentToken) {
       try {
-        await fetch(`${API_HOST}/api/trips/${tripId}/pod`, {
+        const response = await fetch(`${API_HOST}/api/trips/${tripId}/pod`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1103,11 +1091,28 @@ class DatabaseService {
             }
           })
         });
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '');
+          throw new Error(`POD sync failed (${response.status})${errorBody ? `: ${errorBody}` : ''}`);
+        }
         console.log('[DriverDB] uploadPOD synced to backend successfully');
       } catch (err) {
         console.warn('[DriverDB] uploadPOD API sync error:', err);
+        return false;
       }
     }
+
+    trip.podPhotoUri  = finalPhotoUrl ? sanitizeInput(finalPhotoUrl) : undefined;
+    trip.podSignature = sanitizeInput(signature);
+    trip.podNotes     = sanitizeInput(notes);
+    trip.status       = 'REACHED_DESTINATION';
+    trip.currentGPS   = {
+      latitude:    gps.latitude,
+      longitude:   gps.longitude,
+      city:        sanitizeInput(gps.city),
+      address:     sanitizeInput(gps.address),
+      lastUpdated: new Date().toLocaleTimeString(),
+    };
 
     await this.notify();
     return true;
@@ -1154,21 +1159,10 @@ class DatabaseService {
       }
     }
 
-    trip.status              = 'completed';
-    trip.odometerEnd         = odometerEnd;
-    trip.odometerEndPhotoUri = hostedEndPhotoUrl;
-    trip.dieselEnd           = dieselEnd;
-    const now = new Date();
-    trip.endDate = now.toLocaleDateString();
-    trip.endTime = now.toLocaleTimeString();
-
-    this.completedTrips.unshift({ ...trip });
-    await AsyncStorage.setItem(COMPLETED_TRIPS_KEY, JSON.stringify(this.completedTrips));
-
     // Live API Sync to Neon Postgres Backend
     if (this.currentToken) {
       try {
-        await fetch(`${API_HOST}/api/trips/${tripId}/complete`, {
+        const response = await fetch(`${API_HOST}/api/trips/${tripId}/complete`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1180,10 +1174,26 @@ class DatabaseService {
             dieselEnd
           })
         });
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '');
+          throw new Error(`Complete trip failed (${response.status})${errorBody ? `: ${errorBody}` : ''}`);
+        }
       } catch (err) {
         console.warn('[DriverDB] completeTrip API sync error:', err);
+        return false;
       }
     }
+
+    trip.status              = 'completed';
+    trip.odometerEnd         = odometerEnd;
+    trip.odometerEndPhotoUri = hostedEndPhotoUrl;
+    trip.dieselEnd            = dieselEnd;
+    const now = new Date();
+    trip.endDate = now.toLocaleDateString();
+    trip.endTime = now.toLocaleTimeString();
+
+    this.completedTrips.unshift({ ...trip });
+    await AsyncStorage.setItem(COMPLETED_TRIPS_KEY, JSON.stringify(this.completedTrips));
 
     await this.notify();
     return true;

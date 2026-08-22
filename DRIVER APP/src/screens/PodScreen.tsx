@@ -374,7 +374,10 @@ export default function PodScreen({
         if (!uploaded) throw new Error('POD photo upload failed');
       }
 
-      await db.completeTrip(trip.id, odoEndVal, dieselEnd, odometerEndPhotoUri || undefined);
+      const completed = await db.completeTrip(trip.id, odoEndVal, dieselEnd, odometerEndPhotoUri || undefined);
+      if (!completed) {
+        throw new Error('The server did not accept trip completion.');
+      }
       
       // Voice guidance announcement
       try {
