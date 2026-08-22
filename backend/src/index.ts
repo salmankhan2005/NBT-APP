@@ -288,6 +288,17 @@ async function bootstrap() {
     },
   });
 
+  // Keep older document URLs working after the upload route was standardized.
+  await app.register(staticFiles, {
+    root: path.join(process.cwd(), 'uploads'),
+    prefix: '/api/uploads/',
+    decorateReply: false,
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
+
   // Ensure uploaded files are accessible from web app origins for all static response flows.
   app.addHook('onRequest', async (req, reply) => {
     if (req.raw.url?.startsWith('/uploads/')) {

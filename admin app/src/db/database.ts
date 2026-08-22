@@ -40,7 +40,10 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     return cleaned;
   }
 
-  // If relative path like /uploads/xyz or uploads/xyz, prepend API_HOST (http://localhost:3001)
+  // Normalize both current and legacy upload paths before adding the API host.
+  if (cleaned.startsWith('/api/uploads/')) {
+    cleaned = cleaned.replace(/^\/api\/uploads\//, '/uploads/');
+  }
   if (cleaned.startsWith('/uploads/')) {
     cleaned = `${API_HOST}${cleaned}`;
   } else if (cleaned.startsWith('uploads/')) {

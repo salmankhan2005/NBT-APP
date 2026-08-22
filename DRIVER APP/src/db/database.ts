@@ -151,6 +151,9 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     return cleaned;
   }
 
+  if (cleaned.startsWith('/api/uploads/')) {
+    cleaned = cleaned.replace(/^\/api\/uploads\//, '/uploads/');
+  }
   if (cleaned.startsWith('/uploads/')) {
     cleaned = `${API_HOST}${cleaned}`;
   } else if (cleaned.startsWith('uploads/')) {
