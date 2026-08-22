@@ -639,8 +639,8 @@ function getTileCoords(lat: number, lng: number, zoom: number) {
 // Fetches an OpenStreetMap / CartoDB tile image or Google Static Map image server-side.
 // Renders rich SVG pin markers, pulse rings, and GPS coordinate telemetry.
 export async function staticMapHandler(req: FastifyRequest, reply: FastifyReply) {
-  const { lat: latStr, lng: lngStr, zoom: zoomStr = '14', width: widthStr = '600', height: heightStr = '220', color = 'red' } = req.query as {
-    lat?: string; lng?: string; zoom?: string; width?: string; height?: string; color?: string;
+  const { lat: latStr, lng: lngStr, zoom: zoomStr = '14', width: widthStr = '600', height: heightStr = '220', color = 'red', format = 'png' } = req.query as {
+    lat?: string; lng?: string; zoom?: string; width?: string; height?: string; color?: string; format?: string;
   };
 
   if (!latStr || !lngStr) {
@@ -710,6 +710,21 @@ export async function staticMapHandler(req: FastifyRequest, reply: FastifyReply)
   const formattedLng = Math.abs(lng).toFixed(4) + (lng >= 0 ? '&#176; E' : '&#176; W');
 
   if (tileBase64) {
+    if (format === 'svg') {
+      const markerX = width / 2;
+      const markerY = height / 2;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <image href="${tileBase64}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice" />
+  <circle cx="${markerX}" cy="${markerY}" r="20" fill="${pinHex}" fill-opacity="0.2" />
+  <circle cx="${markerX}" cy="${markerY}" r="7" fill="#ffffff" stroke="${pinHexDark}" stroke-width="3" />
+  <path d="M ${markerX} ${markerY - 7} C ${markerX - 22} ${markerY - 34}, ${markerX - 14} ${markerY - 48}, ${markerX} ${markerY - 48} C ${markerX + 14} ${markerY - 48}, ${markerX + 22} ${markerY - 34}, ${markerX} ${markerY - 7} Z" fill="${pinHex}" stroke="#ffffff" stroke-width="2" />
+  <circle cx="${markerX}" cy="${markerY - 31}" r="6" fill="#ffffff" />
+  <rect x="12" y="${height - 30}" width="230" height="20" rx="5" fill="#0f172a" fill-opacity="0.88" />
+  <text x="22" y="${height - 16}" fill="#ffffff" font-size="10" font-family="sans-serif">OpenStreetMap | ${formattedLat}, ${formattedLng}</text>
+</svg>`;
+      reply.header('Content-Type', 'image/svg+xml');
+      return reply.send(svg);
+    }
     // React Native Image reliably decodes the raster tile; embedded SVG data
     // is not consistently supported by Android release builds.
     reply.header('Content-Type', 'image/png');

@@ -674,7 +674,7 @@ export function buildStaticMapUrl(
   width: number = 600,
   height: number = 200
 ): string {
-  return `${PROXY_BASE}/staticmap?lat=${lat}&lng=${lng}&zoom=${zoom}&width=${width}&height=${height}&color=${pinColor}`;
+  return `${PROXY_BASE}/staticmap?lat=${lat}&lng=${lng}&zoom=${zoom}&width=${width}&height=${height}&color=${pinColor}&format=svg`;
 }
 
 // ─── SESSION TOKEN GENERATOR ──────────────────────────────────────────────────
