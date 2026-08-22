@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -35,7 +35,14 @@ export default function MapScreen({
   const [eta, setEta] = useState('');
   const [currentTurn, setCurrentTurn] = useState('Continue on route toward ' + trip.destination);
   const [turnIcon, setTurnIcon] = useState('navigation');
-  const [mapTileUrl, setMapTileUrl] = useState<string | null>(null);
+  const initialGps = trip.currentGPS;
+  const [mapTileUrl, setMapTileUrl] = useState<string | null>(
+    initialGps && Number.isFinite(initialGps.latitude) && Number.isFinite(initialGps.longitude)
+      ? getStaticMapPreviewUrl(initialGps.latitude, initialGps.longitude)
+      : null
+  );
+  const lastPreviewCenterRef = useRef<string | null>(null);
+  const lastGeocodeAtRef = useRef(0);
 
   useEffect(() => {
     const fallbackDistanceText = trip.distanceKm !== undefined && trip.distanceKm !== null ? `${trip.distanceKm} km` : '-- km';
@@ -85,8 +92,15 @@ export default function MapScreen({
         async (loc) => {
           const lat = loc.coords.latitude;
           const lng = loc.coords.longitude;
-          setMapTileUrl(getStaticMapPreviewUrl(lat, lng));
-          const osmGeo = await reverseGeocodeLocation(lat, lng);
+          const previewCenter = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+          if (lastPreviewCenterRef.current !== previewCenter) {
+            lastPreviewCenterRef.current = previewCenter;
+            setMapTileUrl(getStaticMapPreviewUrl(lat, lng));
+          }
+
+          const shouldGeocode = Date.now() - lastGeocodeAtRef.current >= 60000;
+          const osmGeo = shouldGeocode ? await reverseGeocodeLocation(lat, lng) : null;
+          if (shouldGeocode) lastGeocodeAtRef.current = Date.now();
           const city = osmGeo?.city || 'In Transit';
           const address = osmGeo?.formattedAddress || `Lat: ${lat.toFixed(4)}, Long: ${lng.toFixed(4)}`;
           const newGps: GPSLocation = {
