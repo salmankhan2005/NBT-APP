@@ -127,10 +127,10 @@ export default function TripsScreen() {
     }
   };
 
-  // Background poll: 6 s — in-flight dedup + short-term cache in db layer prevents thundering
+  // Background poll: 15 s keeps the registry current without constant full-list fetches.
   useEffect(() => {
     fetchTrips(true);
-    const interval = setInterval(() => fetchTrips(false), 6000);
+    const interval = setInterval(() => fetchTrips(false), 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -141,9 +141,9 @@ export default function TripsScreen() {
     setDetailModalVisible(true);
     // Immediately pull fresh data when admin taps a trip
     fetchSelectedTrip();
-    // Start a fast 2-second refresh loop for this specific trip
+    // Refresh the selected trip periodically while its detail modal is open.
     if (modalIntervalRef.current) clearInterval(modalIntervalRef.current);
-    modalIntervalRef.current = setInterval(fetchSelectedTrip, 2000);
+    modalIntervalRef.current = setInterval(fetchSelectedTrip, 10000);
   };
 
   const handleCloseDetails = () => {

@@ -309,6 +309,8 @@ class DatabaseService {
   private cache: Trip[] = [];
   private completedTrips: Trip[] = [];
   private isInitialized = false;
+  private tripsFetchAt = 0;
+  private tripsFetchPromise: Promise<Trip[]> | null = null;
 
   // Zero-trust: only the authenticated driver's data is ever returned
   private currentDriverId: string | null = null;
@@ -599,6 +601,21 @@ class DatabaseService {
   // ── Queries (Neon DB-First with Local Storage Fallback when Offline) ────────
   async getTrips(): Promise<Trip[]> {
     await this.init();
+
+    const now = Date.now();
+    if (this.tripsFetchPromise) return this.tripsFetchPromise;
+    if (now - this.tripsFetchAt < 5000) return this.getFilteredTrips();
+
+    this.tripsFetchPromise = this.fetchTripsFromServer();
+    try {
+      return await this.tripsFetchPromise;
+    } finally {
+      this.tripsFetchPromise = null;
+    }
+  }
+
+  private async fetchTripsFromServer(): Promise<Trip[]> {
+    this.tripsFetchAt = Date.now();
 
     // Try to fetch latest trips from Neon DB if online
     if (this.currentToken) {

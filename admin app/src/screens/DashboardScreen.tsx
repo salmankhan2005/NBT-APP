@@ -123,10 +123,10 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
       fetchData(false);
     });
 
-    // Real-Time Polling fallback every 8 seconds (db layer caches prevent duplicate requests)
+    // Poll less aggressively; manual refresh and subscriptions cover immediate updates.
     const interval = setInterval(() => {
       fetchData(false);
-    }, 8000);
+    }, 20000);
 
     return () => {
       unsubscribe();
