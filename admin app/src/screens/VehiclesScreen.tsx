@@ -72,6 +72,7 @@ export default function VehiclesScreen() {
   const [docMetaSaving, setDocMetaSaving] = useState(false);
   const [selectedVehicleTrip, setSelectedVehicleTrip] = useState<Trip | null>(null);
   const [selectedVehicleTripImageError, setSelectedVehicleTripImageError] = useState(false);
+  const [documentImageErrors, setDocumentImageErrors] = useState<Record<string, boolean>>({});
   const [allVehicleDocuments, setAllVehicleDocuments] = useState<VehicleDocument[]>([]);
   const [creating, setCreating] = useState(false);
 
@@ -308,6 +309,12 @@ export default function VehiclesScreen() {
     if (fileType && fileType.startsWith('image/')) return true;
     const normalized = uri.toLowerCase().split('?')[0].split('#')[0];
     return /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/.test(normalized) || normalized.startsWith('data:image/') || normalized.startsWith('blob:');
+  };
+
+  const formatDisplayDate = (value?: string) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().slice(0, 10);
   };
 
   const filteredVehicles = vehicles.filter((vehicle) => {
@@ -725,11 +732,12 @@ export default function VehiclesScreen() {
 
   const handleViewDocument = async (uri: string) => {
     if (!uri) return;
+    const resolvedUri = normalizeImageUrl(uri) || uri;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       try {
-        if (uri.startsWith('blob:') || uri.startsWith('data:')) {
+        if (resolvedUri.startsWith('blob:') || resolvedUri.startsWith('data:')) {
           const anchor = document.createElement('a');
-          anchor.href = uri;
+          anchor.href = resolvedUri;
           anchor.target = '_blank';
           anchor.rel = 'noopener noreferrer';
           document.body.appendChild(anchor);
@@ -737,13 +745,13 @@ export default function VehiclesScreen() {
           anchor.remove();
           return;
         }
-        window.open(uri, '_blank', 'noopener,noreferrer');
+        window.open(resolvedUri, '_blank', 'noopener,noreferrer');
       } catch (err) {
-        console.warn('Unable to open document URL:', err, uri);
+        console.warn('Unable to open document URL:', err, resolvedUri);
         Alert.alert('Unable to open document', 'This document cannot be opened directly from the browser. Please use a supported document type or upload it again.');
       }
     } else {
-      Linking.openURL(uri);
+      Linking.openURL(resolvedUri);
     }
   };
 
@@ -1300,22 +1308,26 @@ export default function VehiclesScreen() {
                           </View>
                           <View style={styles.docRow}>
                             <Text style={styles.docLabel}>Issue Date</Text>
-                            <Text style={styles.docDetail}>{latest.issueDate || '—'}</Text>
+                            <Text style={styles.docDetail}>{formatDisplayDate(latest.issueDate)}</Text>
                           </View>
                           <View style={styles.docRow}>
                             <Text style={styles.docLabel}>Expiry Date</Text>
-                            <Text style={styles.docDetail}>{latest.expiryDate || '—'}</Text>
+                            <Text style={styles.docDetail}>{formatDisplayDate(latest.expiryDate)}</Text>
                           </View>
                           <View style={styles.docRow}>
                             <Text style={styles.docLabel}>File</Text>
                             <Text style={styles.docDetail}>{latest.fileName || 'Unknown'}</Text>
                           </View>
-                          {isImageUri(latest.fileUri, latest.fileType) ? (
+                          {isImageUri(latest.fileUri, latest.fileType) && !documentImageErrors[latest.doc_id] ? (
                             <Image
-                              source={{ uri: latest.fileUri }}
+                              source={{ uri: normalizeImageUrl(latest.fileUri) || latest.fileUri }}
                               style={styles.docPreview}
                               resizeMode="cover"
+                              onError={() => setDocumentImageErrors((previous) => ({ ...previous, [latest.doc_id]: true }))}
                             />
+                          ) : null}
+                          {documentImageErrors[latest.doc_id] ? (
+                            <Text style={styles.imageErrorText}>Unable to preview this image. Use VIEW to open the stored file.</Text>
                           ) : null}
                         </View>
                       ) : (
