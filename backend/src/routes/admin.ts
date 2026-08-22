@@ -3,6 +3,11 @@ import argon2 from 'argon2';
 import { sql } from '../db/client';
 import { CreateTripSchema } from '../middleware/validate';
 
+function optionalTimestamp(value: unknown): string | null | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) return null;
+  return value;
+}
 
 /**
  * Admin routes — all require admin JWT role.
@@ -370,14 +375,20 @@ export async function adminRoutes(app: FastifyInstance) {
   app.patch('/vehicles/:vehicleId/documents/:docId', adminHook, async (req: FastifyRequest, reply: FastifyReply) => {
     const { vehicleId, docId } = req.params as { vehicleId: string; docId: string };
     const doc = req.body as Record<string, any>;
+    const issueDate = optionalTimestamp(doc.issueDate);
+    const expiryDate = optionalTimestamp(doc.expiryDate);
+
+    if (issueDate === null || expiryDate === null) {
+      return reply.code(400).send({ error: 'Invalid document date. Use YYYY-MM-DD.' });
+    }
 
     await sql`
       UPDATE vehicle_documents SET
         doc_type    = COALESCE(${doc.docType}, doc_type),
         doc_label   = COALESCE(${doc.docLabel}, doc_label),
         doc_number  = COALESCE(${doc.docNumber}, doc_number),
-        issue_date  = COALESCE(${doc.issueDate}, issue_date),
-        expiry_date = COALESCE(${doc.expiryDate}, expiry_date),
+        issue_date  = COALESCE(${issueDate}, issue_date),
+        expiry_date = COALESCE(${expiryDate}, expiry_date),
         file_uri    = COALESCE(${doc.fileUri}, file_uri),
         file_name   = COALESCE(${doc.fileName}, file_name),
         file_type   = COALESCE(${doc.fileType}, file_type),
