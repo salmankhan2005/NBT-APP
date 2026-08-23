@@ -91,7 +91,13 @@ export default function TripsScreen() {
   const selectedTripIdRef = useRef<string | null>(null);
 
   const fetchTrips = async (showIndicator = false) => {
-    if (showIndicator) setLoading(true);
+    const cached = db.getCachedTrips();
+    if (cached.length > 0) {
+      setTrips(cached);
+      setLoading(false);
+    } else if (showIndicator) {
+      setLoading(true);
+    }
     try {
       const data = await db.getTrips();
       setTrips(data);

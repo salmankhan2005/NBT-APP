@@ -61,7 +61,13 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
 
   // Fetch all dashboard data from shared database
   const fetchData = async (showIndicator = false) => {
-    if (showIndicator) setLoading(true);
+    const cached = db.getCachedTrips();
+    if (cached.length > 0) {
+      setTrips(cached);
+      setLoading(false);
+    } else if (showIndicator) {
+      setLoading(true);
+    }
     try {
       const [fetchedTrips, fetchedFleetVehicles, fetchedLogs, fetchedAlerts] = await Promise.all([
         db.getTrips(),

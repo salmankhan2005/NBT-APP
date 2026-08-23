@@ -1035,6 +1035,10 @@ class AdminDatabase {
     return res;
   }
 
+  getCachedTrips(): Trip[] {
+    return [...this.mockTrips];
+  }
+
   // Trips GET — Live Backend Fetch with Fallback and In-Flight Request Deduplication
   async getTrips(forceRefresh = false): Promise<Trip[]> {
     const now = Date.now();
@@ -1667,6 +1671,10 @@ class AdminDatabase {
     await this.saveVehicles();
     this.notify();
     return { success: true };
+  }
+
+  getCachedManagedVehicles(): ManagedVehicle[] {
+    return [...this.managedVehicles];
   }
 
   async deleteManagedVehicle(vehicle_id: string): Promise<{ success: boolean; error?: string }> {

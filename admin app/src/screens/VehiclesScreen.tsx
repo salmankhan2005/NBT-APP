@@ -269,7 +269,13 @@ export default function VehiclesScreen() {
   };
 
   const fetchVehicles = useCallback(async (showIndicator = false) => {
-    if (showIndicator) setLoading(true);
+    const cached = db.getCachedManagedVehicles();
+    if (cached.length > 0) {
+      setVehicles(cached);
+      setLoading(false);
+    } else if (showIndicator) {
+      setLoading(true);
+    }
     try {
       const [managedVehicles, documents] = await Promise.all([
         db.getManagedVehicles(),
