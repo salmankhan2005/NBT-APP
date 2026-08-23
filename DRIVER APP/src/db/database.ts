@@ -158,6 +158,10 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     cleaned = `${API_HOST}${cleaned}`;
   } else if (cleaned.startsWith('uploads/')) {
     cleaned = `${API_HOST}/${cleaned}`;
+  } else if (cleaned.startsWith('/api/files/')) {
+    cleaned = `${API_HOST}${cleaned}`;
+  } else if (cleaned.startsWith('api/files/')) {
+    cleaned = `${API_HOST}/${cleaned}`;
   }
 
   cleaned = cleaned.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1|10\.0\.2\.2)(?::\d+)?(?=\/)/i, API_HOST);
@@ -449,16 +453,21 @@ class DatabaseService {
                     estimatedTollCost: Number(fetchedTrip.estimated_toll_cost || 0),
                     status: fetchedTrip.status || 'ASSIGNED',
                     trackingId: fetchedTrip.tracking_id || cleanInput,
-                    expenses: fetchedTrip.expenses || [],
+                    expenses: Array.isArray(fetchedTrip.expenses) ? fetchedTrip.expenses.map((e: any) => ({
+                      ...e,
+                      receiptUri: normalizeImageUrl(e.receiptUri || e.receipt_url) || e.receiptUri || e.receipt_url,
+                    })) : (fetchedTrip.expenses || []),
                     odometerStart: fetchedTrip.odometer_start ? Number(fetchedTrip.odometer_start) : undefined,
                     odometerEnd: fetchedTrip.odometer_end ? Number(fetchedTrip.odometer_end) : undefined,
+                    odometerStartPhotoUri: normalizeImageUrl(fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri) || fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri || undefined,
+                    odometerEndPhotoUri: normalizeImageUrl(fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri) || fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri || undefined,
                     dieselStart: fetchedTrip.diesel_start || undefined,
                     dieselEnd: fetchedTrip.diesel_end || undefined,
                     startDate: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleDateString() : undefined,
                     startTime: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleTimeString() : undefined,
                     endDate: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleDateString() : undefined,
                     endTime: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleTimeString() : undefined,
-                    podPhotoUri: fetchedTrip.pod_photo_url || undefined,
+                    podPhotoUri: normalizeImageUrl(fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri) || fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri || undefined,
                     podSignature: fetchedTrip.pod_signature || undefined,
                     podNotes: fetchedTrip.pod_notes || undefined,
                     currentGPS: fetchedTrip.current_gps || {
@@ -643,16 +652,21 @@ class DatabaseService {
                 estimatedTollCost: Number(fetchedTrip.estimated_toll_cost || 0),
                 status: fetchedTrip.status || 'ASSIGNED',
                 trackingId: fetchedTrip.tracking_id || '',
-                expenses: fetchedTrip.expenses || [],
+                expenses: Array.isArray(fetchedTrip.expenses) ? fetchedTrip.expenses.map((e: any) => ({
+                  ...e,
+                  receiptUri: normalizeImageUrl(e.receiptUri || e.receipt_url) || e.receiptUri || e.receipt_url,
+                })) : (fetchedTrip.expenses || []),
                 odometerStart: fetchedTrip.odometer_start ? Number(fetchedTrip.odometer_start) : undefined,
                 odometerEnd: fetchedTrip.odometer_end ? Number(fetchedTrip.odometer_end) : undefined,
+                odometerStartPhotoUri: normalizeImageUrl(fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri) || fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri || undefined,
+                odometerEndPhotoUri: normalizeImageUrl(fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri) || fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri || undefined,
                 dieselStart: fetchedTrip.diesel_start || undefined,
                 dieselEnd: fetchedTrip.diesel_end || undefined,
                 startDate: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleDateString() : undefined,
                 startTime: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleTimeString() : undefined,
                 endDate: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleDateString() : undefined,
                 endTime: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleTimeString() : undefined,
-                podPhotoUri: fetchedTrip.pod_photo_url || undefined,
+                podPhotoUri: normalizeImageUrl(fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri) || fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri || undefined,
                 podSignature: fetchedTrip.pod_signature || undefined,
                 podNotes: fetchedTrip.pod_notes || undefined,
                 currentGPS: fetchedTrip.current_gps || {
@@ -821,11 +835,12 @@ class DatabaseService {
 
     // Upload odometer photo
     const _rawPhotoUrl = await this.uploadLocalImage(odometerPhotoUri);
-    const hostedPhotoUrl = (_rawPhotoUrl.startsWith('http://') || _rawPhotoUrl.startsWith('https://')) ? _rawPhotoUrl : '';
+    const hostedPhotoUrl = normalizeImageUrl(_rawPhotoUrl) || _rawPhotoUrl;
 
-    trip.driverName    = sanitizeInput(driverName);
-    trip.odometerStart = odometer;
-    trip.dieselStart   = dieselLevel;
+    trip.driverName            = sanitizeInput(driverName);
+    trip.odometerStart         = odometer;
+    trip.odometerStartPhotoUri = hostedPhotoUrl;
+    trip.dieselStart           = dieselLevel;
     trip.status        = 'in_transit';
     trip.currentGPS    = {
       latitude:    gps.latitude,
@@ -922,22 +937,32 @@ class DatabaseService {
    */
   private async uploadLocalImage(localUri: string): Promise<string> {
     if (!localUri || typeof localUri !== 'string') return '';
-    // If it's already a hosted URL on the server, return it directly
-    if ((localUri.startsWith('http://') || localUri.startsWith('https://')) && localUri.includes('/uploads/')) {
-      return localUri;
+    const trimmed = localUri.trim();
+
+    // If it's already a hosted or relative URL, return the normalized URL directly
+    if (
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('/api/') ||
+      trimmed.startsWith('/uploads/') ||
+      trimmed.startsWith('uploads/') ||
+      trimmed.includes('/api/files/') ||
+      trimmed.includes('/uploads/')
+    ) {
+      return normalizeImageUrl(trimmed) || trimmed;
     }
 
     try {
-      const filename = localUri.split('/').pop() || `photo_${Date.now()}.jpg`;
+      const filename = trimmed.split('/').pop() || `photo_${Date.now()}.jpg`;
       const formData = new FormData();
 
-      if (Platform.OS === 'web' && (localUri.startsWith('blob:') || localUri.startsWith('data:'))) {
-        const res = await fetch(localUri);
+      if (Platform.OS === 'web' && (trimmed.startsWith('blob:') || trimmed.startsWith('data:'))) {
+        const res = await fetch(trimmed);
         const blob = await res.blob();
         formData.append('file', blob, filename);
       } else {
         formData.append('file', {
-          uri: localUri,
+          uri: trimmed,
           name: filename,
           type: 'image/jpeg',
         } as any);
@@ -971,15 +996,12 @@ class DatabaseService {
     } catch (err) {
       console.warn('[DriverDB] Image upload failed (offline?), using local URI:', err);
     }
-    return localUri;
+    return trimmed;
   }
 
   async uploadPodPhoto(localUri: string): Promise<string | null> {
     const uploadedUri = await this.uploadLocalImage(localUri);
-    if (uploadedUri.startsWith('http://') || uploadedUri.startsWith('https://')) {
-      return normalizeImageUrl(uploadedUri) || uploadedUri;
-    }
-    return null;
+    return normalizeImageUrl(uploadedUri) || uploadedUri || null;
   }
 
   async addExpense(tripId: string, expense: Omit<Expense, 'id' | 'timestamp'>): Promise<Expense | null> {
@@ -1060,15 +1082,10 @@ class DatabaseService {
     if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
 
     // Upload POD photo to backend first to get a hosted URL
-    const isHostedPhoto = podPhotoUri.startsWith('http://') || podPhotoUri.startsWith('https://');
-    const hostedPodUrl = podPhotoUri && !podPhotoUri.startsWith('mock') && !isHostedPhoto
+    const hostedPodUrl = podPhotoUri && !podPhotoUri.startsWith('mock')
       ? await this.uploadPodPhoto(podPhotoUri)
       : podPhotoUri;
-    if (podPhotoUri && !podPhotoUri.startsWith('mock') && !hostedPodUrl) {
-      console.warn('[DriverDB] POD upload failed; refusing to sync an unusable local URI.');
-      return false;
-    }
-    const finalPhotoUrl = hostedPodUrl || podPhotoUri || '';
+    const finalPhotoUrl = normalizeImageUrl(hostedPodUrl || podPhotoUri) || hostedPodUrl || podPhotoUri || '';
 
     // Live API Sync to Neon Postgres Backend (with hosted URL, not local URI)
     if (this.currentToken) {
@@ -1153,10 +1170,8 @@ class DatabaseService {
     // Upload end odometer photo if provided
     let hostedEndPhotoUrl: string | undefined;
     if (odometerEndPhotoUri) {
-      hostedEndPhotoUrl = await this.uploadPodPhoto(odometerEndPhotoUri) || undefined;
-      if (!hostedEndPhotoUrl) {
-        throw new Error('Ending odometer photo upload failed');
-      }
+      const uploaded = await this.uploadLocalImage(odometerEndPhotoUri);
+      hostedEndPhotoUrl = normalizeImageUrl(uploaded) || uploaded;
     }
 
     // Live API Sync to Neon Postgres Backend

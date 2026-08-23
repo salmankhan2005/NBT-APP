@@ -48,6 +48,10 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     cleaned = `${API_HOST}${cleaned}`;
   } else if (cleaned.startsWith('uploads/')) {
     cleaned = `${API_HOST}/${cleaned}`;
+  } else if (cleaned.startsWith('/api/files/')) {
+    cleaned = `${API_HOST}${cleaned}`;
+  } else if (cleaned.startsWith('api/files/')) {
+    cleaned = `${API_HOST}/${cleaned}`;
   }
 
   // Rewrite legacy localhost URLs so existing uploaded documents remain previewable after deployment.

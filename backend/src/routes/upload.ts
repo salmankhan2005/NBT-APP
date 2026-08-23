@@ -93,6 +93,7 @@ export async function fileRoutes(app: FastifyInstance) {
     reply.header('Content-Length', String(file.content.length));
     reply.header('Cache-Control', 'public, max-age=31536000, immutable');
     reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    reply.header('Access-Control-Allow-Origin', '*');
     reply.header('Content-Disposition', `inline; filename="${file.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
     return reply.send(Buffer.from(file.content));
   });
