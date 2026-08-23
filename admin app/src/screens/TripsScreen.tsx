@@ -652,17 +652,19 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
 
       {/* Filter Tabs */}
       <View style={styles.filterTabs}>
-        {(['ALL', 'ASSIGNED', 'STARTED', 'REACHED_DESTINATION', 'COMPLETED'] as const).map((status) => (
-          <TouchableOpacity
-            key={status}
-            style={[styles.filterTab, statusFilter === status && styles.filterTabActive]}
-            onPress={() => setStatusFilter(status)}
-          >
-            <Text style={[styles.filterTabText, statusFilter === status && styles.filterTabTextActive]}>
-              {status === 'ALL' ? 'ALL' : status === 'STARTED' ? 'IN TRANSIT' : status.replace('_', ' ')}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, flexDirection: 'row', justifyContent: isDesktop ? 'space-around' : 'flex-start', paddingHorizontal: 8 }}>
+          {(['ALL', 'ASSIGNED', 'STARTED', 'REACHED_DESTINATION', 'COMPLETED'] as const).map((status) => (
+            <TouchableOpacity
+              key={status}
+              style={[styles.filterTab, !isDesktop && { paddingHorizontal: 16 }, statusFilter === status && styles.filterTabActive]}
+              onPress={() => setStatusFilter(status)}
+            >
+              <Text style={[styles.filterTabText, statusFilter === status && styles.filterTabTextActive]}>
+                {status === 'ALL' ? 'ALL' : status === 'STARTED' ? 'IN TRANSIT' : status.replace('_', ' ')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Main List */}

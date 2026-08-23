@@ -1079,8 +1079,8 @@ export default function VehiclesScreen() {
         </View>
       ) : null}
 
-      <View style={styles.headerBar}>
-        <View style={{ flex: 1 }}>
+      <View style={[styles.headerBar, !isDesktop && { flexWrap: 'wrap', gap: 10 }]}>
+        <View style={{ flex: 1, minWidth: 200 }}>
           <Text style={styles.barTitle}>VEHICLE MANAGEMENT</Text>
           <Text style={styles.barSubtitle}>Admin-managed fleet records and documents</Text>
         </View>
