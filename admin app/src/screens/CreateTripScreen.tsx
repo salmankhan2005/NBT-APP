@@ -796,25 +796,43 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
   // Confirmation
   const [createdTrip, setCreatedTrip] = useState<Trip | null>(null);
 
-  // ── Load vehicles ──────────────────────────────────────────────────────────
+  // ── Helper to match wheel types flexibly ──────────────────────────────────
+  const isWheelTypeMatch = (v?: ManagedVehicle, targetWt?: string) => {
+    if (!v || !targetWt) return false;
+    const wt = targetWt.trim().toLowerCase();
+    const vType = (v.vehicleType || '').trim().toLowerCase();
+    const wType = (v.wheelType || '').trim().toLowerCase();
+    return vType === wt || wType === wt || vType.startsWith(wt.slice(0, 4)) || wType.startsWith(wt.slice(0, 4));
+  };
+
+  // ── Load vehicles and subscribe to database updates ───────────────────────
   useEffect(() => {
-    const loadVehicles = async () => {
+    const loadVehicles = async (force = false) => {
       const available = await db.getAvailableManagedVehicles();
       setVehicles(available);
-      const match = available.find(v => v.vehicleType === wheelType || v.wheelType === wheelType);
+      const match = available.find(v => isWheelTypeMatch(v, wheelType));
       const first = match || available[0];
-      if (first) {
+      if (first && !selectedVehicleId) {
         setSelectedVehicleId(first.vehicle_id);
         setVehicleNumber(first.vehicleNumber);
       }
     };
     loadVehicles();
-  }, []);
+
+    // Subscribe to live database updates (e.g. when vehicle is added in Vehicle Management)
+    const unsubscribe = db.subscribe(() => {
+      loadVehicles(true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [wheelType]);
 
   // ── When wheel type changes, auto-select first matching vehicle ────────────
   useEffect(() => {
     if (vehicles.length === 0) return;
-    const match = vehicles.find(v => v.vehicleType === wheelType || v.wheelType === wheelType);
+    const match = vehicles.find(v => isWheelTypeMatch(v, wheelType));
     if (match) {
       setSelectedVehicleId(match.vehicle_id);
       setVehicleNumber(match.vehicleNumber);
@@ -1419,7 +1437,7 @@ export default function CreateTripScreen({ onTripCreated }: CreateTripScreenProp
           {vehicles.length === 0 ? (
             <Text style={styles.routeWaitingText}>No available vehicles are currently registered. Add vehicles in Vehicle Management first.</Text>
           ) : (() => {
-            const filtered = vehicles.filter(v => v.vehicleType === wheelType || v.wheelType === wheelType);
+            const filtered = vehicles.filter(v => isWheelTypeMatch(v, wheelType));
             return filtered.length === 0 ? (
               <View style={{ backgroundColor: '#fef3c7', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#fde68a' }}>
                 <Text style={{ fontSize: 12, color: '#92400e', fontWeight: '700' }}>

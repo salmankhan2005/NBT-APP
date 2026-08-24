@@ -28,6 +28,33 @@ export const fetchWithTimeout = async (resource: string, options: RequestInit = 
   }
 };
 
+export const parseExpiryDate = (dateStr: string | null | undefined): Date | null => {
+  if (!dateStr) return null;
+  const str = String(dateStr).trim();
+  if (!str) return null;
+
+  let d = new Date(str);
+  if (!Number.isNaN(d.getTime())) return d;
+
+  // Try DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  const dmYMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);
+  if (dmYMatch) {
+    const [, day, month, year] = dmYMatch;
+    d = new Date(Number(year), Number(month) - 1, Number(day));
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  // Try YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD
+  const yMdMatch = str.match(/^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})/);
+  if (yMdMatch) {
+    const [, year, month, day] = yMdMatch;
+    d = new Date(Number(year), Number(month) - 1, Number(day));
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  return null;
+};
+
 export const normalizeImageUrl = (url?: string | null): string | undefined => {
   if (!url || typeof url !== 'string' || !url.trim()) return undefined;
   let cleaned = url.trim();
@@ -1603,7 +1630,7 @@ class AdminDatabase {
 
   async getAvailableManagedVehicles(): Promise<ManagedVehicle[]> {
     const list = await this.getManagedVehicles();
-    return list.filter(v => v.status === 'AVAILABLE');
+    return list.filter(v => (v.status || 'AVAILABLE').trim().toUpperCase() === 'AVAILABLE');
   }
 
   async getManagedVehicleById(vehicle_id: string): Promise<ManagedVehicle | null> {
@@ -1916,8 +1943,8 @@ class AdminDatabase {
     if (!expiryDate) return { status: 'DATE_NOT_AVAILABLE', daysLeft: null };
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const expiry = new Date(expiryDate);
-    if (Number.isNaN(expiry.getTime())) return { status: 'DATE_NOT_AVAILABLE', daysLeft: null };
+    const expiry = parseExpiryDate(expiryDate);
+    if (!expiry || Number.isNaN(expiry.getTime())) return { status: 'DATE_NOT_AVAILABLE', daysLeft: null };
     expiry.setHours(0, 0, 0, 0);
     const daysLeft = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     if (daysLeft < 0) return { status: 'EXPIRED', daysLeft };

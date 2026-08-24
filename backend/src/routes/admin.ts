@@ -3,10 +3,36 @@ import argon2 from 'argon2';
 import { sql } from '../db/client';
 import { CreateTripSchema } from '../middleware/validate';
 
-function optionalTimestamp(value: unknown): string | null | undefined {
+function parseToIsoString(value: unknown): string | null | undefined {
   if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) return null;
-  return value;
+  if (typeof value !== 'string') return null;
+  const str = value.trim();
+  if (!str) return undefined;
+
+  let d = new Date(str);
+  if (!Number.isNaN(d.getTime())) return d.toISOString();
+
+  // Try DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  const dmYMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);
+  if (dmYMatch) {
+    const [, day, month, year] = dmYMatch;
+    d = new Date(Number(year), Number(month) - 1, Number(day));
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+
+  // Try YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD
+  const yMdMatch = str.match(/^(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})/);
+  if (yMdMatch) {
+    const [, year, month, day] = yMdMatch;
+    d = new Date(Number(year), Number(month) - 1, Number(day));
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+
+  return null;
+}
+
+function optionalTimestamp(value: unknown): string | null | undefined {
+  return parseToIsoString(value);
 }
 
 /**
@@ -269,31 +295,50 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post('/vehicles', adminHook, async (req: FastifyRequest, reply: FastifyReply) => {
     const v = req.body as Record<string, any>;
     const vehicleId = v.vehicle_id || v.id || `VEH-${Date.now()}`;
+    const insuranceExpiry = parseToIsoString(v.insuranceExpiryDate) ?? null;
+    const pollutionExpiry = parseToIsoString(v.pollutionExpiryDate) ?? null;
+    const permitExpiry = parseToIsoString(v.permitExpiryDate) ?? null;
+    const fcExpiry = parseToIsoString(v.fcExpiryDate) ?? null;
 
     await sql`
       INSERT INTO managed_vehicles (
         vehicle_id, vehicle_number, vehicle_type, wheel_type, vehicle_make, vehicle_model,
-        owner_name, owner_phone, rc_number, engine_number, chassis_number, year_of_manufacture, status
+        owner_name, owner_phone, rc_number, engine_number, chassis_number, year_of_manufacture, status,
+        insurance_expiry_date, pollution_expiry_date, permit_expiry_date, fc_expiry_date,
+        insurance_url, pollution_url, permit_url, fc_url, rc_front_url, rc_back_url
       )
       VALUES (
         ${vehicleId}, ${v.vehicleNumber}, ${v.vehicleType || '12 Wheel'}, ${v.wheelType || '12 Wheel'},
         ${v.vehicleMake || ''}, ${v.vehicleModel || ''}, ${v.ownerName || ''}, ${v.ownerPhone || ''},
         ${v.rcNumber || ''}, ${v.engineNumber || ''}, ${v.chassisNumber || ''}, ${v.yearOfManufacture || ''},
-        ${v.status || 'AVAILABLE'}
+        ${v.status || 'AVAILABLE'},
+        ${insuranceExpiry}, ${pollutionExpiry}, ${permitExpiry}, ${fcExpiry},
+        ${v.insuranceUrl || null}, ${v.pollutionUrl || null}, ${v.permitUrl || null}, ${v.fcUrl || null},
+        ${v.rcFrontUrl || null}, ${v.rcBackUrl || null}
       )
       ON CONFLICT (vehicle_id) DO UPDATE SET
-        vehicle_number      = EXCLUDED.vehicle_number,
-        vehicle_type        = EXCLUDED.vehicle_type,
-        wheel_type          = EXCLUDED.wheel_type,
-        vehicle_make        = EXCLUDED.vehicle_make,
-        vehicle_model       = EXCLUDED.vehicle_model,
-        owner_name          = EXCLUDED.owner_name,
-        owner_phone         = EXCLUDED.owner_phone,
-        rc_number           = EXCLUDED.rc_number,
-        chassis_number      = EXCLUDED.chassis_number,
-        year_of_manufacture = EXCLUDED.year_of_manufacture,
-        status              = EXCLUDED.status,
-        updated_at          = now()
+        vehicle_number        = EXCLUDED.vehicle_number,
+        vehicle_type          = EXCLUDED.vehicle_type,
+        wheel_type            = EXCLUDED.wheel_type,
+        vehicle_make          = EXCLUDED.vehicle_make,
+        vehicle_model         = EXCLUDED.vehicle_model,
+        owner_name            = EXCLUDED.owner_name,
+        owner_phone           = EXCLUDED.owner_phone,
+        rc_number             = EXCLUDED.rc_number,
+        chassis_number        = EXCLUDED.chassis_number,
+        year_of_manufacture   = EXCLUDED.year_of_manufacture,
+        status                = EXCLUDED.status,
+        insurance_expiry_date = COALESCE(EXCLUDED.insurance_expiry_date, managed_vehicles.insurance_expiry_date),
+        pollution_expiry_date = COALESCE(EXCLUDED.pollution_expiry_date, managed_vehicles.pollution_expiry_date),
+        permit_expiry_date    = COALESCE(EXCLUDED.permit_expiry_date, managed_vehicles.permit_expiry_date),
+        fc_expiry_date        = COALESCE(EXCLUDED.fc_expiry_date, managed_vehicles.fc_expiry_date),
+        insurance_url         = COALESCE(EXCLUDED.insurance_url, managed_vehicles.insurance_url),
+        pollution_url         = COALESCE(EXCLUDED.pollution_url, managed_vehicles.pollution_url),
+        permit_url            = COALESCE(EXCLUDED.permit_url, managed_vehicles.permit_url),
+        fc_url                = COALESCE(EXCLUDED.fc_url, managed_vehicles.fc_url),
+        rc_front_url          = COALESCE(EXCLUDED.rc_front_url, managed_vehicles.rc_front_url),
+        rc_back_url           = COALESCE(EXCLUDED.rc_back_url, managed_vehicles.rc_back_url),
+        updated_at            = now()
     `;
 
     return reply.code(201).send({ vehicleId, vehicle_id: vehicleId });
@@ -307,16 +352,20 @@ export async function adminRoutes(app: FastifyInstance) {
       await sql`UPDATE managed_vehicles SET status = ${body.status}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
     if (body.insuranceExpiryDate !== undefined) {
-      await sql`UPDATE managed_vehicles SET insurance_expiry_date = ${body.insuranceExpiryDate || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+      const dateVal = parseToIsoString(body.insuranceExpiryDate) ?? null;
+      await sql`UPDATE managed_vehicles SET insurance_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
     if (body.pollutionExpiryDate !== undefined) {
-      await sql`UPDATE managed_vehicles SET pollution_expiry_date = ${body.pollutionExpiryDate || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+      const dateVal = parseToIsoString(body.pollutionExpiryDate) ?? null;
+      await sql`UPDATE managed_vehicles SET pollution_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
     if (body.permitExpiryDate !== undefined) {
-      await sql`UPDATE managed_vehicles SET permit_expiry_date = ${body.permitExpiryDate || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+      const dateVal = parseToIsoString(body.permitExpiryDate) ?? null;
+      await sql`UPDATE managed_vehicles SET permit_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
     if (body.fcExpiryDate !== undefined) {
-      await sql`UPDATE managed_vehicles SET fc_expiry_date = ${body.fcExpiryDate || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+      const dateVal = parseToIsoString(body.fcExpiryDate) ?? null;
+      await sql`UPDATE managed_vehicles SET fc_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
     if (body.insuranceUrl !== undefined) {
       await sql`UPDATE managed_vehicles SET insurance_url = ${body.insuranceUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
@@ -329,6 +378,12 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     if (body.fcUrl !== undefined) {
       await sql`UPDATE managed_vehicles SET fc_url = ${body.fcUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+    }
+    if (body.rcFrontUrl !== undefined) {
+      await sql`UPDATE managed_vehicles SET rc_front_url = ${body.rcFrontUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+    }
+    if (body.rcBackUrl !== undefined) {
+      await sql`UPDATE managed_vehicles SET rc_back_url = ${body.rcBackUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
 
     return reply.code(200).send({ success: true });
@@ -356,6 +411,8 @@ export async function adminRoutes(app: FastifyInstance) {
     const { vehicleId } = req.params as { vehicleId: string };
     const doc = req.body as Record<string, any>;
     const docId = doc.doc_id || `DOC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const issueDate = parseToIsoString(doc.issueDate) ?? null;
+    const expiryDate = parseToIsoString(doc.expiryDate) ?? null;
 
     await sql`
       INSERT INTO vehicle_documents (
@@ -364,7 +421,7 @@ export async function adminRoutes(app: FastifyInstance) {
       )
       VALUES (
         ${docId}, ${vehicleId}, ${doc.docType || 'OTHER'}, ${doc.docLabel || 'Document'}, ${doc.docNumber || ''},
-        ${doc.issueDate || null}, ${doc.expiryDate || null}, ${doc.fileUri || ''}, ${doc.fileName || ''},
+        ${issueDate}, ${expiryDate}, ${doc.fileUri || ''}, ${doc.fileName || ''},
         ${doc.fileType || ''}, ${doc.uploadedBy || 'admin'}, true
       )
     `;
