@@ -219,6 +219,18 @@ export default function LiveStatusScreen() {
                       {exp.reason ? <Text style={styles.expenseReason}>{exp.reason}</Text> : null}
                       {exp.liters ? <Text style={styles.expenseReason}>{exp.liters} Liters</Text> : null}
                       <Text style={styles.expenseTime}>{exp.timestamp}</Text>
+                      {exp.receiptUri ? (
+                        <View style={{ marginTop: 6, gap: 4 }}>
+                          <Image source={{ uri: exp.receiptUri }} style={{ width: 80, height: 60, borderRadius: 6 }} resizeMode="cover" />
+                          <TouchableOpacity
+                            style={styles.expenseMapBtn}
+                            onPress={() => Linking.openURL(exp.receiptUri!)}
+                          >
+                            <Text style={styles.expenseMapText}>VIEW RECEIPT</Text>
+                            <MaterialIcons name="open-in-new" size={10} color={COLORS.secondary} />
+                          </TouchableOpacity>
+                        </View>
+                      ) : null}
                     </View>
                     
                     {exp.location && (

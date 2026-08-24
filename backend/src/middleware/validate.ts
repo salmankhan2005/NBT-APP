@@ -50,15 +50,15 @@ export const GpsSchema = z.object({
 export const ExpenseSchema = z.object({
   category: z.enum(['FUEL', 'TOLL', 'RTO', 'POLICE', 'LORRY', 'OTHER']),
   amount: z.number().positive().max(999999),
-  reason: z.string().max(500).trim().optional(),
-  liters: z.number().positive().optional(),
-  receiptUrl: z.string().max(2000).trim().optional(),
+  reason: z.string().max(500).trim().nullish(),
+  liters: z.number().positive().nullish(),
+  receiptUrl: z.string().max(500000).trim().nullish(),
   location: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
     city: z.string().max(100).trim(),
     address: z.string().max(300).trim(),
-  }).optional(),
+  }).nullish(),
 });
 
 export const PodSchema = z.object({
