@@ -91,48 +91,62 @@ export default function AddExpenseScreen({
     }
   }, [amount, liters]);
 
+  // Auto-capture accurate GPS position on screen load
+  useEffect(() => {
+    handleCaptureLocation();
+  }, []);
+
   const handleCaptureLocation = async () => {
     setLoadingGps(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'GPS location access is required.');
+        Alert.alert('Permission Denied', 'GPS location access is required to record expense location.');
         setLoadingGps(false);
         return;
       }
 
-      const loc = await Promise.race([
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
-      ]);
+      // Try last known position first for instant high-accuracy retrieval
+      let loc = await Location.getLastKnownPositionAsync({});
 
-      const gps: GPSLocation = {
-        latitude: loc ? loc.coords.latitude : 13.0827,
-        longitude: loc ? loc.coords.longitude : 80.2707,
-        city: loc ? 'Current Location' : 'Salem Bypass',
-        address: loc ? `Lat: ${loc.coords.latitude.toFixed(4)}, Long: ${loc.coords.longitude.toFixed(4)}` : 'NH544 Roadside, Salem, Tamil Nadu',
-        lastUpdated: new Date().toLocaleTimeString(),
-      };
+      // If no cached position, get fresh high accuracy position with an 8-second timeout
+      if (!loc || !loc.coords) {
+        loc = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+          new Promise<Location.LocationObject | null>((resolve) => setTimeout(() => resolve(null), 8000))
+        ]);
+      }
 
-      if (loc) {
+      if (loc && loc.coords) {
+        const lat = loc.coords.latitude;
+        const lng = loc.coords.longitude;
+        const gps: GPSLocation = {
+          latitude: lat,
+          longitude: lng,
+          city: 'Current Location',
+          address: `Lat: ${lat.toFixed(5)}, Long: ${lng.toFixed(5)}`,
+          lastUpdated: new Date().toLocaleTimeString(),
+        };
+
         try {
-          const geoRes = await reverseGeocodeLocation(loc.coords.latitude, loc.coords.longitude);
+          const geoRes = await reverseGeocodeLocation(lat, lng);
           if (geoRes) {
             gps.city = geoRes.city || 'Current Location';
             gps.address = geoRes.formattedAddress || gps.address;
           }
         } catch (err) {
-          // ignore
+          // fallback to exact lat/lng address format
         }
-      }
 
-      setCapturedLocation(gps);
-      // For fuel bunk location, prefill bunk address
-      if (selectedCategory === 'FUEL') {
-        setBunkLocation(gps.address);
+        setCapturedLocation(gps);
+        if (selectedCategory === 'FUEL') {
+          setBunkLocation(gps.address);
+        }
+      } else {
+        Alert.alert('GPS Notice', 'Unable to acquire location lock. Please ensure GPS/location services are enabled on your device.');
       }
     } catch (e) {
-      Alert.alert('Error', 'Could not retrieve GPS location.');
+      console.warn('GPS location capture error:', e);
     } finally {
       setLoadingGps(false);
     }

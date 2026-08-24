@@ -284,16 +284,19 @@ export default function PodScreen({
 
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
-          const loc = await Promise.race([
-            Location.getCurrentPositionAsync({}),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
-          ]);
-          if (loc) {
+          let loc = await Location.getLastKnownPositionAsync({});
+          if (!loc || !loc.coords) {
+            loc = await Promise.race([
+              Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+              new Promise<Location.LocationObject | null>((resolve) => setTimeout(() => resolve(null), 8000))
+            ]);
+          }
+          if (loc && loc.coords) {
             gps = {
               latitude: loc.coords.latitude,
               longitude: loc.coords.longitude,
               city: 'Destination reached',
-              address: `Lat: ${loc.coords.latitude.toFixed(4)}, Long: ${loc.coords.longitude.toFixed(4)}`,
+              address: `Lat: ${loc.coords.latitude.toFixed(5)}, Long: ${loc.coords.longitude.toFixed(5)}`,
               lastUpdated: new Date().toLocaleTimeString(),
             };
           }

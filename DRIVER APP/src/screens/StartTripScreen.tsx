@@ -181,19 +181,20 @@ export default function StartTripScreen({
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        // Run with a 2-second timeout to prevent emulator hangs when GPS signal is unavailable
-        const loc = await Promise.race([
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000))
-        ]);
+        let loc = await Location.getLastKnownPositionAsync({});
+        if (!loc || !loc.coords) {
+          loc = await Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+            new Promise<Location.LocationObject | null>((resolve) => setTimeout(() => resolve(null), 8000))
+          ]);
+        }
 
-        if (loc) {
-          // Simple mock reverse geocode
+        if (loc && loc.coords) {
           gps = {
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
             city: 'Current Location',
-            address: `Lat: ${loc.coords.latitude.toFixed(4)}, Long: ${loc.coords.longitude.toFixed(4)}`,
+            address: `Lat: ${loc.coords.latitude.toFixed(5)}, Long: ${loc.coords.longitude.toFixed(5)}`,
             lastUpdated: new Date().toLocaleTimeString(),
           };
 
