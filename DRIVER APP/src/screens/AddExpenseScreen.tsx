@@ -101,20 +101,56 @@ export default function AddExpenseScreen({
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'GPS location access is required to record expense location.');
+        Alert.alert('Permission Required', 'GPS location access is required to record driver location for expenses.');
         setLoadingGps(false);
         return;
       }
 
-      // Try last known position first for instant high-accuracy retrieval
-      let loc = await Location.getLastKnownPositionAsync({});
+      let loc: Location.LocationObject | null = null;
 
-      // If no cached position, get fresh high accuracy position with an 8-second timeout
-      if (!loc || !loc.coords) {
+      // 1. Always attempt fresh high-accuracy position first when driver taps button
+      try {
         loc = await Promise.race([
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
-          new Promise<Location.LocationObject | null>((resolve) => setTimeout(() => resolve(null), 8000))
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000))
         ]);
+      } catch (err) {
+        console.log('[GPS] Fresh position query failed/timed out, trying cached fallback:', err);
+        loc = null;
+      }
+
+      // 2. If fresh position timed out, fallback to last known cached position
+      if (!loc || !loc.coords) {
+        try {
+          loc = await Location.getLastKnownPositionAsync({});
+        } catch {
+          loc = null;
+        }
+      }
+
+      // 3. Web browser geolocation API fallback if running on Web platform
+      if ((!loc || !loc.coords) && Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
+        await new Promise<void>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              loc = {
+                coords: {
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude,
+                  altitude: pos.coords.altitude,
+                  accuracy: pos.coords.accuracy,
+                  altitudeAccuracy: pos.coords.altitudeAccuracy,
+                  heading: pos.coords.heading,
+                  speed: pos.coords.speed,
+                },
+                timestamp: pos.timestamp,
+              };
+              resolve();
+            },
+            () => resolve(),
+            { enableHighAccuracy: true, timeout: 8000 }
+          );
+        });
       }
 
       if (loc && loc.coords) {
@@ -131,11 +167,11 @@ export default function AddExpenseScreen({
         try {
           const geoRes = await reverseGeocodeLocation(lat, lng);
           if (geoRes) {
-            gps.city = geoRes.city || 'Current Location';
+            gps.city = geoRes.city || 'Recorded Location';
             gps.address = geoRes.formattedAddress || gps.address;
           }
         } catch (err) {
-          // fallback to exact lat/lng address format
+          // Keep exact lat/lng address format
         }
 
         setCapturedLocation(gps);
@@ -143,10 +179,10 @@ export default function AddExpenseScreen({
           setBunkLocation(gps.address);
         }
       } else {
-        Alert.alert('GPS Notice', 'Unable to acquire location lock. Please ensure GPS/location services are enabled on your device.');
+        Alert.alert('GPS Signal Low', 'Could not lock onto live satellite location. Please check your device settings and ensure Location is enabled.');
       }
     } catch (e) {
-      console.warn('GPS location capture error:', e);
+      Alert.alert('Error', 'Could not retrieve GPS location. Please check location permissions.');
     } finally {
       setLoadingGps(false);
     }
@@ -545,10 +581,13 @@ export default function AddExpenseScreen({
                   <View style={styles.capturedLocationCard}>
                     <Text style={styles.locationCity}>City/Town: {capturedLocation.city}</Text>
                     <Text style={styles.locationAddr} numberOfLines={2}>Addr: {capturedLocation.address}</Text>
-                    <Text style={styles.locationTime}>Time: {capturedLocation.lastUpdated}</Text>
+                    <Text style={styles.locationTime}>Recorded: {capturedLocation.lastUpdated}</Text>
+                    <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: 'bold', marginTop: 4 }}>
+                      📍 GPS Pin: {capturedLocation.latitude.toFixed(5)}, {capturedLocation.longitude.toFixed(5)}
+                    </Text>
                   </View>
                 ) : (
-                  <Text style={styles.gpsWarning}>*GPS location coordinates must be captured to submit expense</Text>
+                  <Text style={styles.gpsWarning}>*Tap [📍 GIVE LOCATION] above to lock your accurate GPS coordinates</Text>
                 )}
               </View>
 
