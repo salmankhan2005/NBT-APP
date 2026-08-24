@@ -1197,12 +1197,26 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                                 <Text style={styles.indExpDetailValue}>{exp.timestamp || '—'}</Text>
                               </View>
                               {exp.location ? (
-                                <View style={[styles.indExpDetailItem, { flex: 2 }]}>
-                                  <Text style={styles.indExpDetailLabel}>LOCATION</Text>
-                                  <Text style={styles.indExpDetailValue}>
-                                    {exp.location.city}{' '}({exp.location.latitude.toFixed(4)}, {exp.location.longitude.toFixed(4)})
-                                  </Text>
-                                </View>
+                                <TouchableOpacity
+                                  style={[styles.indExpDetailItem, { flex: 2 }]}
+                                  onPress={() => {
+                                    const lat = exp.location!.latitude;
+                                    const lng = exp.location!.longitude;
+                                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                                    Linking.openURL(mapsUrl).catch(() => {
+                                      Alert.alert('Error', 'Unable to open Google Maps.');
+                                    });
+                                  }}
+                                >
+                                  <Text style={styles.indExpDetailLabel}>LOCATION 📍 (TAP FOR GOOGLE MAPS)</Text>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                    <MaterialIcons name="place" size={14} color={COLORS.primary} />
+                                    <Text style={[styles.indExpDetailValue, { color: COLORS.primary, textDecorationLine: 'underline', fontWeight: 'bold' }]}>
+                                      {exp.location.city || exp.location.address || 'View Location'} ({exp.location.latitude.toFixed(4)}, {exp.location.longitude.toFixed(4)})
+                                    </Text>
+                                    <MaterialIcons name="open-in-new" size={12} color={COLORS.primary} />
+                                  </View>
+                                </TouchableOpacity>
                               ) : null}
                             </View>
 

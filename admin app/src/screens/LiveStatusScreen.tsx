@@ -240,13 +240,22 @@ export default function LiveStatusScreen() {
                           <Text style={styles.locCity}>{exp.location.city}</Text>
                         </View>
                         <Text style={styles.locAddress}>{exp.location.address}</Text>
-                        <TouchableOpacity 
-                          style={styles.expenseMapBtn}
-                          onPress={() => handleViewOnMap(exp.location!.latitude, exp.location!.longitude, `${exp.category} Expense - ${exp.location!.city}`)}
-                        >
-                          <Text style={styles.expenseMapText}>VIEW ON MAP</Text>
-                          <MaterialIcons name="open-in-new" size={10} color={COLORS.secondary} />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                          <TouchableOpacity 
+                            style={styles.expenseMapBtn}
+                            onPress={() => openExternalMapsApp(exp.location!.latitude, exp.location!.longitude, `${exp.category} Expense - ${exp.location!.city}`)}
+                          >
+                            <Text style={styles.expenseMapText}>OPEN IN GOOGLE MAPS</Text>
+                            <MaterialIcons name="open-in-new" size={10} color={COLORS.secondary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.expenseMapBtn}
+                            onPress={() => handleViewOnMap(exp.location!.latitude, exp.location!.longitude, `${exp.category} Expense - ${exp.location!.city}`)}
+                          >
+                            <Text style={styles.expenseMapText}>LIVE MAP</Text>
+                            <MaterialIcons name="map" size={10} color={COLORS.secondary} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     )}
                   </View>
