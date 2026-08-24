@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import path from 'path';
+import fs from 'fs';
 import { sql } from '../db/client';
 
-const FILE_ID_PATTERN = /^[a-zA-Z0-9_-]{8,80}$/;
+const FILE_ID_PATTERN = /^[a-zA-Z0-9._-]{5,120}$/;
 
 function getPublicHost(req: FastifyRequest): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -20,10 +21,10 @@ export async function uploadRoutes(app: FastifyInstance) {
   /**
    * POST /api/upload
    * Accepts a multipart form file upload (field name: "file")
-  * Returns a permanent database-backed URL: /api/files/<fileId>
+   * Returns a permanent database-backed URL: /api/files/<fileId>
    *
-   * Used by Driver App to upload POD photos and expense receipt images.
-   * The returned URL is stored in Neon Postgres and served to the Admin App.
+   * Used by Driver App & Admin App to upload photos, document images, and receipts.
+   * The file binary is stored permanently in Neon Postgres and cached locally on disk.
    */
   app.post(
     '/',
@@ -54,13 +55,26 @@ export async function uploadRoutes(app: FastifyInstance) {
         const fileId = `file_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
         const content = await data.toBuffer();
 
+        // 1. Permanent database store in Neon Postgres
         await sql`
           INSERT INTO uploaded_files (file_id, file_name, mime_type, content, size_bytes)
           VALUES (${fileId}, ${safeName}, ${data.mimetype}, ${content}, ${content.length})
+          ON CONFLICT (file_id) DO NOTHING
         `;
 
+        // 2. Cache to local disk for fast static file serving
+        try {
+          const uploadsDir = path.join(process.cwd(), 'uploads');
+          if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+          }
+          fs.writeFileSync(path.join(uploadsDir, safeName), content);
+        } catch (diskErr) {
+          app.log.warn(`Local disk caching failed (non-critical): ${diskErr}`);
+        }
+
         const publicUrl = `${getPublicHost(req)}/api/files/${fileId}`;
-        app.log.info(`File uploaded to database: ${fileId}`);
+        app.log.info(`File uploaded successfully to database: ${fileId} (${safeName})`);
 
         return reply.code(201).send({ url: publicUrl, filename: safeName, fileId });
       } catch (err: any) {
@@ -72,29 +86,102 @@ export async function uploadRoutes(app: FastifyInstance) {
 }
 
 export async function fileRoutes(app: FastifyInstance) {
+  // Helper function to serve file from DB or Disk
+  const serveFile = async (req: FastifyRequest, reply: FastifyReply, fileIdentifier: string) => {
+    if (!FILE_ID_PATTERN.test(fileIdentifier)) {
+      return reply.code(404).send({ error: 'File not found' });
+    }
+
+    // 1. Query Neon Postgres first
+    try {
+      const rows = await sql`
+        SELECT file_name, mime_type, content
+        FROM uploaded_files
+        WHERE file_id = ${fileIdentifier} OR file_name = ${fileIdentifier}
+        LIMIT 1
+      `;
+      if (rows.length > 0) {
+        const file = rows[0] as { file_name: string; mime_type: string; content: Uint8Array };
+        reply.header('Content-Type', file.mime_type || 'image/jpeg');
+        reply.header('Content-Length', String(file.content.length));
+        reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+        reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+        reply.header('Access-Control-Allow-Origin', '*');
+        reply.header('Content-Disposition', `inline; filename="${file.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
+        return reply.send(Buffer.from(file.content));
+      }
+    } catch (err) {
+      app.log.warn(`DB file lookup failed for ${fileIdentifier}, checking local disk...`);
+    }
+
+    // 2. Check local disk fallback
+    const diskPath = path.join(process.cwd(), 'uploads', fileIdentifier);
+    if (fs.existsSync(diskPath) && fs.statSync(diskPath).isFile()) {
+      const ext = path.extname(fileIdentifier).toLowerCase();
+      const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.pdf' ? 'application/pdf' : 'image/jpeg';
+      const fileBuffer = fs.readFileSync(diskPath);
+      reply.header('Content-Type', mimeType);
+      reply.header('Content-Length', String(fileBuffer.length));
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+      reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+      reply.header('Access-Control-Allow-Origin', '*');
+      reply.header('Content-Disposition', `inline; filename="${fileIdentifier.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
+      return reply.send(fileBuffer);
+    }
+
+    return reply.code(404).send({ error: 'File not found', message: 'The requested image or file could not be found.' });
+  };
+
+  // Serve GET /api/files/:fileId
   app.get('/:fileId', async (req: FastifyRequest, reply: FastifyReply) => {
     const { fileId } = req.params as { fileId: string };
-    if (!FILE_ID_PATTERN.test(fileId)) {
-      return reply.code(404).send({ error: 'File not found' });
+    return serveFile(req, reply, fileId);
+  });
+}
+
+export async function legacyUploadsFallbackRoutes(app: FastifyInstance) {
+  const serveFile = async (req: FastifyRequest, reply: FastifyReply, fileName: string) => {
+    const diskPath = path.join(process.cwd(), 'uploads', fileName);
+    if (fs.existsSync(diskPath) && fs.statSync(diskPath).isFile()) {
+      const ext = path.extname(fileName).toLowerCase();
+      const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.pdf' ? 'application/pdf' : 'image/jpeg';
+      const fileBuffer = fs.readFileSync(diskPath);
+      reply.header('Content-Type', mimeType);
+      reply.header('Content-Length', String(fileBuffer.length));
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+      reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+      reply.header('Access-Control-Allow-Origin', '*');
+      reply.header('Content-Disposition', `inline; filename="${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
+      return reply.send(fileBuffer);
     }
 
-    const rows = await sql`
-      SELECT file_name, mime_type, content
-      FROM uploaded_files
-      WHERE file_id = ${fileId}
-      LIMIT 1
-    `;
-    if (!rows.length) {
-      return reply.code(404).send({ error: 'File not found' });
+    // DB fallback
+    try {
+      const rows = await sql`
+        SELECT file_name, mime_type, content
+        FROM uploaded_files
+        WHERE file_name = ${fileName} OR file_id = ${fileName}
+        LIMIT 1
+      `;
+      if (rows.length > 0) {
+        const file = rows[0] as { file_name: string; mime_type: string; content: Uint8Array };
+        reply.header('Content-Type', file.mime_type || 'image/jpeg');
+        reply.header('Content-Length', String(file.content.length));
+        reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+        reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+        reply.header('Access-Control-Allow-Origin', '*');
+        reply.header('Content-Disposition', `inline; filename="${file.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
+        return reply.send(Buffer.from(file.content));
+      }
+    } catch (err) {
+      app.log.warn(`DB file lookup failed for legacy filename ${fileName}`);
     }
 
-    const file = rows[0] as { file_name: string; mime_type: string; content: Uint8Array };
-    reply.header('Content-Type', file.mime_type);
-    reply.header('Content-Length', String(file.content.length));
-    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
-    reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
-    reply.header('Access-Control-Allow-Origin', '*');
-    reply.header('Content-Disposition', `inline; filename="${file.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
-    return reply.send(Buffer.from(file.content));
+    return reply.code(404).send({ error: 'File not found' });
+  };
+
+  app.get('/:fileName', async (req: FastifyRequest, reply: FastifyReply) => {
+    const { fileName } = req.params as { fileName: string };
+    return serveFile(req, reply, fileName);
   });
 }

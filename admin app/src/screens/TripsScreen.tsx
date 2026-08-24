@@ -1224,13 +1224,16 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                               <View style={styles.receiptContainer}>
                                 <Text style={styles.receiptLabel}>📄 Receipt Photo</Text>
                                 <Image
-                                  source={{ uri: exp.receiptUri }}
+                                  source={{ uri: normalizeImageUrl(exp.receiptUri) || exp.receiptUri }}
                                   style={styles.receiptImage}
                                   resizeMode="contain"
                                 />
                                 <TouchableOpacity
                                   style={styles.viewReceiptBtn}
-                                  onPress={() => Linking.openURL(exp.receiptUri!)}
+                                  onPress={() => {
+                                    const targetUrl = normalizeImageUrl(exp.receiptUri) || exp.receiptUri;
+                                    if (targetUrl) Linking.openURL(targetUrl);
+                                  }}
                                 >
                                   <MaterialIcons name="open-in-new" size={14} color={COLORS.primary} />
                                   <Text style={styles.viewReceiptText}>View Full Size</Text>

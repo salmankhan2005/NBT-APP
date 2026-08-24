@@ -84,6 +84,11 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     return cleaned;
   }
 
+  // If full HTTP/HTTPS URL contains /api/files/, /uploads/, or /api/uploads/, rewrite host to API_HOST
+  if (/^https?:\/\/[^\/]+(?:\/api\/files\/|\/uploads\/|\/api\/uploads\/)/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^https?:\/\/[^\/]+/i, API_HOST);
+  }
+
   // Normalize both current and legacy upload paths before adding the API host.
   if (cleaned.startsWith('/api/uploads/')) {
     cleaned = cleaned.replace(/^\/api\/uploads\//, '/uploads/');

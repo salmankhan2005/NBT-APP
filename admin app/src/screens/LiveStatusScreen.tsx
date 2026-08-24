@@ -23,6 +23,13 @@ export default function LiveStatusScreen() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
+  const openExternalMapsApp = (lat: number, lng: number, _label?: string) => {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    Linking.openURL(mapsUrl).catch(() => {
+      Alert.alert('Error', 'Unable to open Google Maps.');
+    });
+  };
+
   const fetchLiveStatus = async () => {
     if (!searchId.trim()) return;
     try {
@@ -221,10 +228,10 @@ export default function LiveStatusScreen() {
                       <Text style={styles.expenseTime}>{exp.timestamp}</Text>
                       {exp.receiptUri ? (
                         <View style={{ marginTop: 6, gap: 4 }}>
-                          <Image source={{ uri: exp.receiptUri }} style={{ width: 80, height: 60, borderRadius: 6 }} resizeMode="cover" />
+                          <Image source={{ uri: normalizeImageUrl(exp.receiptUri) || exp.receiptUri }} style={{ width: 80, height: 60, borderRadius: 6 }} resizeMode="cover" />
                           <TouchableOpacity
                             style={styles.expenseMapBtn}
-                            onPress={() => Linking.openURL(exp.receiptUri!)}
+                            onPress={() => Linking.openURL(normalizeImageUrl(exp.receiptUri) || exp.receiptUri!)}
                           >
                             <Text style={styles.expenseMapText}>VIEW RECEIPT</Text>
                             <MaterialIcons name="open-in-new" size={10} color={COLORS.secondary} />

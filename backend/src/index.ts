@@ -15,7 +15,7 @@ import { tripRoutes } from './routes/trips';
 import { adminRoutes } from './routes/admin';
 import { docsRoutes } from './routes/docs';
 import { mapsRoutes } from './routes/maps';
-import { uploadRoutes, fileRoutes } from './routes/upload';
+import { uploadRoutes, fileRoutes, legacyUploadsFallbackRoutes } from './routes/upload';
 import { lorryBookingRoutes } from './routes/lorryBooking';
 import { authenticate, requireAdmin } from './middleware/auth';
 
@@ -337,6 +337,8 @@ async function bootstrap() {
   // ── Upload route ──────────────────────────────────────────────────────────
   app.register(uploadRoutes, { prefix: '/api/upload' });
   app.register(fileRoutes, { prefix: '/api/files' });
+  app.register(legacyUploadsFallbackRoutes, { prefix: '/uploads' });
+  app.register(legacyUploadsFallbackRoutes, { prefix: '/api/uploads' });
 
   // ── Lorry Booking Agency routes ─────────────────────────────────────────
   app.register(lorryBookingRoutes, { prefix: '/api/lorry-booking' });
