@@ -60,7 +60,7 @@ export default function StartTripScreen({
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      quality: 0.7,
+      quality: 0.5,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setOdometerPhotoUri(result.assets[0].uri);
@@ -70,7 +70,7 @@ export default function StartTripScreen({
   const handleChooseOdometerPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.7,
+      quality: 0.5,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setOdometerPhotoUri(result.assets[0].uri);

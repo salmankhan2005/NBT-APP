@@ -11,6 +11,23 @@ export const getApiHost = (): string => {
 };
 export const API_HOST = getApiHost();
 
+// ── Timeout-aware fetch helper (Prevents network hangs on mobile) ───────────
+export const fetchWithTimeout = async (resource: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+};
+
 export const normalizeImageUrl = (url?: string | null): string | undefined => {
   if (!url || typeof url !== 'string' || !url.trim()) return undefined;
   let cleaned = url.trim();

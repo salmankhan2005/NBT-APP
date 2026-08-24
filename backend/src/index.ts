@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -198,7 +199,17 @@ async function bootstrap() {
         updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `;
-    app.log.info('  ✓ DB auto-migrations applied (expenses + trips financial columns + driver pin + odometer_start_url + is_pinned + lorry booking tables + vehicle_documents is_active fix + gc_notes + memos)');
+    // Auto-migrate: performance indexes for fast mobile queries
+    await sql`CREATE INDEX IF NOT EXISTS idx_gps_trip_id_time ON gps_updates(trip_id, recorded_at DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_expenses_trip_id ON expenses(trip_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_trips_driver_id ON trips(driver_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_trips_status ON trips(status)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_trips_created_at ON trips(created_at DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_trips_updated_at ON trips(updated_at DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_managed_vehicles_number ON managed_vehicles(vehicle_number)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_vehicle_docs_vehicle_id ON vehicle_documents(vehicle_id, is_active)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_uploaded_files_file_id ON uploaded_files(file_id)`;
+    app.log.info('  ✓ DB auto-migrations applied (expenses + trips financial columns + driver pin + odometer_start_url + is_pinned + lorry booking tables + vehicle_documents is_active fix + gc_notes + memos + performance indexes)');
   } catch (err) {
     app.log.warn(`Database connection or auto-migration failed: ${err}`);
   }
@@ -208,6 +219,12 @@ async function bootstrap() {
     contentSecurityPolicy: false, // Mobile app doesn't need strict CSP
     crossOriginResourcePolicy: false,
     crossOriginOpenerPolicy: false,
+  });
+
+  // ── Gzip / Brotli Compression (Reduces payload size by 80-90%) ─────────────
+  await app.register(compress, {
+    global: true,
+    threshold: 512,
   });
 
   // ── CORS ─────────────────────────────────────────────────────────────────
@@ -363,6 +380,16 @@ async function bootstrap() {
   app.log.info(`📦  Endpoints: /health  /api/auth  /api/trips  /api/admin  /api/gc  /api/memos  /api/maps  /api/upload`);
   app.log.info(`🗺️  Maps proxy: ${process.env.GOOGLE_MAPS_API_KEY ? 'ENABLED (key configured)' : 'DISABLED (GOOGLE_MAPS_API_KEY not set)'}`);
   app.log.info(`📸  File uploads: /api/upload → served at /uploads/`);
+
+  // ── Periodic Keepalive Self-Ping (Prevents Render free-tier spin down) ────
+  setInterval(async () => {
+    try {
+      await pingDatabase();
+      app.log.info('💓 [Keepalive] Database & server active ping');
+    } catch {
+      // ignore transient keepalive failures
+    }
+  }, 10 * 60 * 1000);
 }
 
 bootstrap().catch((err) => {

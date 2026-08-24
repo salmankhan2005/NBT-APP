@@ -9,6 +9,23 @@ export const API_HOST = typeof process !== 'undefined' && process.env?.EXPO_PUBL
   ? process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, '')
   : DEFAULT_API_HOST;
 
+// ── Timeout-aware fetch helper (Prevents network hangs on mobile) ───────────
+export const fetchWithTimeout = async (resource: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+};
+
 // ── Secure storage helpers (Dual-write for robust persistence across reloads) ───
 const safeGetItem = async (key: string): Promise<string | null> => {
   return AsyncStorage.getItem(key);
