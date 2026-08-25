@@ -883,18 +883,24 @@ class DatabaseService {
     // Run image upload & backend API sync asynchronously in background
     (async () => {
       try {
+        // Step 1: Upload image FIRST, await it fully
         let hostedPhotoUrl: string | undefined = undefined;
         if (rawOdoPhoto) {
+          console.log('[DriverDB] Uploading odometer photo...');
           const uploaded = await this.uploadLocalImage(rawOdoPhoto);
           if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
             hostedPhotoUrl = uploaded;
             trip.odometerStartPhotoUri = hostedPhotoUrl;
             await this.notify();
+            console.log('[DriverDB] Odometer photo ready:', hostedPhotoUrl.substring(0, 80));
+          } else {
+            console.warn('[DriverDB] Odometer photo upload returned nothing useful');
           }
         }
 
+        // Step 2: Call PATCH /start with photo URL included (upload is already done)
         if (this.currentToken) {
-          await fetch(`${API_HOST}/api/trips/${tripId}/start`, {
+          const startRes = await fetch(`${API_HOST}/api/trips/${tripId}/start`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -913,6 +919,24 @@ class DatabaseService {
               }
             })
           });
+          console.log('[DriverDB] startTrip PATCH status:', startRes.status);
+
+          // Step 3: Dedicated photo patch as a safety net
+          if (hostedPhotoUrl) {
+            try {
+              const photoRes = await fetch(`${API_HOST}/api/trips/${tripId}/photo`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${this.currentToken}`
+                },
+                body: JSON.stringify({ photoUrl: hostedPhotoUrl, photoField: 'odometer_start_url' })
+              });
+              console.log('[DriverDB] Photo URL saved to DB, status:', photoRes.status);
+            } catch (photoErr) {
+              console.warn('[DriverDB] Photo patch failed:', photoErr);
+            }
+          }
         }
       } catch (err) {
         console.warn('[DriverDB] startTrip background sync error:', err);
