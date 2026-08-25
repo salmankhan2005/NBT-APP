@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { SHA256 } from 'crypto-js';
 import * as FileSystem from 'expo-file-system';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 // ── API Host Configuration ──────────────────────────────────────────────────
 const DEFAULT_API_HOST = 'https://nbt-app.onrender.com';
@@ -991,14 +992,30 @@ class DatabaseService {
     }
     const token = this.currentToken || 'mock-driver-token';
 
+    // COMPRESS IMAGE FIRST: Android JS bridge crashes on large Base64, and large file uploads often timeout.
+    let finalUriToUpload = trimmed;
+    try {
+      if (Platform.OS !== 'web' && (trimmed.startsWith('file://') || trimmed.startsWith('content://'))) {
+        const manipResult = await manipulateAsync(
+          trimmed,
+          [{ resize: { width: 1000 } }],
+          { compress: 0.6, format: SaveFormat.JPEG }
+        );
+        finalUriToUpload = manipResult.uri;
+        console.log('[DriverDB] Compressed image to:', finalUriToUpload);
+      }
+    } catch (e) {
+      console.warn('[DriverDB] Image compression failed, proceeding with original URI:', e);
+    }
+
     // 2. Native FileSystem.uploadAsync (Fast, rock-solid native streaming for Android/iOS)
-    if (Platform.OS !== 'web' && (trimmed.startsWith('file://') || trimmed.startsWith('content://'))) {
+    if (Platform.OS !== 'web' && (finalUriToUpload.startsWith('file://') || finalUriToUpload.startsWith('content://'))) {
       try {
-        const uploadResult = await FileSystem.uploadAsync(`${API_HOST}/api/upload`, trimmed, {
+        const uploadResult = await FileSystem.uploadAsync(`${API_HOST}/api/upload`, finalUriToUpload, {
           httpMethod: 'POST',
           uploadType: FileSystem.FileSystemUploadType.MULTIPART,
           fieldName: 'file',
-          mimeType: trimmed.toLowerCase().endsWith('.png') ? 'image/png' : trimmed.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/jpeg',
+          mimeType: 'image/jpeg', // Always jpeg after manipulation
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1019,16 +1036,16 @@ class DatabaseService {
 
     // 3. Fallback to standard fetch with FormData
     try {
-      const filename = trimmed.split('/').pop() || `photo_${Date.now()}.jpg`;
+      const filename = finalUriToUpload.split('/').pop() || `photo_${Date.now()}.jpg`;
       const formData = new FormData();
 
-      if (Platform.OS === 'web' && (trimmed.startsWith('blob:') || trimmed.startsWith('data:'))) {
-        const res = await fetch(trimmed);
+      if (Platform.OS === 'web' && (finalUriToUpload.startsWith('blob:') || finalUriToUpload.startsWith('data:'))) {
+        const res = await fetch(finalUriToUpload);
         const blob = await res.blob();
         formData.append('file', blob, filename);
       } else {
         formData.append('file', {
-          uri: trimmed,
+          uri: finalUriToUpload,
           name: filename,
           type: 'image/jpeg',
         } as any);
@@ -1056,10 +1073,10 @@ class DatabaseService {
 
     // 4. Offline Fallback: Convert to Base64 Data URI so Admin App can ALWAYS view it across devices
     try {
-      if ((trimmed.startsWith('file://') || trimmed.startsWith('content://')) && Platform.OS !== 'web') {
-        const base64 = await FileSystem.readAsStringAsync(trimmed, { encoding: FileSystem.EncodingType.Base64 });
+      if ((finalUriToUpload.startsWith('file://') || finalUriToUpload.startsWith('content://')) && Platform.OS !== 'web') {
+        const base64 = await FileSystem.readAsStringAsync(finalUriToUpload, { encoding: FileSystem.EncodingType.Base64 });
         if (base64) {
-          const ext = trimmed.split('.').pop()?.toLowerCase();
+          const ext = finalUriToUpload.split('.').pop()?.toLowerCase();
           const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
           return `data:${mime};base64,${base64}`;
         }
