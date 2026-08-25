@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Platform } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 
 interface FadeInViewProps {
   children: React.ReactNode;
@@ -9,31 +9,35 @@ interface FadeInViewProps {
 
 export default function FadeInView({
   children,
-  duration = 350,
+  duration = 250,
   style = {},
 }: FadeInViewProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(15)).current; // slide up from 15px
+  const slideAnim = useRef(new Animated.Value(8)).current;
 
   useEffect(() => {
-    // Reset to start values on mount
     fadeAnim.setValue(0);
-    slideAnim.setValue(15);
+    slideAnim.setValue(8);
 
-    // Trigger animations parallelly
-    Animated.parallel([
+    const animation = Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: duration,
-        useNativeDriver: Platform.OS !== 'web',
+        duration,
+        useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: duration,
-        useNativeDriver: Platform.OS !== 'web',
+        duration,
+        useNativeDriver: true,
       }),
-    ]).start();
-  }, [children]); // triggers on child component changes
+    ]);
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, []);
 
   return (
     <Animated.View

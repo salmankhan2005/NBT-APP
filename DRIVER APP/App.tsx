@@ -91,9 +91,6 @@ export default function App() {
               _setDriverTab(savedTab as DriverTab);
             }
           } catch {}
-
-          // Immediately bypass splash screen when restoring an existing session
-          setShowSplash(false);
         }
       }
     });

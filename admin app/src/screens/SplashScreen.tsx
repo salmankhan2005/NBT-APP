@@ -24,7 +24,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
 
   useEffect(() => {
     // Logo scale-in and fade animation
-    Animated.parallel([
+    const a1 = Animated.parallel([
       Animated.timing(scaleAnim, {
         toValue: 1,
         duration: 1000,
@@ -37,10 +37,11 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
         easing: Easing.out(Easing.ease),
         useNativeDriver: Platform.OS !== 'web',
       }),
-    ]).start();
+    ]);
+    a1.start();
 
     // Pulsing glow effect
-    Animated.loop(
+    const loopAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.08,
@@ -55,15 +56,17 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
           useNativeDriver: Platform.OS !== 'web',
         }),
       ])
-    ).start();
+    );
+    loopAnim.start();
 
-    // Progress bar animation (3 seconds total)
-    Animated.timing(progressAnim, {
+    // Progress bar animation (2.5 seconds total)
+    const progAnim = Animated.timing(progressAnim, {
       toValue: 100,
-      duration: 3000,
+      duration: 2500,
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: false,
-    }).start();
+    });
+    progAnim.start();
 
     // Listener for progress text & status steps
     const listenerId = progressAnim.addListener(({ value }) => {
@@ -79,16 +82,19 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
       }
     });
 
-    // Auto complete after 3.2 seconds
+    // Auto complete after 2.8 seconds
     const timer = setTimeout(() => {
       onComplete();
-    }, 3200);
+    }, 2800);
 
     return () => {
       progressAnim.removeListener(listenerId);
       clearTimeout(timer);
+      a1.stop();
+      loopAnim.stop();
+      progAnim.stop();
     };
-  }, [onComplete, progressAnim]);
+  }, []);
 
   const progressBarWidth = progressAnim.interpolate({
     inputRange: [0, 100],

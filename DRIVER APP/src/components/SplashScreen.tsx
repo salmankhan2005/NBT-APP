@@ -10,72 +10,86 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS } from '../theme';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface SplashScreenProps {
   onAnimationEnd: () => void;
 }
 
 export default function SplashScreen({ onAnimationEnd }: SplashScreenProps) {
-  // Animation values
+  // Animation values - 100% Native Driver compatible
   const logoScale = useRef(new Animated.Value(0)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
-  const textTranslateY = useRef(new Animated.Value(30)).current;
-  const progressBarWidth = useRef(new Animated.Value(0)).current;
+  const textTranslateY = useRef(new Animated.Value(20)).current;
+  const progressBarScale = useRef(new Animated.Value(0.01)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // 1. Logo scale and fade in
-    Animated.parallel([
+    const a1 = Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
       Animated.spring(logoScale, {
         toValue: 1,
-        friction: 5,
+        friction: 6,
         tension: 40,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]);
 
-    // 2. Text slide up and fade in after 600ms
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(textTranslateY, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 600);
-
-    // 3. Progress bar fill over 2.2 seconds
-    Animated.timing(progressBarWidth, {
-      toValue: 1,
-      duration: 2200,
-      useNativeDriver: false, // width animation does not support native driver
-    }).start();
-
-    // 4. Fade out entire screen after 2.8 seconds and call end callback
-    const timer = setTimeout(() => {
-      Animated.timing(screenOpacity, {
+    // 2. Text slide up and fade in
+    const a2 = Animated.parallel([
+      Animated.timing(textOpacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(textTranslateY, {
         toValue: 0,
         duration: 600,
         useNativeDriver: true,
-      }).start(() => {
-        onAnimationEnd();
-      });
-    }, 2800);
+      }),
+    ]);
 
-    return () => clearTimeout(timer);
+    // 3. Progress bar fill
+    const a3 = Animated.timing(progressBarScale, {
+      toValue: 1,
+      duration: 1800,
+      useNativeDriver: true,
+    });
+
+    a1.start();
+    const t1 = setTimeout(() => a2.start(), 400);
+    const t2 = setTimeout(() => a3.start(), 200);
+
+    // 4. Fade out screen and end
+    let a4: Animated.CompositeAnimation | null = null;
+    const t3 = setTimeout(() => {
+      a4 = Animated.timing(screenOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      });
+      a4.start(({ finished }) => {
+        if (finished) {
+          onAnimationEnd();
+        }
+      });
+    }, 2200);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      a1.stop();
+      a2.stop();
+      a3.stop();
+      if (a4) a4.stop();
+    };
   }, []);
 
   return (
@@ -119,10 +133,14 @@ export default function SplashScreen({ onAnimationEnd }: SplashScreenProps) {
             style={[
               styles.progressBar,
               {
-                width: progressBarWidth.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0%', '100%'],
-                }),
+                transform: [
+                  { scaleX: progressBarScale },
+                  { translateX: progressBarScale.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-width * 0.3, 0],
+                    })
+                  }
+                ],
               },
             ]}
           />
@@ -175,12 +193,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textAlign: 'center',
   },
-  ampersand: {
-    fontSize: 16,
-    color: COLORS.secondary,
-    marginVertical: 4,
-    fontWeight: 'bold',
-  },
   subtitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -206,6 +218,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressBar: {
+    width: '100%',
     height: '100%',
     backgroundColor: COLORS.secondary,
     borderRadius: 2,
@@ -217,7 +230,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.5,
   },
-  // Glowing abstract background assets
   glow1: {
     position: 'absolute',
     top: -100,

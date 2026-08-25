@@ -22,7 +22,7 @@ import { db } from './src/db/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Hold splash screen during boot initialization
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Import Screens
 import LandingPage from './src/screens/LandingPage';
