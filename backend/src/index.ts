@@ -107,11 +107,14 @@ async function bootstrap() {
         file_id     TEXT PRIMARY KEY,
         file_name   TEXT NOT NULL,
         mime_type   TEXT NOT NULL,
-        content     BYTEA NOT NULL,
+        content     BYTEA,
+        storage_path TEXT,
         size_bytes  INTEGER NOT NULL,
         created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `;
+    await sql`ALTER TABLE uploaded_files ALTER COLUMN content DROP NOT NULL`;
+    await sql`ALTER TABLE uploaded_files ADD COLUMN IF NOT EXISTS storage_path TEXT`;
     // Auto-migrate: expenses table location columns
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS latitude NUMERIC`;
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS longitude NUMERIC`;

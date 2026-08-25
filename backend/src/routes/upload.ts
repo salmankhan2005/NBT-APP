@@ -1,9 +1,16 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import path from 'path';
 import fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 import { sql } from '../db/client';
 
 const FILE_ID_PATTERN = /^[a-zA-Z0-9._-]{5,120}$/;
+const supabaseUrl = process.env.SUPABASE_URL?.trim();
+const supabaseKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
+const supabaseBucket = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'nbt-uploads';
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+}) : null;
 
 function getPublicHost(req: FastifyRequest): string {
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -54,11 +61,21 @@ export async function uploadRoutes(app: FastifyInstance) {
         const safeName = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
         const fileId = `file_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
         const content = await data.toBuffer();
+        const storagePath = `${fileId}/${safeName}`;
+
+        if (supabase) {
+          const { error } = await supabase.storage.from(supabaseBucket).upload(storagePath, content, {
+            contentType: data.mimetype,
+            cacheControl: '31536000',
+            upsert: false,
+          });
+          if (error) throw new Error(`Supabase upload failed: ${error.message}`);
+        }
 
         // 1. Permanent database store in Neon Postgres
         await sql`
-          INSERT INTO uploaded_files (file_id, file_name, mime_type, content, size_bytes)
-          VALUES (${fileId}, ${safeName}, ${data.mimetype}, ${content}, ${content.length})
+          INSERT INTO uploaded_files (file_id, file_name, mime_type, content, storage_path, size_bytes)
+          VALUES (${fileId}, ${safeName}, ${data.mimetype}, ${supabase ? null : content}, ${supabase ? storagePath : null}, ${content.length})
           ON CONFLICT (file_id) DO NOTHING
         `;
 
@@ -74,7 +91,7 @@ export async function uploadRoutes(app: FastifyInstance) {
         }
 
         const publicUrl = `${getPublicHost(req)}/api/files/${fileId}`;
-        app.log.info(`File uploaded successfully to database: ${fileId} (${safeName})`);
+        app.log.info(`File uploaded to ${supabase ? 'Supabase Storage' : 'database fallback'}: ${fileId}`);
 
         return reply.code(201).send({ url: publicUrl, filename: safeName, fileId });
       } catch (err: any) {
@@ -95,20 +112,26 @@ export async function fileRoutes(app: FastifyInstance) {
     // 1. Query Neon Postgres first
     try {
       const rows = await sql`
-        SELECT file_name, mime_type, content
+        SELECT file_name, mime_type, content, storage_path
         FROM uploaded_files
         WHERE file_id = ${fileIdentifier} OR file_name = ${fileIdentifier}
         LIMIT 1
       `;
       if (rows.length > 0) {
-        const file = rows[0] as { file_name: string; mime_type: string; content: Uint8Array };
+        const file = rows[0] as { file_name: string; mime_type: string; content: Uint8Array | null; storage_path: string | null };
+        let content = file.content ? Buffer.from(file.content) : null;
+        if (file.storage_path && supabase) {
+          const { data, error } = await supabase.storage.from(supabaseBucket).download(file.storage_path);
+          if (!error && data) content = Buffer.from(await data.arrayBuffer());
+        }
+        if (!content) throw new Error('Stored file content unavailable');
         reply.header('Content-Type', file.mime_type || 'image/jpeg');
-        reply.header('Content-Length', String(file.content.length));
+        reply.header('Content-Length', String(content.length));
         reply.header('Cache-Control', 'public, max-age=31536000, immutable');
         reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
         reply.header('Access-Control-Allow-Origin', '*');
         reply.header('Content-Disposition', `inline; filename="${file.file_name.replace(/[^a-zA-Z0-9._-]/g, '_')}"`);
-        return reply.send(Buffer.from(file.content));
+        return reply.send(content);
       }
     } catch (err) {
       app.log.warn(`DB file lookup failed for ${fileIdentifier}, checking local disk...`);

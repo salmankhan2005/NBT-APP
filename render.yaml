@@ -25,6 +25,12 @@ services:
         sync: false          # paste your frontend URL after deploying the web app
       - key: PUBLIC_HOST
         sync: false          # set to the public HTTPS backend URL, e.g. https://nbt-app.onrender.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false          # backend only; never expose to either web app
+      - key: SUPABASE_STORAGE_BUCKET
+        value: nbt-uploads
       - key: AUTH_RATE_LIMIT_MAX
         value: "20"
       - key: AUTH_RATE_LIMIT_WINDOW_MS
