@@ -1032,30 +1032,45 @@ class DatabaseService {
       console.warn('[DriverDB] Image compression failed, proceeding with original URI:', e);
     }
 
-    // 2. Native FileSystem.uploadAsync (Fast, rock-solid native streaming for Android/iOS)
-    if (Platform.OS !== 'web' && (finalUriToUpload.startsWith('file://') || finalUriToUpload.startsWith('content://'))) {
-      try {
-        const uploadResult = await FileSystem.uploadAsync(`${API_HOST}/api/upload`, finalUriToUpload, {
-          httpMethod: 'POST',
-          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-          fieldName: 'file',
-          mimeType: 'image/jpeg', // Always jpeg after manipulation
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+    // STEP 2: Warm up the Render server (it sleeps on free tier) before uploading
+    try {
+      await fetch(`${API_HOST}/health`, { method: 'GET' });
+      console.log('[DriverDB] Server warm-up ping sent');
+    } catch {}
 
-        if (uploadResult.status >= 200 && uploadResult.status < 300) {
-          const json = JSON.parse(uploadResult.body);
-          if (json.url || json.publicUrl) {
-            const hostedUrl = normalizeImageUrl(json.url || json.publicUrl) || json.url || json.publicUrl;
-            console.log('[DriverDB] Native uploadAsync succeeded:', hostedUrl);
-            return hostedUrl;
+    // STEP 3: Native FileSystem.uploadAsync with 3 retries (handles Render cold start)
+    if (Platform.OS !== 'web' && (finalUriToUpload.startsWith('file://') || finalUriToUpload.startsWith('content://'))) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`[DriverDB] Upload attempt ${attempt}/3...`);
+          const uploadResult = await FileSystem.uploadAsync(`${API_HOST}/api/upload`, finalUriToUpload, {
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            fieldName: 'file',
+            mimeType: 'image/jpeg',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          console.log(`[DriverDB] Upload attempt ${attempt} status:`, uploadResult.status);
+          if (uploadResult.status >= 200 && uploadResult.status < 300) {
+            const json = JSON.parse(uploadResult.body);
+            if (json.url || json.publicUrl) {
+              const hostedUrl = normalizeImageUrl(json.url || json.publicUrl) || json.url || json.publicUrl;
+              console.log('[DriverDB] Native uploadAsync succeeded:', hostedUrl);
+              return hostedUrl;
+            }
+          }
+        } catch (nativeUploadErr) {
+          console.warn(`[DriverDB] Upload attempt ${attempt} failed:`, nativeUploadErr);
+          if (attempt < 3) {
+            console.log('[DriverDB] Waiting 5s before retry...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
           }
         }
-      } catch (nativeUploadErr) {
-        console.warn('[DriverDB] FileSystem.uploadAsync failed, attempting FormData fetch fallback:', nativeUploadErr);
       }
+      console.warn('[DriverDB] All upload attempts failed, trying FormData fallback...');
     }
 
     // 3. Fallback to standard fetch with FormData
