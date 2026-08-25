@@ -1118,7 +1118,7 @@ export default function VehiclesScreen() {
       ) : filteredVehicles.length === 0 ? (
         <View style={styles.centerBox}><MaterialIcons name="directions-bus" size={64} color={COLORS.outline} /><Text style={styles.emptyTitle}>No vehicles yet</Text><Text style={styles.emptyDesc}>Add the first vehicle to begin managing fleet documents and trip assignment.</Text></View>
       ) : (
-        <FlatList data={filteredVehicles} renderItem={renderVehicleItem} keyExtractor={(item) => item.vehicle_id} numColumns={numColumns} columnWrapperStyle={isDesktop ? { justifyContent: 'space-between', marginBottom: 8 } : undefined} contentContainerStyle={styles.listContent} />
+        <FlatList key={`vehicles-grid-${numColumns}`} data={filteredVehicles} renderItem={renderVehicleItem} keyExtractor={(item) => item.vehicle_id} numColumns={numColumns} columnWrapperStyle={numColumns > 1 ? { justifyContent: 'space-between', marginBottom: 8 } : undefined} contentContainerStyle={styles.listContent} />
       )}
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
