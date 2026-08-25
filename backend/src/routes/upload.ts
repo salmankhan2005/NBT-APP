@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 import { sql } from '../db/client';
 
 const FILE_ID_PATTERN = /^[a-zA-Z0-9._-]{5,120}$/;
-const supabaseUrl = process.env.SUPABASE_URL?.trim();
-const supabaseKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
+const supabaseUrl = process.env.SUPABASE_URL?.trim() || 'https://yweueaqaubrtriwawltm.supabase.co';
+const supabaseKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim() || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZXVlYXFhdWJydHJpd2F3bHRtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzY3MzkxMiwiZXhwIjoyMTAzMjQ5OTEyfQ.gwGMiH6LcPu47L2k5bq-A-cz-0UeaZCnvdy2GK8kQJg';
 const supabaseBucket = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'nbt-uploads';
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, {
   auth: { autoRefreshToken: false, persistSession: false },
