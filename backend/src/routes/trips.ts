@@ -228,7 +228,7 @@ export async function tripRoutes(app: FastifyInstance) {
       SET
         driver_name        = ${driverName},
         odometer_start     = ${odometer},
-        odometer_start_url = ${odometerPhotoUrl},
+        odometer_start_url = COALESCE(${odometerPhotoUrl ?? null}, odometer_start_url),
         diesel_start       = ${dieselLevel},
         status             = 'STARTED',
         start_date         = now()
@@ -243,6 +243,39 @@ export async function tripRoutes(app: FastifyInstance) {
 
     const trip = await buildTripResponse(id);
     return reply.code(200).send(trip);
+  });
+
+  // ── PATCH /api/trips/:id/photo ────────────────────────────────────────────
+  // Called after async image upload succeeds to update just the photo URL
+  app.patch('/:id/photo', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = req.params as { id: string };
+    const user = req.user as JWTUser;
+    const { photoUrl, photoField } = req.body as { photoUrl: string; photoField?: string };
+
+    if (!photoUrl || typeof photoUrl !== 'string') {
+      return reply.code(400).send({ error: 'photoUrl is required' });
+    }
+
+    const check = await sql`SELECT id FROM trips WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId}) LIMIT 1`;
+    if (check.length === 0) {
+      return reply.code(403).send({ error: 'Access denied.' });
+    }
+
+    const field = photoField || 'odometer_start_url';
+    const allowedFields = ['odometer_start_url', 'odometer_end_url', 'pod_photo_url'];
+    if (!allowedFields.includes(field)) {
+      return reply.code(400).send({ error: 'Invalid photoField' });
+    }
+
+    if (field === 'odometer_start_url') {
+      await sql`UPDATE trips SET odometer_start_url = ${photoUrl} WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})`;
+    } else if (field === 'odometer_end_url') {
+      await sql`UPDATE trips SET odometer_end_url = ${photoUrl} WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})`;
+    } else if (field === 'pod_photo_url') {
+      await sql`UPDATE trips SET pod_photo_url = ${photoUrl} WHERE id = ${id} AND (driver_id = ${user.driverId} OR id = ${user.tripId})`;
+    }
+
+    return reply.code(200).send({ success: true, photoUrl });
   });
 
   // ── POST /api/trips/:id/gps ───────────────────────────────────────────────
