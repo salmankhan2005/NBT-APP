@@ -127,9 +127,17 @@ export async function uploadRoutes(app: FastifyInstance) {
         }
 
         const publicUrl = `${getPublicHost(req)}/api/files/${fileId}`;
+        let supabasePublicUrl: string | undefined = undefined;
+        if (uploadedToSupabase && supabase) {
+          const { data: pUrlData } = supabase.storage.from(supabaseBucket).getPublicUrl(storagePath);
+          if (pUrlData?.publicUrl) {
+            supabasePublicUrl = pUrlData.publicUrl;
+          }
+        }
+        const finalUrl = supabasePublicUrl || publicUrl;
         app.log.info(`File uploaded to ${uploadedToSupabase ? 'Supabase Storage + Neon Backup' : 'Neon Postgres Database'}: ${fileId}`);
 
-        return reply.code(201).send({ url: publicUrl, filename: safeName, fileId });
+        return reply.code(201).send({ url: finalUrl, supabaseUrl: supabasePublicUrl, publicUrl, filename: safeName, fileId });
       } catch (err: any) {
         app.log.error('Upload error:', err);
         return reply.code(500).send({ error: 'Upload failed', message: err.message || 'Unknown error' });

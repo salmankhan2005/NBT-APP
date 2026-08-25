@@ -73,11 +73,17 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     return undefined;
   }
 
-  // Preserve valid base64 data URIs, blob URIs, and native local URIs directly
+  // Preserve valid base64 data URIs, blob URIs, and direct Supabase CDN URLs directly
   if (
     cleaned.startsWith('data:image/') ||
     cleaned.startsWith('data:application/') ||
     cleaned.startsWith('blob:') ||
+    cleaned.includes('supabase.co/storage/')
+  ) {
+    return cleaned;
+  }
+
+  if (
     cleaned.startsWith('file://') ||
     cleaned.startsWith('content://')
   ) {

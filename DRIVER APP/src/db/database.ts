@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { SHA256 } from 'crypto-js';
+import * as FileSystem from 'expo-file-system';
 
 // ── API Host Configuration ──────────────────────────────────────────────────
 const DEFAULT_API_HOST = 'https://nbt-app.onrender.com';
@@ -162,6 +163,7 @@ export const normalizeImageUrl = (url?: string | null): string | undefined => {
     cleaned.startsWith('data:image/') ||
     cleaned.startsWith('data:application/') ||
     cleaned.startsWith('blob:') ||
+    cleaned.includes('supabase.co/storage/') ||
     cleaned.startsWith('file://') ||
     cleaned.startsWith('content://')
   ) {
@@ -977,7 +979,9 @@ class DatabaseService {
       trimmed.startsWith('/uploads/') ||
       trimmed.startsWith('uploads/') ||
       trimmed.includes('/api/files/') ||
-      trimmed.includes('/uploads/')
+      trimmed.includes('/uploads/') ||
+      trimmed.startsWith('data:image/') ||
+      trimmed.startsWith('data:application/')
     ) {
       return normalizeImageUrl(trimmed) || trimmed;
     }
@@ -1024,8 +1028,23 @@ class DatabaseService {
       }
       console.warn('[DriverDB] Image upload returned unexpected response:', response.status);
     } catch (err) {
-      console.warn('[DriverDB] Image upload failed (offline?), using local URI:', err);
+      console.warn('[DriverDB] Image upload failed (offline?), preparing fallback:', err);
     }
+
+    // Device-local URI fallback: convert to base64 Data URI so it can be previewed cross-device on Admin App
+    try {
+      if ((trimmed.startsWith('file://') || trimmed.startsWith('content://')) && Platform.OS !== 'web') {
+        const base64 = await FileSystem.readAsStringAsync(trimmed, { encoding: FileSystem.EncodingType.Base64 });
+        if (base64) {
+          const ext = trimmed.split('.').pop()?.toLowerCase();
+          const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+          return `data:${mime};base64,${base64}`;
+        }
+      }
+    } catch (fsErr) {
+      console.warn('[DriverDB] FileSystem base64 fallback error:', fsErr);
+    }
+
     return trimmed;
   }
 
