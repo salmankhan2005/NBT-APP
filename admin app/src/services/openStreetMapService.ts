@@ -60,7 +60,7 @@ const isWeb = Platform.OS === 'web';
 
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 const OSRM_BASE = 'https://router.project-osrm.org';
-const USER_AGENT = 'NBT-ARS-FleetTransit-AdminApp/1.0';
+const USER_AGENT = 'NBT-ARS-FleetTransit-AdminApp/1.0 (admin@nbt.com)';
 
 import { API_HOST } from '../db/database';
 

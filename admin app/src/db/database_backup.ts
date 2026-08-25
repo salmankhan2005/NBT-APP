@@ -1218,7 +1218,7 @@ class AdminDatabase {
         formData.append('file', {
           uri: localUri,
           name: filename,
-          type: fileType || 'application/octet-stream',
+          type: fileType || (filename.toLowerCase().endsWith('.png') ? 'image/png' : filename.toLowerCase().endsWith('.webp') ? 'image/webp' : filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
         } as any);
       }
 

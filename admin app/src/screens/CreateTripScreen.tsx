@@ -59,7 +59,7 @@ interface CreateTripScreenProps {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 1000;
 
 // Expanded offline fallback database — covers common freight corridors in Tamil Nadu / Karnataka.
 // Used ONLY when the API key is not configured or network call fails.

@@ -998,6 +998,7 @@ class DatabaseService {
           httpMethod: 'POST',
           uploadType: FileSystem.FileSystemUploadType.MULTIPART,
           fieldName: 'file',
+          mimeType: trimmed.toLowerCase().endsWith('.png') ? 'image/png' : trimmed.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/jpeg',
           headers: {
             Authorization: `Bearer ${token}`,
           },
