@@ -78,8 +78,9 @@ export async function uploadRoutes(app: FastifyInstance) {
         }
 
         // Validate MIME type
-        const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'application/pdf'];
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif', 'application/pdf', 'application/octet-stream'];
         if (!allowedMimes.includes(data.mimetype)) {
+          app.log.error(`Upload rejected due to mimetype: ${data.mimetype}`);
           return reply.code(400).send({
             error: 'Invalid file type',
             message: `Only images and PDF files are allowed. Received: ${data.mimetype}`,
