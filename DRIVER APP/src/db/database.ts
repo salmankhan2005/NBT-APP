@@ -882,11 +882,11 @@ class DatabaseService {
     // Run image upload & backend API sync asynchronously in background
     (async () => {
       try {
-        let hostedPhotoUrl = initialOdoPhotoUrl;
-        if (rawOdoPhoto && (rawOdoPhoto.startsWith('file://') || rawOdoPhoto.startsWith('content://') || rawOdoPhoto.startsWith('data:') || rawOdoPhoto.startsWith('blob:'))) {
+        let hostedPhotoUrl: string | undefined = undefined;
+        if (rawOdoPhoto) {
           const uploaded = await this.uploadLocalImage(rawOdoPhoto);
-          if (uploaded) {
-            hostedPhotoUrl = normalizeImageUrl(uploaded) || uploaded;
+          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+            hostedPhotoUrl = uploaded;
             trip.odometerStartPhotoUri = hostedPhotoUrl;
             await this.notify();
           }
@@ -965,13 +965,13 @@ class DatabaseService {
   // ── Image Upload Helper ──────────────────────────────────────────────────
   /**
    * Uploads a local file:// URI to the backend and returns the hosted public URL.
-   * Falls back to returning the original URI if the upload fails (offline).
+   * Uses native FileSystem.uploadAsync on Android/iOS, fetch on Web, and Base64 Data URI on offline fallback.
    */
   private async uploadLocalImage(localUri: string): Promise<string> {
     if (!localUri || typeof localUri !== 'string') return '';
     const trimmed = localUri.trim();
 
-    // If it's already a hosted or relative URL, return the normalized URL directly
+    // 1. If it's already a hosted URL or Base64 Data URI, return it directly
     if (
       trimmed.startsWith('http://') ||
       trimmed.startsWith('https://') ||
@@ -986,6 +986,37 @@ class DatabaseService {
       return normalizeImageUrl(trimmed) || trimmed;
     }
 
+    if (!this.currentToken) {
+      this.currentToken = await safeGetItem('session_token');
+    }
+    const token = this.currentToken || 'mock-driver-token';
+
+    // 2. Native FileSystem.uploadAsync (Fast, rock-solid native streaming for Android/iOS)
+    if (Platform.OS !== 'web' && (trimmed.startsWith('file://') || trimmed.startsWith('content://'))) {
+      try {
+        const uploadResult = await FileSystem.uploadAsync(`${API_HOST}/api/upload`, trimmed, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'file',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (uploadResult.status >= 200 && uploadResult.status < 300) {
+          const json = JSON.parse(uploadResult.body);
+          if (json.url || json.publicUrl) {
+            const hostedUrl = normalizeImageUrl(json.url || json.publicUrl) || json.url || json.publicUrl;
+            console.log('[DriverDB] Native uploadAsync succeeded:', hostedUrl);
+            return hostedUrl;
+          }
+        }
+      } catch (nativeUploadErr) {
+        console.warn('[DriverDB] FileSystem.uploadAsync failed, attempting FormData fetch fallback:', nativeUploadErr);
+      }
+    }
+
+    // 3. Fallback to standard fetch with FormData
     try {
       const filename = trimmed.split('/').pop() || `photo_${Date.now()}.jpg`;
       const formData = new FormData();
@@ -1002,11 +1033,6 @@ class DatabaseService {
         } as any);
       }
 
-      if (!this.currentToken) {
-        this.currentToken = await safeGetItem('session_token');
-      }
-      const token = this.currentToken || 'mock-driver-token';
-
       const response = await fetch(`${API_HOST}/api/upload`, {
         method: 'POST',
         headers: {
@@ -1017,18 +1043,17 @@ class DatabaseService {
 
       if (response.ok) {
         const json = await response.json();
-        if (json.url) {
-          const hostedUrl = normalizeImageUrl(json.url) || json.url;
-          console.log('[DriverDB] Image uploaded successfully:', hostedUrl);
+        if (json.url || json.publicUrl) {
+          const hostedUrl = normalizeImageUrl(json.url || json.publicUrl) || json.url || json.publicUrl;
+          console.log('[DriverDB] FormData upload succeeded:', hostedUrl);
           return hostedUrl;
         }
       }
-      console.warn('[DriverDB] Image upload returned unexpected response:', response.status);
     } catch (err) {
-      console.warn('[DriverDB] Image upload failed (offline?), preparing fallback:', err);
+      console.warn('[DriverDB] FormData upload failed (offline?):', err);
     }
 
-    // Device-local URI fallback: convert to base64 Data URI so it can be previewed cross-device on Admin App
+    // 4. Offline Fallback: Convert to Base64 Data URI so Admin App can ALWAYS view it across devices
     try {
       if ((trimmed.startsWith('file://') || trimmed.startsWith('content://')) && Platform.OS !== 'web') {
         const base64 = await FileSystem.readAsStringAsync(trimmed, { encoding: FileSystem.EncodingType.Base64 });
@@ -1039,10 +1064,10 @@ class DatabaseService {
         }
       }
     } catch (fsErr) {
-      console.warn('[DriverDB] FileSystem base64 fallback error:', fsErr);
+      console.warn('[DriverDB] Base64 conversion fallback error:', fsErr);
     }
 
-    return trimmed;
+    return '';
   }
 
   async uploadPodPhoto(localUri: string): Promise<string | null> {
@@ -1084,11 +1109,11 @@ class DatabaseService {
     // Perform image upload and backend API sync asynchronously in background
     (async () => {
       try {
-        let hostedReceiptUrl: string | undefined = initialReceiptUrl;
-        if (rawReceiptUri && (rawReceiptUri.startsWith('file://') || rawReceiptUri.startsWith('content://') || rawReceiptUri.startsWith('data:') || rawReceiptUri.startsWith('blob:'))) {
+        let hostedReceiptUrl: string | undefined = undefined;
+        if (rawReceiptUri) {
           const uploadedReceiptUrl = await this.uploadLocalImage(rawReceiptUri);
-          if (uploadedReceiptUrl && (uploadedReceiptUrl.startsWith('http') || uploadedReceiptUrl.startsWith('/api/'))) {
-            hostedReceiptUrl = normalizeImageUrl(uploadedReceiptUrl) || uploadedReceiptUrl;
+          if (uploadedReceiptUrl && (uploadedReceiptUrl.startsWith('http') || uploadedReceiptUrl.startsWith('/api') || uploadedReceiptUrl.startsWith('data:image/'))) {
+            hostedReceiptUrl = uploadedReceiptUrl;
             newExpense.receiptUri = hostedReceiptUrl;
             await this.notify();
           }
@@ -1151,11 +1176,11 @@ class DatabaseService {
     // Run image upload & backend API sync asynchronously in background
     (async () => {
       try {
-        let finalPhotoUrl = initialPhotoUrl;
-        if (rawPhoto && (rawPhoto.startsWith('file://') || rawPhoto.startsWith('content://') || rawPhoto.startsWith('data:') || rawPhoto.startsWith('blob:'))) {
+        let finalPhotoUrl: string | undefined = undefined;
+        if (rawPhoto) {
           const uploaded = await this.uploadPodPhoto(rawPhoto);
-          if (uploaded) {
-            finalPhotoUrl = normalizeImageUrl(uploaded) || uploaded;
+          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+            finalPhotoUrl = uploaded;
             trip.podPhotoUri = finalPhotoUrl;
             await this.notify();
           }
@@ -1241,11 +1266,11 @@ class DatabaseService {
     // Run image upload & backend API sync asynchronously in background
     (async () => {
       try {
-        let hostedEndPhotoUrl = initialEndPhotoUrl;
-        if (rawEndPhoto && (rawEndPhoto.startsWith('file://') || rawEndPhoto.startsWith('content://') || rawEndPhoto.startsWith('data:') || rawEndPhoto.startsWith('blob:'))) {
+        let hostedEndPhotoUrl: string | undefined = undefined;
+        if (rawEndPhoto) {
           const uploaded = await this.uploadLocalImage(rawEndPhoto);
-          if (uploaded) {
-            hostedEndPhotoUrl = normalizeImageUrl(uploaded) || uploaded;
+          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+            hostedEndPhotoUrl = uploaded;
             trip.odometerEndPhotoUri = hostedEndPhotoUrl;
             await this.notify();
           }

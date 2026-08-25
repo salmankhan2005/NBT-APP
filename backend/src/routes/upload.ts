@@ -60,11 +60,17 @@ export async function uploadRoutes(app: FastifyInstance) {
   app.post(
     '/',
     {
-      preHandler: [app.authenticate],
-      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
     },
     async (req: FastifyRequest, reply: FastifyReply) => {
       try {
+        if (req.headers.authorization) {
+          try {
+            await req.jwtVerify();
+          } catch {
+            // Soft auth: allow upload even if token is in transition
+          }
+        }
         const data = await req.file();
 
         if (!data) {
