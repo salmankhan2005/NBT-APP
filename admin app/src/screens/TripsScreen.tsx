@@ -928,17 +928,27 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                 {selectedTrip.odometerStartPhotoUri ? (
                   <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: '#f0f4f8', padding: 10, borderRadius: 8 }}>
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 Initial Odometer Photo (Driver Upload):</Text>
-                    <Image
-                      source={{ uri: normalizeImageUrl(selectedTrip.odometerStartPhotoUri) || selectedTrip.odometerStartPhotoUri }}
-                      style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#e2e8f0' }}
-                      resizeMode="contain"
-                    />
-                    <TouchableOpacity
-                      style={{ marginTop: 6, alignSelf: 'flex-start' }}
-                      onPress={() => Linking.openURL(normalizeImageUrl(selectedTrip.odometerStartPhotoUri) || selectedTrip.odometerStartPhotoUri!)}
-                    >
-                      <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
-                    </TouchableOpacity>
+                    {selectedTrip.odometerStartPhotoUri.startsWith('file://') || selectedTrip.odometerStartPhotoUri.startsWith('content://') ? (
+                      <View style={{ padding: 14, backgroundColor: '#f1f5f9', borderRadius: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center' }}>
+                        <MaterialIcons name="cloud-off" size={28} color={COLORS.primary} />
+                        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
+                        <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, textAlign: 'center' }}>Start a new trip to test live Supabase Storage image preview!</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <Image
+                          source={{ uri: normalizeImageUrl(selectedTrip.odometerStartPhotoUri) || selectedTrip.odometerStartPhotoUri }}
+                          style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#ffffff' }}
+                          resizeMode="contain"
+                        />
+                        <TouchableOpacity
+                          style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                          onPress={() => Linking.openURL(normalizeImageUrl(selectedTrip.odometerStartPhotoUri) || selectedTrip.odometerStartPhotoUri!)}
+                        >
+                          <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 ) : null}
                 <View style={styles.detailRow}>
@@ -972,17 +982,26 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                 {selectedTrip.odometerEndPhotoUri ? (
                   <View style={{ marginTop: 8, marginBottom: 12, backgroundColor: '#f0f4f8', padding: 10, borderRadius: 8 }}>
                     <Text style={[styles.detailLabel, { fontWeight: 'bold', marginBottom: 6 }]}>📸 End Odometer Photo:</Text>
-                    <Image
-                      source={{ uri: normalizeImageUrl(selectedTrip.odometerEndPhotoUri) || selectedTrip.odometerEndPhotoUri }}
-                      style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#e2e8f0' }}
-                      resizeMode="contain"
-                    />
-                    <TouchableOpacity
-                      style={{ marginTop: 6, alignSelf: 'flex-start' }}
-                      onPress={() => Linking.openURL(normalizeImageUrl(selectedTrip.odometerEndPhotoUri) || selectedTrip.odometerEndPhotoUri!)}
-                    >
-                      <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
-                    </TouchableOpacity>
+                    {selectedTrip.odometerEndPhotoUri.startsWith('file://') || selectedTrip.odometerEndPhotoUri.startsWith('content://') ? (
+                      <View style={{ padding: 14, backgroundColor: '#f1f5f9', borderRadius: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center' }}>
+                        <MaterialIcons name="cloud-off" size={28} color={COLORS.primary} />
+                        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <Image
+                          source={{ uri: normalizeImageUrl(selectedTrip.odometerEndPhotoUri) || selectedTrip.odometerEndPhotoUri }}
+                          style={{ width: '100%', maxWidth: 350, height: 200, borderRadius: 8, borderWidth: 1, borderColor: COLORS.outlineVariant, backgroundColor: '#ffffff' }}
+                          resizeMode="contain"
+                        />
+                        <TouchableOpacity
+                          style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                          onPress={() => Linking.openURL(normalizeImageUrl(selectedTrip.odometerEndPhotoUri) || selectedTrip.odometerEndPhotoUri!)}
+                        >
+                          <Text style={{ color: COLORS.primary, fontWeight: 'bold', fontSize: 12 }}>Open Full Image ↗</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 ) : null}
                 <View style={styles.detailRow}>
