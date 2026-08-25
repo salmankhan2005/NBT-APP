@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "NBT-ARS Driver App",
+    "name": "NBT Logistics Driver",
     "slug": "nbt-ars-driver",
+    "scheme": "nbt-driver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#031635",
         "foregroundImage": "./assets/icon.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

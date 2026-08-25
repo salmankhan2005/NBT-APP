@@ -1,5 +1,4 @@
-﻿import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const getApiHost = (): string => {
@@ -392,8 +391,8 @@ class AdminDatabase {
 
   async loadSession() {
     try {
-      this.token = await SecureStore.getItemAsync('admin_session_token');
-      this.currentUsername = await SecureStore.getItemAsync('admin_username');
+      this.token = await AsyncStorage.getItem('admin_session_token');
+      this.currentUsername = await AsyncStorage.getItem('admin_username');
       
       const savedVehicles = await AsyncStorage.getItem('nbt_managed_vehicles');
       if (savedVehicles) {
@@ -404,7 +403,7 @@ class AdminDatabase {
         this.vehicleDocuments = JSON.parse(savedDocs);
       }
     } catch (e) {
-      console.warn('SecureStore unavailable, loading session in-memory');
+      console.warn('Storage unavailable, loading session in-memory');
       this.token = 'local-fallback-token';
     }
   }
@@ -450,8 +449,8 @@ class AdminDatabase {
           this.token = data.token;
           this.currentUsername = data.username || username;
           try {
-            await SecureStore.setItemAsync('admin_session_token', this.token!);
-            await SecureStore.setItemAsync('admin_username', this.currentUsername!);
+            await AsyncStorage.setItem('admin_session_token', this.token!);
+            await AsyncStorage.setItem('admin_username', this.currentUsername!);
           } catch (e) {}
           this.notify();
           return true;
@@ -464,8 +463,8 @@ class AdminDatabase {
         this.token = 'local-fallback-token';
         this.currentUsername = 'admin';
         try {
-          await SecureStore.setItemAsync('admin_session_token', this.token);
-          await SecureStore.setItemAsync('admin_username', this.currentUsername);
+          await AsyncStorage.setItem('admin_session_token', this.token);
+          await AsyncStorage.setItem('admin_username', this.currentUsername);
         } catch (e) {}
         this.notify();
         return true;
@@ -478,8 +477,8 @@ class AdminDatabase {
     this.token = null;
     this.currentUsername = null;
     try {
-      await SecureStore.deleteItemAsync('admin_session_token');
-      await SecureStore.deleteItemAsync('admin_username');
+      await AsyncStorage.removeItem('admin_session_token');
+      await AsyncStorage.removeItem('admin_username');
     } catch (e) {}
     this.notify();
   }
