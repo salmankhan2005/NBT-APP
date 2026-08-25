@@ -178,79 +178,229 @@ function getMockPlaceDetails(placeId: string): PlaceDetails | null {
   return mocks[placeId] || null;
 }
 
-// ─── PLACES AUTOCOMPLETE (Nominatim Search) ──────────────────────────────────
+// In-memory cache for fast, 0ms lookup of recently searched places
+const placeCache = new Map<string, PlaceDetails>();
+
+// ─── PLACES AUTOCOMPLETE (Nominatim + Photon Search) ──────────────────────────
 /**
- * Fetches place suggestions using Nominatim search API.
- * Uses local backend proxy first to avoid browser CORS issues.
+ * Fetches accurate place suggestions for Indian addresses and locations.
+ * Uses Nominatim with India countrycode + Photon fallback for typo-tolerance.
  */
 export async function searchPlacesAutocomplete(
   query: string,
-  sessionToken: string
+  sessionToken?: string
 ): Promise<PlaceAutocompleteResult[]> {
-  if (!query.trim()) return [];
+  const cleanQuery = query?.trim();
+  if (!cleanQuery || cleanQuery.length < 2) return [];
 
-  // 1. Try Backend Proxy (uses Nominatim internally, bypasses CORS)
+  // Strategy 1: Direct Nominatim Search (OpenStreetMap, India filtered)
+  try {
+    const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(cleanQuery)}&format=json&addressdetails=1&limit=10&countrycodes=in&accept-language=en`;
+    const res = await fetch(url, {
+      headers: Platform.OS !== 'web' ? { 'User-Agent': USER_AGENT } : undefined,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((item: any): PlaceAutocompleteResult => {
+          const placeId = `osm_${item.osm_type || 'node'}_${item.osm_id || item.place_id}`;
+          const mainText = item.name || item.display_name?.split(',')[0]?.trim() || cleanQuery;
+          const secondaryParts = item.display_name?.split(',').slice(1).map((s: string) => s.trim()).filter(Boolean) || [];
+          const secondaryText = secondaryParts.join(', ');
+          const fullDescription = item.display_name || `${mainText}, ${secondaryText}`;
+
+          // Cache details immediately for 0ms lookup on select
+          const lat = parseFloat(item.lat);
+          const lng = parseFloat(item.lon);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            placeCache.set(placeId, {
+              placeName: mainText,
+              formattedAddress: fullDescription,
+              latitude: lat,
+              longitude: lng,
+              placeId,
+              mapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+              viewport: item.boundingbox ? {
+                northeast: { lat: parseFloat(item.boundingbox[1]), lng: parseFloat(item.boundingbox[3]) },
+                southwest: { lat: parseFloat(item.boundingbox[0]), lng: parseFloat(item.boundingbox[2]) },
+              } : undefined,
+            });
+          }
+
+          return {
+            placeId,
+            mainText,
+            secondaryText,
+            fullDescription,
+          };
+        });
+      }
+    }
+  } catch (nomErr) {
+    console.warn('[OSMMaps] Direct Nominatim search error:', nomErr);
+  }
+
+  // Strategy 2: Photon Geocoder (OSM-based by Komoot, high-speed fuzzy search)
+  try {
+    const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=10&lat=12.9716&lon=77.5946&bbox=68.1,6.5,97.4,35.5`;
+    const res = await fetch(photonUrl);
+    if (res.ok) {
+      const data = await res.json() as any;
+      if (Array.isArray(data.features) && data.features.length > 0) {
+        return data.features.map((feature: any): PlaceAutocompleteResult => {
+          const props = feature.properties || {};
+          const coords = feature.geometry?.coordinates; // [lng, lat]
+          const name = props.name || props.street || cleanQuery;
+          const contextParts = [
+            props.city || props.town || props.village || props.district,
+            props.state,
+            props.country || 'India',
+          ].filter(Boolean);
+          const secondaryText = contextParts.join(', ');
+          const fullDescription = [name, ...contextParts].filter(Boolean).join(', ');
+          const placeId = `photon_${props.osm_type || 'N'}_${props.osm_id || Math.abs(props.name?.length || 0)}_${coords ? `${coords[1].toFixed(4)}_${coords[0].toFixed(4)}` : Date.now()}`;
+
+          if (coords && coords.length >= 2) {
+            const lat = coords[1];
+            const lng = coords[0];
+            placeCache.set(placeId, {
+              placeName: name,
+              formattedAddress: fullDescription,
+              latitude: lat,
+              longitude: lng,
+              placeId,
+              mapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+            });
+          }
+
+          return {
+            placeId,
+            mainText: name,
+            secondaryText,
+            fullDescription,
+          };
+        });
+      }
+    }
+  } catch (photonErr) {
+    console.warn('[OSMMaps] Photon search error:', photonErr);
+  }
+
+  // Strategy 3: Backend Proxy
   try {
     const headers = await getAuthHeaders();
-    const proxyUrl = `${PROXY_BASE}/places/autocomplete?input=${encodeURIComponent(query)}&sessiontoken=${encodeURIComponent(sessionToken)}&provider=osm`;
+    const proxyUrl = `${PROXY_BASE}/places/autocomplete?input=${encodeURIComponent(cleanQuery)}&provider=osm`;
     const res = await fetch(proxyUrl, { headers });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.predictions) && data.predictions.length > 0) {
-        return (data.predictions || []).map((p: any): PlaceAutocompleteResult => ({
-          placeId: p.place_id,
-          mainText: p.structured_formatting?.main_text || p.description,
-          secondaryText: p.structured_formatting?.secondary_text || '',
-          fullDescription: p.description,
-        }));
+        return (data.predictions || []).map((p: any): PlaceAutocompleteResult => {
+          const item: PlaceAutocompleteResult = {
+            placeId: p.place_id,
+            mainText: p.structured_formatting?.main_text || p.description,
+            secondaryText: p.structured_formatting?.secondary_text || '',
+            fullDescription: p.description,
+          };
+          if (p._osm?.lat && p._osm?.lon) {
+            placeCache.set(p.place_id, {
+              placeName: item.mainText,
+              formattedAddress: item.fullDescription,
+              latitude: parseFloat(p._osm.lat),
+              longitude: parseFloat(p._osm.lon),
+              placeId: p.place_id,
+              mapsUrl: `https://www.google.com/maps/search/?api=1&query=${p._osm.lat},${p._osm.lon}`,
+            });
+          } else if (p._known?.lat && p._known?.lng) {
+            placeCache.set(p.place_id, {
+              placeName: item.mainText,
+              formattedAddress: item.fullDescription,
+              latitude: p._known.lat,
+              longitude: p._known.lng,
+              placeId: p.place_id,
+              mapsUrl: `https://www.google.com/maps/search/?api=1&query=${p._known.lat},${p._known.lng}`,
+            });
+          }
+          return item;
+        });
       }
     }
   } catch (proxyErr) {
     console.warn('[OSMMaps] Proxy fetch failed:', proxyErr);
   }
 
-  // 2. Direct Nominatim fallback (Disabled on Web to avoid CORS)
-  if (isWeb) {
-    console.warn('[OSMMaps] Direct fetch to Nominatim skipped on Web (CORS). Returning fallback.');
-    return getFallbackAutocomplete(query);
-  }
-
-  try {
-    const url = `${NOMINATIM_BASE}/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=8&countrycodes=in&accept-language=en`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
-    });
-    const data = await res.json();
-
-    if (!Array.isArray(data) || data.length === 0) {
-      return getFallbackAutocomplete(query);
-    }
-
-    return data.map((item: any): PlaceAutocompleteResult => ({
-      placeId: `osm_${item.osm_type}_${item.osm_id}`,
-      mainText: item.name || item.display_name?.split(',')[0] || '',
-      secondaryText: item.display_name?.split(',').slice(1).join(',').trim() || '',
-      fullDescription: item.display_name || '',
-    }));
-  } catch (err) {
-    console.warn('[OSMMaps] Nominatim search failed:', err);
-    return getFallbackAutocomplete(query);
-  }
+  // Strategy 4: Local freight corridors fallback
+  return getFallbackAutocomplete(cleanQuery);
 }
 
 // ─── PLACE DETAILS (Nominatim Lookup) ─────────────────────────────────────────
 /**
- * Fetches full details for a place ID using Nominatim.
- * Supports our custom osm_<type>_<id> format and mock place IDs.
+ * Fetches full details for a place ID using cached memory, Nominatim lookup, or backend proxy.
  */
 export async function getPlaceDetails(
   placeId: string,
-  sessionToken: string
+  sessionToken?: string
 ): Promise<PlaceDetails | null> {
+  if (!placeId) return null;
+
+  // 1. Check in-memory cache from search step (Instant 0ms!)
+  const cached = placeCache.get(placeId);
+  if (cached) return cached;
+
   const mockMatch = getMockPlaceDetails(placeId);
   if (mockMatch) return mockMatch;
 
-  // 1. Try Backend Proxy
+  // 2. Parse direct coordinates from placeId
+  const coordMatch = placeId.match(/^(?:GEO-|photon_.*_)(-?\d+\.\d+)[_,](-?\d+\.\d+)$/);
+  if (coordMatch) {
+    const lat = parseFloat(coordMatch[1]);
+    const lng = parseFloat(coordMatch[2]);
+    return {
+      placeName: 'Selected Location',
+      formattedAddress: `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      latitude: lat,
+      longitude: lng,
+      placeId,
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+    };
+  }
+
+  // 3. Direct Nominatim Lookup
+  const osmMatch = placeId.match(/^osm_([a-z]+)_(\d+)$/i);
+  if (osmMatch) {
+    try {
+      const typeLetter = osmMatch[1][0].toUpperCase(); // N, W, R
+      const osmId = osmMatch[2];
+      const url = `${NOMINATIM_BASE}/lookup?osm_ids=${typeLetter}${osmId}&format=json&addressdetails=1&accept-language=en`;
+      const res = await fetch(url, {
+        headers: Platform.OS !== 'web' ? { 'User-Agent': USER_AGENT } : undefined,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const item = data[0];
+          const mainText = item.name || item.display_name?.split(',')[0]?.trim() || '';
+          const details: PlaceDetails = {
+            placeName: mainText,
+            formattedAddress: item.display_name || '',
+            latitude: parseFloat(item.lat),
+            longitude: parseFloat(item.lon),
+            placeId,
+            mapsUrl: `https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lon}`,
+            viewport: item.boundingbox ? {
+              northeast: { lat: parseFloat(item.boundingbox[1]), lng: parseFloat(item.boundingbox[3]) },
+              southwest: { lat: parseFloat(item.boundingbox[0]), lng: parseFloat(item.boundingbox[2]) },
+            } : undefined,
+          };
+          placeCache.set(placeId, details);
+          return details;
+        }
+      }
+    } catch (nomErr) {
+      console.warn('[OSMMaps] Direct Nominatim lookup error:', nomErr);
+    }
+  }
+
+  // 4. Try Backend Proxy
   try {
     const headers = await getAuthHeaders();
     const proxyUrl = `${PROXY_BASE}/places/details?place_id=${encodeURIComponent(placeId)}&provider=osm`;
@@ -260,7 +410,7 @@ export async function getPlaceDetails(
       if (data.result) {
         const result = data.result;
         const loc = result.geometry?.location;
-        return {
+        const details: PlaceDetails = {
           placeName: result.name || result.formatted_address,
           formattedAddress: result.formatted_address || '',
           latitude: loc?.lat ?? 0,
@@ -269,50 +419,15 @@ export async function getPlaceDetails(
           mapsUrl: result.url || `https://www.google.com/maps/search/?api=1&query=${loc?.lat},${loc?.lng}`,
           viewport: result.geometry?.viewport,
         };
+        placeCache.set(placeId, details);
+        return details;
       }
     }
   } catch (proxyErr) {
     console.warn('[OSMMaps] Proxy details failed:', proxyErr);
   }
 
-  // 2. Direct Nominatim fallback (Disabled on Web)
-  if (isWeb) {
-    console.warn('[OSMMaps] Direct Nominatim skipped on Web (CORS).');
-    return null;
-  }
-
-  // Parse OSM place_id format: osm_<type>_<id>
-  const osmMatch = placeId.match(/^osm_(node|way|relation)_(\d+)$/);
-  if (!osmMatch) return null;
-
-  try {
-    const osmType = osmMatch[1][0].toUpperCase(); // N, W, R
-    const osmId = osmMatch[2];
-    const url = `${NOMINATIM_BASE}/lookup?osm_ids=${osmType}${osmId}&format=json&addressdetails=1&accept-language=en`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
-    });
-    const data = await res.json();
-
-    if (!Array.isArray(data) || data.length === 0) return null;
-
-    const item = data[0];
-    return {
-      placeName: item.name || item.display_name?.split(',')[0] || '',
-      formattedAddress: item.display_name || '',
-      latitude: parseFloat(item.lat),
-      longitude: parseFloat(item.lon),
-      placeId: placeId,
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lon}`,
-      viewport: item.boundingbox ? {
-        northeast: { lat: parseFloat(item.boundingbox[1]), lng: parseFloat(item.boundingbox[3]) },
-        southwest: { lat: parseFloat(item.boundingbox[0]), lng: parseFloat(item.boundingbox[2]) },
-      } : undefined,
-    };
-  } catch (err) {
-    console.warn('[OSMMaps] Nominatim lookup failed:', err);
-    return null;
-  }
+  return null;
 }
 
 // ─── GEOCODE / RESOLVE URL ────────────────────────────────────────────────────
@@ -497,41 +612,33 @@ export async function reverseGeocode(lat: number, lng: number): Promise<PlaceDet
     console.warn('[OSMMaps] Proxy reverse geocode failed:', proxyErr);
   }
 
-  // 2. Direct Nominatim fallback (Disabled on Web to prevent CORS error)
-  if (isWeb) {
-    console.warn('[OSMMaps] Direct Nominatim reverse geocode skipped on Web (CORS).');
-    return null;
-  }
-
+  // Direct Nominatim reverse geocode
   try {
     const url = `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: Platform.OS !== 'web' ? { 'User-Agent': USER_AGENT } : undefined,
     });
     const data = await res.json();
 
-    if (data.error) {
-      console.warn('[OSMMaps] Reverse geocode error:', data.error);
-      return null;
+    if (data && !data.error) {
+      const shortName = data.name || data.display_name?.split(',')[0]?.trim() || '';
+      return {
+        placeName: shortName || extractShortName(data.display_name || ''),
+        formattedAddress: data.display_name || '',
+        latitude: lat,
+        longitude: lng,
+        placeId: `osm_${data.osm_type || 'node'}_${data.osm_id || '0'}`,
+        mapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+      };
     }
-
-    const shortName = data.name || data.display_name?.split(',')[0]?.trim() || '';
-    return {
-      placeName: shortName || extractShortName(data.display_name || ''),
-      formattedAddress: data.display_name || '',
-      latitude: lat,
-      longitude: lng,
-      placeId: `osm_${data.osm_type}_${data.osm_id}`,
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
-    };
   } catch (err) {
     console.warn('[OSMMaps] Reverse geocode fetch failed:', err);
-    return null;
   }
+
+  return null;
 }
 
 function extractShortName(formattedAddress: string): string {
-  // Return the first comma-delimited part as the short place name
   return formattedAddress.split(',')[0].trim();
 }
 
@@ -545,7 +652,49 @@ export async function getDirections(
   destinationPlaceId: string,
   vehicleType?: string
 ): Promise<DirectionsResult | null> {
-  // 1. Try Backend Proxy
+  // Resolve place IDs to coordinates
+  const originCoords = await resolvePlaceIdToCoords(originPlaceId);
+  const destCoords = await resolvePlaceIdToCoords(destinationPlaceId);
+
+  if (originCoords && destCoords) {
+    try {
+      // OSRM expects lng,lat
+      const url = `${OSRM_BASE}/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&geometries=polyline`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.code === 'Ok' && data.routes?.length) {
+          const route = data.routes[0];
+          const distMeters = Math.round(route.distance);
+          const durationSecs = Math.round(route.duration);
+          const distanceKm = Math.round(distMeters / 1000);
+          const durationMins = Math.round(durationSecs / 60);
+
+          let durationText: string;
+          if (durationMins >= 60) {
+            const hrs = Math.floor(durationMins / 60);
+            const mins = durationMins % 60;
+            durationText = mins > 0 ? `${hrs} hr ${mins} mins` : `${hrs} hr`;
+          } else {
+            durationText = `${durationMins} mins`;
+          }
+
+          return {
+            distanceKm,
+            distanceText: `${distanceKm} km`,
+            durationText,
+            routeSummary: route.legs?.[0]?.summary || 'via road',
+            startAddress: originPlaceId,
+            endAddress: destinationPlaceId,
+          };
+        }
+      }
+    } catch (osrmErr) {
+      console.warn('[OSMMaps] Direct OSRM directions error:', osrmErr);
+    }
+  }
+
+  // Fallback to Backend Proxy
   try {
     const headers = await getAuthHeaders();
     const proxyUrl = `${PROXY_BASE}/directions?origin=${encodeURIComponent(`place_id:${originPlaceId}`)}&destination=${encodeURIComponent(`place_id:${destinationPlaceId}`)}`;
@@ -571,55 +720,7 @@ export async function getDirections(
     console.warn('[OSMMaps] Proxy directions failed:', proxyErr);
   }
 
-  // 2. Direct OSRM fallback (Disabled on Web)
-  if (isWeb) {
-    console.warn('[OSMMaps] Direct OSRM skipped on Web (CORS).');
-    return null;
-  }
-
-  // Resolve place IDs to coordinates
-  const originCoords = await resolvePlaceIdToCoords(originPlaceId);
-  const destCoords = await resolvePlaceIdToCoords(destinationPlaceId);
-
-  if (!originCoords || !destCoords) return null;
-
-  try {
-    // OSRM expects lng,lat
-    const url = `${OSRM_BASE}/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&geometries=polyline`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
-    });
-    const data = await res.json();
-
-    if (data.code !== 'Ok' || !data.routes?.length) return null;
-
-    const route = data.routes[0];
-    const distMeters = Math.round(route.distance);
-    const durationSecs = Math.round(route.duration);
-    const distanceKm = Math.round(distMeters / 1000);
-    const durationMins = Math.round(durationSecs / 60);
-
-    let durationText: string;
-    if (durationMins >= 60) {
-      const hrs = Math.floor(durationMins / 60);
-      const mins = durationMins % 60;
-      durationText = mins > 0 ? `${hrs} hr ${mins} mins` : `${hrs} hr`;
-    } else {
-      durationText = `${durationMins} mins`;
-    }
-
-    return {
-      distanceKm,
-      distanceText: `${distanceKm} km`,
-      durationText,
-      routeSummary: route.legs?.[0]?.summary || 'via road',
-      startAddress: originPlaceId,
-      endAddress: destinationPlaceId,
-    };
-  } catch (err) {
-    console.warn('[OSMMaps] OSRM directions failed:', err);
-    return null;
-  }
+  return null;
 }
 
 /**

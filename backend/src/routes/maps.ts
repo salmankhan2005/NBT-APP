@@ -14,7 +14,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 const OSRM_BASE = 'https://router.project-osrm.org';
-const USER_AGENT = 'NBT-ARS-FleetTransit/1.0';
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NBTLogisticsApp/2.0 (contact: info@nbtlogistics.in)';
 
 const KNOWN_PLACE_COORDS: Record<string, { lat: number; lng: number }> = {
   salem: { lat: 11.6643, lng: 78.146 },
