@@ -59,6 +59,7 @@ const app = Fastify({
         ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } }
         : undefined,
   },
+  bodyLimit: 50 * 1024 * 1024, // 50MB to support large Base64 fallbacks for offline sync
 });
 
 // ── Validate required environment variables ──────────────────────────────────
