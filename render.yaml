@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: nbt-ars-backend
+    runtime: node
+    region: singapore   # closest region to India
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false          # you will paste this in Render dashboard
+      - key: JWT_SECRET
+        sync: false          # you will paste this in Render dashboard
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false          # paste your frontend URL after deploying the web app
+      - key: PUBLIC_HOST
+        sync: false          # set to the public HTTPS backend URL, e.g. https://nbt-app.onrender.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false          # backend only; never expose to either web app
+      - key: SUPABASE_STORAGE_BUCKET
+        value: nbt-uploads
+      - key: AUTH_RATE_LIMIT_MAX
+        value: "20"
+      - key: AUTH_RATE_LIMIT_WINDOW_MS
+        value: "60000"

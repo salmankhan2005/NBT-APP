@@ -1,0 +1,145 @@
+patterns:
+  # Authentication & Credentials
+  - rule_name: hardcoded_admin_pin
+    substrings: ["pin=", "PIN = ", "hardcoded_pin"]
+    reminder: "Hardcoded PIN detected. All credentials must be loaded from secure config/backend, never hardcoded."
+
+  - rule_name: hardcoded_session_token
+    substrings: ["session_token = '", "session_token = \"", "token = '", "token = \""]
+    regex: "\\w+\\s*=\\s*['\"](?:admin|driver)_[a-zA-Z0-9]{20,}['\"]"
+    reminder: "Hardcoded session token found. Tokens must be generated dynamically with crypto.randomBytes() and validated on backend."
+
+  - rule_name: api_key_exposure
+    substrings: ["sk_live_", "sk_test_", "AKIA", "api_key ="]
+    reminder: "API key or secret detected in code. Load from environment variables or secret manager, never hardcode."
+
+  - rule_name: password_comparison_insecure
+    regex: "\\w+\\s*===\\s*\\w+"
+    paths: ["**/src/**"]
+    reminder: "Insecure equality comparison detected. Use crypto.timingSafeEqual() for PIN/token comparison to prevent timing attacks."
+
+  # Sensitive Data Logging
+  - rule_name: log_sensitive_driver_data
+    regex: "(console\\.(log|info|warn|error)|logger\\.(info|debug|warn|error))\\([^)]*(?:pin|password|token|driver_id|session_token)[^)]*\\)"
+    reminder: "Logging sensitive data. Never log PINs, passwords, tokens, or session identifiers at any level."
+
+  - rule_name: log_raw_gps_coordinates
+    regex: "(console\\.(log|info|warn|error)|logger\\.(info|debug))\\([^)]*(?:latitude|longitude|location|gps)[^)]*\\)"
+    reminder: "Logging GPS coordinates at INFO level. GPS data is HIGH sensitivity. Log sanitized references only (e.g., trip_id hash)."
+
+  - rule_name: log_payment_account
+    substrings: ["console.log(payment", "logger.info(account", "console.log(bank"]
+    reminder: "Logging payment/account data. Do not log payment account numbers, bank details, or UPI IDs at any level."
+
+  # AsyncStorage Misuse
+  - rule_name: sensitive_data_in_asyncstorage
+    regex: "await\\s+AsyncStorage\\.setItem\\(['\"](?:pin|password|token|session_token|admin_session)['\"]"
+    reminder: "Storing sensitive data in AsyncStorage (unencrypted). Use expo-secure-store for credentials, PINs, and tokens."
+
+  - rule_name: asyncstorage_no_encryption
+    regex: "setItem\\(['\"].*(?:secret|auth|credential)['\"]"
+    reminder: "AsyncStorage does not encrypt data. Use expo-secure-store for any authentication or credential storage."
+
+  # Input Validation
+  - rule_name: missing_trip_id_validation
+    regex: "trip_id\\s*[=:]\\s*req\\.body\\.trip_id"
+    paths: ["**/src/**", "**/backend/**"]
+    reminder: "Trip ID from request body without validation. Validate trip_id format and length before database queries."
+
+  - rule_name: sql_like_injection_risk
+    regex: "\\.filter\\(.*==.*\\)|\\.where\\(.*==.*\\)"
+    reminder: "Potential injection risk in filter. Validate and sanitize all user inputs before database queries."
+
+  # Authorization
+  - rule_name: admin_route_without_auth_check
+    regex: "router\\.(post|get|put|delete)\\(['\"].*admin.*['\"].*=>\\s*\\{(?!.*(?:verify|auth|admin_role|is_admin))"
+    reminder: "Admin route detected without authorization check. Verify admin_role or is_admin flag before any database operation."
+
+  - rule_name: driver_cross_access_risk
+    regex: "getTrip\\(['\"]driver_id['\"].*=>.*[^filter]*db\\.(trips|expenses)"
+    reminder: "Driver may access trips not assigned to them. Filter all driver queries by authenticated driver_id."
+
+  # Offline/Sync Security
+  - rule_name: stale_sync_action
+    regex: "SyncAction.*timestamp|sync.*queue.*age"
+    reminder: "Offline sync detected. Validate timestamp of sync actions before merge; reject actions older than 7 days."
+
+  # Signature Handling
+  - rule_name: signature_no_validation
+    regex: "setSignature\\(|uploadSignature\\(.*=>\\s*\\{(?!.*(?:validate|size|format|jpeg|png))"
+    reminder: "Signature capture without validation. Validate file size (< 2 MB), format (JPEG/PNG only), before encoding."
+
+  - rule_name: signature_plaintext_storage
+    regex: "AsyncStorage.*signature|localStorage.*signature"
+    reminder: "Storing signature in AsyncStorage. Signatures are HIGH sensitivity. Transmit to backend immediately and delete locally."
+
+  # Cryptography
+  - rule_name: weak_hash_algorithm
+    regex: "crypto\\.createHash\\(['\"]md5['\"]|crypto\\.createHash\\(['\"]sha1['\"]"
+    reminder: "Weak hashing algorithm (MD5/SHA1). Use SHA-256 or stronger (bcrypt/Argon2 for passwords)."
+
+  - rule_name: plain_sha256_for_password
+    regex: "crypto\\.createHash\\(['\"]sha256['\"].*pin|crypto\\.createHash\\(['\"]sha256['\"].*password"
+    reminder: "Using plain SHA-256 for PIN/password. Use bcrypt (cost 10+) or Argon2 instead."
+
+  # Session Management
+  - rule_name: session_no_expiry
+    regex: "session_token.*=|token.*expires|expiry.*null"
+    reminder: "Session token without expiration. All tokens must expire after 24 hours or on logout."
+
+  - rule_name: session_stored_plaintext_web
+    regex: "localStorage\\.setItem\\(['\"]session|sessionStorage\\.setItem\\(['\"]session"
+    reminder: "Session token stored in localStorage/sessionStorage (unencrypted). Use httpOnly cookies or expo-secure-store."
+
+  # Rate Limiting
+  - rule_name: api_no_rate_limit
+    regex: "router\\.post\\(['\"].*\\/(?:login|trip|expense)['\"].*=>\\s*\\{(?!.*(?:rateLimit|RateLimit|rate_limit))"
+    reminder: "API endpoint without rate limiting. Implement rate limits (e.g., 100 req/min per IP, 1000 req/min per admin)."
+
+  # Error Handling
+  - rule_name: stack_trace_in_response
+    regex: "res\\.send\\(error\\)|res\\.json\\(err\\)|res\\.send\\(err\\.stack\\)"
+    reminder: "Returning error stack trace to client. Return generic error message; log full error server-side only."
+
+  - rule_name: database_error_exposed
+    regex: "res\\.send.*(?:ENOENT|SQLITE_CONSTRAINT|ERR_)"
+    reminder: "Database error exposed to client. Do not return internal error details. Use generic 500 or 400 response."
+
+  # Dependencies
+  - rule_name: package_dependency_unversioned
+    regex: "\"[^\"]+\"\\s*:\\s*\"\\*|\"[^\"]+\"\\s*:\\s*\"latest"
+    paths: ["**/package.json"]
+    reminder: "Unversioned dependency (*|latest). Pin exact versions in package-lock.json to ensure reproducible builds."
+
+  - rule_name: deprecated_library
+    substrings: ["react-native-deprecated", "old-crypto", "insecure-"]
+    reminder: "Deprecated or insecure library detected. Replace with maintained, secure alternative."
+
+  # HTTPS & Transport
+  - rule_name: hardcoded_http_endpoint
+    regex: "http://(?!localhost|127\\.0\\.0\\.1|192\\.168)"
+    reminder: "HTTP endpoint detected for non-local address. Use HTTPS for all production API calls."
+
+  - rule_name: self_signed_cert_ignore
+    substrings: ["rejectUnauthorized: false", "NODE_TLS_REJECT_UNAUTHORIZED", "strictSSL: false"]
+    reminder: "SSL certificate validation disabled. This allows MITM attacks. Enable certificate verification for production."
+
+  # Data Retention & Cleanup
+  - rule_name: permanent_data_storage
+    regex: "AsyncStorage.*trip|AsyncStorage.*expense|AsyncStorage.*driver"
+    reminder: "Potential permanent storage of business data. Implement data retention policy and automatic purge for old data."
+
+  # Workflow Files
+  - rule_name: github_actions_secrets
+    paths: [".github/workflows/*"]
+    substrings: ["secrets.", "env:", "GITHUB_TOKEN"]
+    reminder: "Secrets found in workflow file. Use GitHub Secrets; never hardcode credentials in workflow YAML."
+
+  # General
+  - rule_name: todo_fixme_security
+    regex: "TODO.*(?:security|auth|encrypt|validate)|FIXME.*(?:security|auth|encrypt|validate)"
+    reminder: "TODO/FIXME comment flagging a security issue. Prioritize fixing this before merging."
+
+  - rule_name: unsafe_eval_execution
+    substrings: ["eval(", "new Function(", "vm.runInThisContext", "vm.runInNewContext"]
+    reminder: "Unsafe code execution detected (eval, Function, vm). These allow arbitrary code execution. Use static parsing or safe alternatives."

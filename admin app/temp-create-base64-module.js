@@ -1,0 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+const src = path.resolve('temp-signature-base64.txt');
+const dst = path.resolve('src', 'nbtSignatureBase64.ts');
+const data = fs.readFileSync(src, 'utf8').trim();
+const content = `const nbtAuthorisedSignatureBase64 = ${JSON.stringify(data)};
+export default nbtAuthorisedSignatureBase64;
+`;
+fs.writeFileSync(dst, content);
+console.log('Wrote', dst);

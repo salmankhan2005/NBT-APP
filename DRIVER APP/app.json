@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "NBT Logistics Driver",
+    "slug": "nbt-ars-driver",
+    "scheme": "nbt-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nbtars.driverapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is required to capture Proof of Delivery (POD) photos and expense receipts.",
+        "NSPhotoLibraryUsageDescription": "Photo library access is required to attach delivery or expense images.",
+        "NSPhotoLibraryAddUsageDescription": "Permission is required to save captured delivery photos.",
+        "NSLocationWhenInUseUsageDescription": "Location is used to record GPS coordinates for trip tracking and expense logging.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Location is used to continuously track your trip route and sync GPS updates with dispatch.",
+        "NSMicrophoneUsageDescription": "Microphone access is required for voice-to-text expense description input.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#031635",
+        "foregroundImage": "./assets/icon.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.vahith_app1234.tempexpo",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCRQ3QPWMeXqYFOBtayGkScl7lXynWqNus"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6f15f73a-77a4-4e3d-ad3a-ba377c2f4e2e"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone for voice expense notes.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to convert spoken expense notes into text."
+        }
+      ]
+    ]
+  }
+}
