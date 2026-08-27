@@ -18,21 +18,22 @@ async function buildTripResponse(tripId: string) {
       COALESCE(
         json_agg(
           json_build_object(
-            'id',          e.id,
-            'category',    e.category,
-            'amount',      e.amount,
-            'reason',      e.reason,
-            'liters',      e.liters,
-            'receiptUri',  e.receipt_url,
-            'timestamp',   e.recorded_at,
-            'location',    CASE WHEN e.latitude IS NOT NULL THEN
-                             json_build_object(
-                               'latitude',  e.latitude,
-                               'longitude', e.longitude,
-                               'city',      e.city,
-                               'address',   e.address
-                             )
-                           ELSE NULL END
+            'id',           e.id,
+            'category',     e.category,
+            'amount',       e.amount,
+            'reason',       e.reason,
+            'liters',       e.liters,
+            'receiptUri',   e.receipt_url,
+            'receiptUris',  COALESCE(e.receipt_urls, '[]'::jsonb),
+            'timestamp',    e.recorded_at,
+            'location',     CASE WHEN e.latitude IS NOT NULL THEN
+                              json_build_object(
+                                'latitude',  e.latitude,
+                                'longitude', e.longitude,
+                                'city',      e.city,
+                                'address',   e.address
+                              )
+                            ELSE NULL END
           ) ORDER BY e.recorded_at
         ) FILTER (WHERE e.id IS NOT NULL),
         '[]'
@@ -115,7 +116,7 @@ export async function tripRoutes(app: FastifyInstance) {
     const rows = await sql`
       SELECT
         t.*,
-        COALESCE(
+      COALESCE(
           json_agg(
             json_build_object(
               'id',          e.id,
@@ -124,6 +125,7 @@ export async function tripRoutes(app: FastifyInstance) {
               'reason',      e.reason,
               'liters',      e.liters,
               'receiptUri',  e.receipt_url,
+              'receiptUris', COALESCE(e.receipt_urls, '[]'::jsonb),
               'timestamp',   e.recorded_at,
               'location',    CASE WHEN e.latitude IS NOT NULL THEN
                                json_build_object(
@@ -291,11 +293,23 @@ export async function tripRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Validation failed', details: parsed.error.errors });
     }
 
-    const { category, amount, reason, liters, receiptUrl, location } = parsed.data;
+    const { category, amount, reason, liters, receiptUrl, receiptUrls, location } = parsed.data;
     const expenseId = `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+    // Build the receipt_urls JSONB array (merge legacy receiptUrl + new receiptUrls, max 10)
+    const allUrls: string[] = [];
+    if (receiptUrl) allUrls.push(receiptUrl);
+    if (receiptUrls && receiptUrls.length > 0) {
+      for (const u of receiptUrls) {
+        if (!allUrls.includes(u)) allUrls.push(u);
+      }
+    }
+    const receiptUrlsJson = JSON.stringify(allUrls.slice(0, 10));
+    // Use first URL as the legacy receipt_url for backward compat
+    const primaryReceiptUrl = allUrls[0] ?? null;
+
     await sql`
-      INSERT INTO expenses (id, trip_id, category, amount, reason, liters, receipt_url, latitude, longitude, city, address)
+      INSERT INTO expenses (id, trip_id, category, amount, reason, liters, receipt_url, receipt_urls, latitude, longitude, city, address)
       VALUES (
         ${expenseId}, 
         ${id}, 
@@ -303,7 +317,8 @@ export async function tripRoutes(app: FastifyInstance) {
         ${amount}, 
         ${reason ?? null}, 
         ${liters ?? null}, 
-        ${receiptUrl ?? null},
+        ${primaryReceiptUrl},
+        ${receiptUrlsJson}::jsonb,
         ${location?.latitude ?? null},
         ${location?.longitude ?? null},
         ${location?.city ?? null},
@@ -318,7 +333,7 @@ export async function tripRoutes(app: FastifyInstance) {
       `;
     }
 
-    return reply.code(201).send({ id: expenseId, category, amount });
+    return reply.code(201).send({ id: expenseId, category, amount, receiptUrls: allUrls });
   });
 
   // ── POST /api/trips/:id/pod ───────────────────────────────────────────────

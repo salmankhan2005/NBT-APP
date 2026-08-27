@@ -52,7 +52,10 @@ export const ExpenseSchema = z.object({
   amount: z.number().positive().max(999999),
   reason: z.string().max(500).trim().nullish(),
   liters: z.number().positive().nullish(),
+  // Legacy single receipt URL (kept for backward compatibility)
   receiptUrl: z.string().max(500000).trim().nullish(),
+  // New: up to 10 receipt photo URLs per expense
+  receiptUrls: z.array(z.string().max(500000).trim()).max(10).nullish(),
   location: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
@@ -60,6 +63,7 @@ export const ExpenseSchema = z.object({
     address: z.string().max(300).trim(),
   }).nullish(),
 });
+
 
 export const PodSchema = z.object({
   podPhotoUrl: z.string().max(10000000).trim().optional().default(''),

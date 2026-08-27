@@ -85,6 +85,7 @@ export async function adminRoutes(app: FastifyInstance) {
               'reason',      e.reason,
               'liters',      e.liters,
               'receiptUri',  e.receipt_url,
+              'receiptUris', COALESCE(e.receipt_urls, '[]'::jsonb),
               'timestamp',   e.recorded_at,
               'location',    CASE WHEN e.latitude IS NOT NULL THEN
                                json_build_object(
@@ -132,6 +133,7 @@ export async function adminRoutes(app: FastifyInstance) {
             'reason',      e.reason,
             'liters',      e.liters,
             'receiptUri',  e.receipt_url,
+            'receiptUris', COALESCE(e.receipt_urls, '[]'::jsonb),
             'timestamp',   e.recorded_at,
             'location',    CASE WHEN e.latitude IS NOT NULL THEN
                              json_build_object(

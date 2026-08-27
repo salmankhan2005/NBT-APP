@@ -255,20 +255,39 @@ async function migrate() {
   // ── Expenses ──────────────────────────────────────────────────────────────
   await sql`
     CREATE TABLE IF NOT EXISTS expenses (
-      id           TEXT PRIMARY KEY,
-      trip_id      TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-      category     TEXT NOT NULL,
-      amount       NUMERIC(12,2) NOT NULL,
-      reason       TEXT,
-      liters       NUMERIC,
-      receipt_url  TEXT,
-      recorded_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      id            TEXT PRIMARY KEY,
+      trip_id       TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      category      TEXT NOT NULL,
+      amount        NUMERIC(12,2) NOT NULL,
+      reason        TEXT,
+      liters        NUMERIC,
+      receipt_url   TEXT,
+      receipt_urls  JSONB NOT NULL DEFAULT '[]',
+      recorded_at   TIMESTAMPTZ NOT NULL DEFAULT now()
     )
+  `;
+  // Add receipt_urls to existing tables (idempotent)
+  await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_urls JSONB NOT NULL DEFAULT '[]'`;
+  // Add a CHECK constraint to enforce max 10 photos per expense (idempotent via DO block)
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_expenses_receipt_urls_max10'
+        AND conrelid = 'expenses'::regclass
+      ) THEN
+        ALTER TABLE expenses
+          ADD CONSTRAINT chk_expenses_receipt_urls_max10
+          CHECK (jsonb_array_length(receipt_urls) <= 10);
+      END IF;
+    END;
+    $$
   `;
   await sql`
     CREATE INDEX IF NOT EXISTS idx_expenses_trip_id ON expenses(trip_id)
   `;
-  console.log('  ✓ expenses');
+  console.log('  ✓ expenses (receipt_urls multi-photo, max 10)');
 
   // ── Offline Sync Audit Log ────────────────────────────────────────────────
   await sql`
