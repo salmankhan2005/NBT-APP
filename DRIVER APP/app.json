@@ -22,10 +22,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#031635",
-        "foregroundImage": "./assets/icon.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.vahith_app1234.tempexpo",
