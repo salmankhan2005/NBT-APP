@@ -2355,6 +2355,46 @@ class AdminDatabase {
     return Promise.resolve({ success: true, gcNote: newNote });
   }
 
+  async updateGcNote(id: string, gcData: any): Promise<{ success: boolean; gcNote?: GcNote; error?: string }> {
+    const existingIdx = this.mockGcNotes.findIndex(n => n.id === id || n.noteNumber === id);
+    const prefixInfo = this.getGcPrefix(gcData.date);
+    const noteId = id || gcData.noteNumber || gcData.id;
+    const finalNoteNumber = gcData.noteNumber?.trim() || (existingIdx !== -1 ? (this.mockGcNotes[existingIdx].noteNumber || this.mockGcNotes[existingIdx].id) : noteId);
+
+    const updatedNote: GcNote = {
+      ...(existingIdx !== -1 ? this.mockGcNotes[existingIdx] : {}),
+      ...gcData,
+      id: noteId,
+      noteNumber: finalNoteNumber,
+      createdAt: existingIdx !== -1 ? this.mockGcNotes[existingIdx].createdAt : new Date().toISOString(),
+      gcYear: prefixInfo ? prefixInfo.year : undefined,
+      gcMonth: prefixInfo ? prefixInfo.month : undefined,
+    };
+
+    if (existingIdx !== -1) {
+      this.mockGcNotes[existingIdx] = updatedNote;
+    } else {
+      this.mockGcNotes.unshift(updatedNote);
+    }
+
+    await this.persistGcNotes();
+
+    try {
+      await this.authFetch(`${API_HOST}/api/gc`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedNote)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] updateGcNote API error:', err);
+    }
+
+    this.notify();
+    return Promise.resolve({ success: true, gcNote: updatedNote });
+  }
+
   async deleteGcNote(id: string): Promise<{ success: boolean }> {
     this.mockGcNotes = this.mockGcNotes.filter((n) => n.id !== id);
     await this.persistGcNotes();
