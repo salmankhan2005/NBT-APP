@@ -24,7 +24,6 @@ import { db } from '../db/database';
 const CORRECT_LOGIN_ID = 'NBT';
 const DEFAULT_PIN = '8520';
 const PIN_STORAGE_KEY = 'nbt_admin_pin';
-const AUTHORIZED_PHONES = ['7418698082', '9789271721'];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Screen = 'LOGIN' | 'FORGOT_PIN' | 'VERIFY_OTP' | 'SET_NEW_PIN';
@@ -32,10 +31,6 @@ type Screen = 'LOGIN' | 'FORGOT_PIN' | 'VERIFY_OTP' | 'SET_NEW_PIN';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateOtp(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
-}
-
-function maskPhone(phone: string): string {
-  return `+91 ${phone.slice(0, 2)}****${phone.slice(-4)}`;
 }
 
 interface LoginScreenProps {
@@ -151,16 +146,12 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setOtp(generatedOtp);
 
     try {
-      // Send OTP via backend or simulated SMS trigger
-      for (const phone of AUTHORIZED_PHONES) {
-        try {
-          await fetch('https://nbt-app.onrender.com/api/send-otp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, otp: generatedOtp, purpose: 'admin_pin_reset' }),
-          });
-        } catch {}
-      }
+      // Simulated / background SMS API trigger
+      await fetch('https://nbt-app.onrender.com/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp: generatedOtp, purpose: 'admin_pin_reset' }),
+      }).catch(() => {});
     } catch {}
 
     setSendingOtp(false);
@@ -168,10 +159,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setOtpResendTimer(60);
     setScreen('VERIFY_OTP');
 
-    // Also display alert with notification for confirmation in testing
+    // Display alert with verification OTP for instant access
     Alert.alert(
-      'OTP Dispatched',
-      `Verification OTP (${generatedOtp}) has been transmitted to authorized numbers:\n• ${maskPhone(AUTHORIZED_PHONES[0])}\n• ${maskPhone(AUTHORIZED_PHONES[1])}`,
+      'Security Verification OTP',
+      `Your 4-digit verification OTP code is:\n\n${generatedOtp}\n\nPlease enter this code to reset your Security PIN.`,
       [{ text: 'ENTER OTP' }]
     );
   }, []);
@@ -261,13 +252,13 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             {renderHeader()}
 
             <View style={cardStyle}>
-              {/* Card Header */}
+              {/* Card Title */}
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderIconBox}>
                   <MaterialIcons name="admin-panel-settings" size={24} color={COLORS.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>Admin Sign In</Text>
+                  <Text style={styles.cardTitle}>Administrator Sign In</Text>
                   <Text style={styles.cardSubtitle}>Enter your Login ID and Security PIN</Text>
                 </View>
               </View>
@@ -275,15 +266,15 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
               {renderErrorBox(loginError)}
 
-              {/* Login ID Input */}
+              {/* Login ID */}
               <View style={styles.inputGroup}>
                 <View style={styles.labelRow}>
-                  <Text style={styles.inputLabel}>LOGIN ID</Text>
+                  <Text style={styles.inputLabel}>LOGIN ID *</Text>
                   <Text style={styles.labelHint}>Default: NBT</Text>
                 </View>
                 <View style={styles.inputRow}>
                   <View style={styles.inputIconBox}>
-                    <MaterialIcons name="badge" size={20} color={COLORS.primary} />
+                    <MaterialIcons name="person" size={20} color={COLORS.primary} />
                   </View>
                   <TextInput
                     style={styles.textInput}
@@ -299,11 +290,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 </View>
               </View>
 
-              {/* PIN Input */}
+              {/* Security PIN */}
               <View style={styles.inputGroup}>
                 <View style={styles.labelRow}>
-                  <Text style={styles.inputLabel}>SECURITY PIN</Text>
-                  <Text style={styles.labelHint}>4-digit PIN</Text>
+                  <Text style={styles.inputLabel}>SECURITY PIN *</Text>
+                  <Text style={styles.labelHint}>Default: 8520</Text>
                 </View>
                 <View style={styles.inputRow}>
                   <View style={styles.inputIconBox}>
@@ -311,10 +302,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   </View>
                   <TextInput
                     ref={pinInputRef}
-                    style={[styles.textInput, { flex: 1 }]}
+                    style={styles.textInput}
                     value={pin}
-                    onChangeText={(v) => { setPin(v.replace(/\D/g, '')); setLoginError(''); }}
-                    placeholder="Enter PIN (Default: 8520)"
+                    onChangeText={(v) => { setPin(v); setLoginError(''); }}
+                    placeholder="Enter Security PIN"
                     placeholderTextColor="#94a3b8"
                     secureTextEntry={!showPin}
                     keyboardType="number-pad"
@@ -334,11 +325,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 style={styles.forgotPinBtn}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="lock-reset" size={15} color={COLORS.secondary} />
+                <MaterialIcons name="lock-reset" size={16} color={COLORS.secondary} />
                 <Text style={styles.forgotPinText}>Forgot PIN?</Text>
               </TouchableOpacity>
 
-              {/* Login Button */}
+              {/* Submit Button */}
               <TouchableOpacity
                 style={[styles.primaryBtn, loginLoading && { opacity: 0.7 }]}
                 onPress={handleLogin}
@@ -390,28 +381,20 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>Forgot Security PIN</Text>
-                  <Text style={styles.cardSubtitle}>Two-Factor SMS Verification</Text>
+                  <Text style={styles.cardSubtitle}>Administrative PIN Recovery</Text>
                 </View>
               </View>
               <View style={styles.divider} />
 
-              {/* Info banner with the two designated numbers */}
+              {/* Security info banner */}
               <View style={styles.infoBanner}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <MaterialIcons name="verified-user" size={18} color="#1d4ed8" />
-                  <Text style={styles.infoBannerTitle}>Authorized Recovery Numbers</Text>
+                  <Text style={styles.infoBannerTitle}>Security Verification</Text>
                 </View>
                 <Text style={styles.infoBannerDesc}>
-                  For security, the one-time verification code (OTP) will be dispatched strictly to the registered admin contacts:
+                  To recover and reset your Admin Security PIN, tap the button below to generate a secure 4-digit verification OTP.
                 </Text>
-                <View style={styles.phonePillList}>
-                  {AUTHORIZED_PHONES.map((ph, idx) => (
-                    <View key={ph} style={styles.phonePill}>
-                      <MaterialIcons name="phone-android" size={14} color="#1e40af" />
-                      <Text style={styles.phonePillText}>Phone {idx + 1}: <Text style={{ fontWeight: '800' }}>{maskPhone(ph)}</Text></Text>
-                    </View>
-                  ))}
-                </View>
               </View>
 
               {otpError ? renderErrorBox(otpError) : null}
@@ -426,8 +409,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <MaterialIcons name="send" size={18} color="#fff" />
-                    <Text style={styles.primaryBtnText}>SEND OTP TO BOTH NUMBERS</Text>
+                    <MaterialIcons name="lock-reset" size={18} color="#fff" />
+                    <Text style={styles.primaryBtnText}>GENERATE VERIFICATION OTP</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -456,7 +439,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <View style={cardStyle}>
               <TouchableOpacity onPress={() => setScreen('FORGOT_PIN')} style={styles.backRow} activeOpacity={0.7}>
                 <MaterialIcons name="arrow-back" size={18} color={COLORS.primary} />
-                <Text style={styles.backText}>Change Phone Numbers</Text>
+                <Text style={styles.backText}>Back to PIN Recovery</Text>
               </TouchableOpacity>
 
               <View style={styles.cardHeader}>
@@ -465,17 +448,29 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>Verify Security Code</Text>
-                  <Text style={styles.cardSubtitle}>Enter 4-digit code sent to registered phones</Text>
+                  <Text style={styles.cardSubtitle}>Enter 4-digit code generated for administrative verification</Text>
                 </View>
               </View>
               <View style={styles.divider} />
 
               <View style={styles.otpSentBanner}>
-                <MaterialIcons name="check-circle" size={16} color="#16a34a" />
-                <Text style={styles.otpSentText}>
-                  OTP dispatched to {AUTHORIZED_PHONES.map(maskPhone).join(' and ')}
-                </Text>
+                <MaterialIcons name="check-circle" size={18} color="#16a34a" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.otpSentTitle}>Verification OTP Generated</Text>
+                  <Text style={styles.otpSentText}>
+                    Please enter the 4-digit code below to proceed with PIN reset.
+                  </Text>
+                </View>
               </View>
+
+              {!!otp && (
+                <View style={styles.codeHintBox}>
+                  <MaterialIcons name="vpn-key" size={15} color="#1e40af" />
+                  <Text style={styles.codeHintText}>
+                    Active OTP: <Text style={styles.codeHintValue}>{otp}</Text>
+                  </Text>
+                </View>
+              )}
 
               {renderErrorBox(otpError)}
 
@@ -509,7 +504,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               >
                 <MaterialIcons name="refresh" size={16} color={COLORS.secondary} />
                 <Text style={styles.resendText}>
-                  {otpResendTimer > 0 ? `Resend code in ${otpResendTimer}s` : 'Resend OTP to both numbers'}
+                  {otpResendTimer > 0 ? `Request new code in ${otpResendTimer}s` : 'Generate New OTP'}
                 </Text>
               </TouchableOpacity>
 
@@ -803,34 +798,39 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoBannerTitle: { fontSize: 12.5, fontWeight: '800', color: '#1d4ed8' },
-  infoBannerDesc: { fontSize: 11, color: '#334155', lineHeight: 16, marginBottom: 10 },
-  phonePillList: { gap: 6 },
-  phonePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  phonePillText: { fontSize: 11.5, color: '#1e40af', fontWeight: '600' },
+  infoBannerDesc: { fontSize: 11.5, color: '#334155', lineHeight: 17 },
 
   // ── OTP Sent Banner ──
   otpSentBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 10,
     backgroundColor: '#f0fdf4',
     borderWidth: 1,
     borderColor: '#86efac',
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: 10,
+    padding: 12,
     marginBottom: 14,
   },
-  otpSentText: { fontSize: 11.5, color: '#15803d', fontWeight: '700', flex: 1 },
+  otpSentTitle: { fontSize: 12, fontWeight: '800', color: '#15803d' },
+  otpSentText: { fontSize: 11, color: '#166534', marginTop: 2, lineHeight: 15 },
+
+  // ── Code Hint Box ──
+  codeHintBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+  },
+  codeHintText: { fontSize: 12, color: '#1e40af', fontWeight: '700' },
+  codeHintValue: { fontSize: 15, fontWeight: '900', color: COLORS.primary, letterSpacing: 3 },
 
   // ── Resend ──
   resendBtn: {
