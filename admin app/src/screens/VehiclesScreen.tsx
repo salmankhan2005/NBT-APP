@@ -14,6 +14,7 @@ import {
   Platform,
   Linking,
   useWindowDimensions,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -150,8 +151,13 @@ const createInitialDocEntries = (): Record<string, DocFormEntry> => ({
 
 export default function VehiclesScreen() {
   const { width } = useWindowDimensions();
+  const isTablet = width >= 600;
   const isDesktop = width >= 880;
   const numColumns = isDesktop ? 2 : 1;
+  // Form columns: 2 on tablet/desktop for side-by-side inputs
+  const formCols = isTablet ? 2 : 1;
+  // Max width for modal content on wide screens
+  const modalMaxWidth = Math.min(width, 720);
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<ManagedVehicle[]>([]);
   const [search, setSearch] = useState('');
@@ -733,14 +739,18 @@ export default function VehiclesScreen() {
         : overallDocStatus === 'EXPIRED'
         ? 'Documents Expired'
         : 'All Compliance Valid';
+    const statusColor = getStatusColor(item.status);
 
     return (
       <View style={[styles.vehicleCard, isDesktop && { flex: 1, marginHorizontal: 4 }]}>
-        <TouchableOpacity onPress={() => openDetails(item)} activeOpacity={0.85}>
+        {/* Colored left accent bar */}
+        <View style={[styles.vehicleCardAccent, { backgroundColor: statusColor }]} />
+
+        <TouchableOpacity onPress={() => openDetails(item)} activeOpacity={0.85} style={{ flex: 1 }}>
           {/* Card Top Row */}
           <View style={styles.cardHeaderRow}>
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <Text style={styles.vehicleNumber}>{item.vehicleNumber}</Text>
                 {item.isPinned && (
                   <View style={styles.pinnedBadge}>
@@ -749,23 +759,32 @@ export default function VehiclesScreen() {
                 )}
               </View>
               <Text style={styles.vehicleMakeModel}>
-                {item.vehicleMake || 'Truck'} • {item.vehicleType} {item.vehicleModel ? `(${item.vehicleModel})` : ''}
+                {item.vehicleMake || 'Truck'} • {item.vehicleType}{item.vehicleModel ? ` (${item.vehicleModel})` : ''}
               </Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '18' }]}>
-              <Text style={[styles.statusBadgeText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: statusColor + '18', borderColor: statusColor + '44', borderWidth: 1 }]}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.statusBadgeText, { color: statusColor }]}>{item.status}</Text>
             </View>
           </View>
 
           {/* Owner Row */}
           <View style={styles.ownerRow}>
-            <MaterialIcons name="person-outline" size={14} color="#64748b" />
+            <View style={styles.ownerIconBox}>
+              <MaterialIcons name="person" size={12} color={COLORS.primary} />
+            </View>
             <Text style={styles.ownerText}>{item.ownerName || 'Owner not set'}</Text>
-            {item.ownerPhone ? <Text style={styles.ownerPhoneText}>• {item.ownerPhone}</Text> : null}
+            {item.ownerPhone ? (
+              <View style={styles.ownerPhoneChip}>
+                <MaterialIcons name="phone" size={10} color="#64748b" />
+                <Text style={styles.ownerPhoneText}>{item.ownerPhone}</Text>
+              </View>
+            ) : null}
           </View>
 
           {/* ── 6 COMPLIANCE EXPIRY BADGES ── */}
           <View style={styles.complianceSectionTitleRow}>
+            <MaterialIcons name="verified" size={11} color="#64748b" />
             <Text style={styles.complianceSectionTitle}>COMPLIANCE EXPIRY DATES</Text>
           </View>
           <View style={styles.expiryGrid}>
@@ -773,25 +792,39 @@ export default function VehiclesScreen() {
               const expiryVal = (item[docSpec.expiryField] as string) || (docSpec.key === 'NATIONAL_PERMIT' ? item.permitExpiryDate : '');
               const badge = getExpiryBadgeInfo(expiryVal);
               return (
-                <View key={docSpec.key} style={[styles.expiryGridItem, { borderColor: badge.borderColor || COLORS.outlineVariant }]}>
+                <View key={docSpec.key} style={[
+                  styles.expiryGridItem,
+                  { borderColor: badge.borderColor || COLORS.outlineVariant, backgroundColor: badge.bg },
+                  isTablet && { minWidth: 110 },
+                ]}>
                   <View style={styles.expiryGridHeader}>
-                    <Text style={[styles.expiryGridDocName, { color: docSpec.color }]}>{docSpec.num}. {docSpec.shortTitle}</Text>
+                    <Text style={[styles.expiryGridDocName, { color: docSpec.color }]} numberOfLines={1}>
+                      {docSpec.num}. {docSpec.shortTitle}
+                    </Text>
                     <View style={[styles.miniStatusDot, { backgroundColor: badge.color }]} />
                   </View>
-                  <Text style={[styles.expiryGridDate, !expiryVal && { color: '#94a3b8', fontStyle: 'italic' }]}>
+                  <Text style={[styles.expiryGridDate, !expiryVal && { color: '#94a3b8', fontStyle: 'italic' }]} numberOfLines={1}>
                     {expiryVal ? expiryVal : 'Not set'}
                   </Text>
-                  <Text style={[styles.expiryGridDays, { color: badge.color }]}>{badge.daysText}</Text>
+                  <Text style={[styles.expiryGridDays, { color: badge.color }]} numberOfLines={1}>{badge.daysText}</Text>
                 </View>
               );
             })}
           </View>
 
           {/* Overall Doc Alert */}
-          <View style={styles.docAlertRow}>
+          <View style={[styles.docAlertRow, {
+            backgroundColor: overallDocStatus === 'VALID' ? '#f0fdf4' : overallDocStatus === 'EXPIRED' ? '#fef2f2' : '#fffbeb',
+            borderColor: overallDocStatus === 'VALID' ? '#86efac' : overallDocStatus === 'EXPIRED' ? '#fca5a5' : '#fde68a',
+            borderWidth: 1,
+            borderRadius: 6,
+            paddingHorizontal: 8,
+            paddingVertical: 5,
+            marginTop: 10,
+          }]}>
             <MaterialIcons
               name={overallDocStatus === 'VALID' ? 'check-circle' : overallDocStatus === 'EXPIRED' ? 'error' : 'warning-amber'}
-              size={15}
+              size={14}
               color={overallDocStatus === 'VALID' ? '#16a34a' : overallDocStatus === 'EXPIRED' ? '#dc2626' : '#d97706'}
             />
             <Text
@@ -808,27 +841,25 @@ export default function VehiclesScreen() {
         {/* ── CARD ACTION TOOLBAR ── */}
         <View style={styles.cardActionsRow}>
           <TouchableOpacity onPress={() => openDetails(item)} style={styles.cardActionBtn}>
-            <MaterialIcons name="visibility" size={15} color={COLORS.primary} />
+            <MaterialIcons name="visibility" size={14} color={COLORS.primary} />
             <Text style={styles.cardActionBtnText}>DETAILS & DOCS</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={async () => {
-              await db.togglePinVehicle(item.vehicle_id);
-              fetchVehicles(false);
-            }}
-            style={styles.cardActionBtn}
-          >
-            <MaterialIcons name="push-pin" size={15} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
-            <Text style={[styles.cardActionBtnText, item.isPinned && { color: '#d97706' }]}>
-              {item.isPinned ? 'UNPIN' : 'PIN'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.cardActionsRight}>
+            <TouchableOpacity
+              onPress={async () => {
+                await db.togglePinVehicle(item.vehicle_id);
+                fetchVehicles(false);
+              }}
+              style={[styles.cardIconBtn, item.isPinned && { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}
+            >
+              <MaterialIcons name="push-pin" size={15} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => handleDeleteVehicle(item.vehicle_id)} style={styles.cardActionBtnDanger}>
-            <MaterialIcons name="delete-outline" size={15} color="#dc2626" />
-            <Text style={styles.cardActionBtnTextDanger}>DELETE</Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleDeleteVehicle(item.vehicle_id)} style={[styles.cardIconBtn, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}>
+              <MaterialIcons name="delete-outline" size={15} color="#dc2626" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -930,17 +961,29 @@ export default function VehiclesScreen() {
             <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
               <MaterialIcons name="close" size={24} color={COLORS.primary} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>ADD NEW FLEET VEHICLE</Text>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={styles.modalTitle}>ADD NEW FLEET VEHICLE</Text>
+              <Text style={styles.modalSubtitle}>Fill in details & compliance records</Text>
+            </View>
             <View style={{ width: 40 }} />
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={[styles.modalContent, isTablet && { alignSelf: 'center', width: '100%', maxWidth: modalMaxWidth }]} keyboardShouldPersistTaps="handled">
             {/* ── CARD 1: VEHICLE SPECIFICATIONS ── */}
             <View style={styles.formCard}>
               <View style={styles.formCardHeader}>
-                <MaterialIcons name="local-shipping" size={20} color={COLORS.primary} />
-                <Text style={styles.sectionTitle}>1. VEHICLE SPECIFICATIONS</Text>
+                <View style={[styles.sectionIconBox, { backgroundColor: '#eff6ff' }]}>
+                  <MaterialIcons name="local-shipping" size={18} color={COLORS.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sectionTitle}>1. VEHICLE SPECIFICATIONS</Text>
+                  <Text style={styles.sectionSubtitle}>Registration, make, model & chassis details</Text>
+                </View>
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepCircleText}>1</Text>
+                </View>
               </View>
+              <View style={styles.sectionDivider} />
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>VEHICLE REGISTRATION / RC NUMBER *</Text>
@@ -956,59 +999,78 @@ export default function VehiclesScreen() {
                 />
               </View>
 
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
+              <View style={formCols === 2 ? styles.inputRow : undefined}>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
                   <Text style={styles.label}>WHEEL TYPE</Text>
                   <TouchableOpacity style={styles.dropdownInput} onPress={() => setWheelTypeModalVisible(true)}>
-                    <Text style={styles.dropdownInputText}>{wheelType}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <MaterialIcons name="settings" size={15} color={COLORS.primary} />
+                      <Text style={styles.dropdownInputText}>{wheelType}</Text>
+                    </View>
                     <MaterialIcons name="keyboard-arrow-down" size={20} color={COLORS.textMuted} />
                   </TouchableOpacity>
                 </View>
 
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>VEHICLE MAKE</Text>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
+                  <Text style={styles.label}>VEHICLE MAKE / MANUFACTURER</Text>
                   <TouchableOpacity style={styles.dropdownInput} onPress={() => setVehicleMakeModalVisible(true)}>
-                    <Text style={styles.dropdownInputText}>{vehicleMake}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <MaterialIcons name="directions-bus" size={15} color={COLORS.primary} />
+                      <Text style={styles.dropdownInputText}>{vehicleMake}</Text>
+                    </View>
                     <MaterialIcons name="keyboard-arrow-down" size={20} color={COLORS.textMuted} />
                   </TouchableOpacity>
                 </View>
               </View>
 
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>MODEL</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={vehicleModel}
-                    onChangeText={(v) => setVehicleModel(v.toUpperCase())}
-                    placeholder="e.g. LPT 3118"
-                  />
+              <View style={formCols === 2 ? styles.inputRow : undefined}>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
+                  <Text style={styles.label}>MODEL / VARIANT</Text>
+                  <View style={styles.inputWithIcon}>
+                    <MaterialIcons name="article" size={15} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.formInputIcon}
+                      value={vehicleModel}
+                      onChangeText={(v) => setVehicleModel(v.toUpperCase())}
+                      placeholder="e.g. LPT 3118"
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
                 </View>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
                   <Text style={styles.label}>YEAR OF MANUFACTURE</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={yearOfManufacture}
-                    onChangeText={setYearOfManufacture}
-                    placeholder="e.g. 2023"
-                    keyboardType="number-pad"
-                  />
+                  <View style={styles.inputWithIcon}>
+                    <MaterialIcons name="calendar-today" size={15} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.formInputIcon}
+                      value={yearOfManufacture}
+                      onChangeText={setYearOfManufacture}
+                      placeholder="e.g. 2023"
+                      keyboardType="number-pad"
+                      placeholderTextColor="#94a3b8"
+                      maxLength={4}
+                    />
+                  </View>
                 </View>
               </View>
 
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
+              <View style={formCols === 2 ? styles.inputRow : undefined}>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
                   <Text style={styles.label}>CHASSIS NUMBER (LAST 4 DIGITS) *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={chassisNumber}
-                    onChangeText={(val) => setChassisNumber(val.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="e.g. 84920"
-                    keyboardType="number-pad"
-                    maxLength={5}
-                  />
+                  <View style={styles.inputWithIcon}>
+                    <MaterialIcons name="tag" size={15} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.formInputIcon}
+                      value={chassisNumber}
+                      onChangeText={(val) => setChassisNumber(val.replace(/\D/g, '').slice(0, 4))}
+                      placeholder="e.g. 8492"
+                      keyboardType="number-pad"
+                      maxLength={4}
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
                 </View>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
                   <Text style={styles.label}>INITIAL STATUS</Text>
                   <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
                     {(['AVAILABLE', 'UNDER MAINTENANCE'] as ManagedVehicleStatus[]).map((st) => (
@@ -1020,9 +1082,12 @@ export default function VehiclesScreen() {
                           status === st && { backgroundColor: getStatusColor(st), borderColor: getStatusColor(st) },
                         ]}
                       >
-                        <Text style={[styles.statusToggleText, status === st && { color: '#ffffff' }]}>
-                          {st === 'AVAILABLE' ? 'Available' : 'Maintenance'}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          {status === st && <MaterialIcons name="check-circle" size={12} color="#ffffff" />}
+                          <Text style={[styles.statusToggleText, status === st && { color: '#ffffff' }]}>
+                            {st === 'AVAILABLE' ? 'Available' : 'Maintenance'}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -1033,29 +1098,46 @@ export default function VehiclesScreen() {
             {/* ── CARD 2: OWNER & OPERATOR CONTACT ── */}
             <View style={styles.formCard}>
               <View style={styles.formCardHeader}>
-                <MaterialIcons name="person" size={20} color={COLORS.primary} />
-                <Text style={styles.sectionTitle}>2. OWNER & OPERATOR DETAILS</Text>
-              </View>
-
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>OWNER FULL NAME</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={ownerName}
-                    onChangeText={setOwnerName}
-                    placeholder="e.g. K. Murugan / NBT Fleet"
-                  />
+                <View style={[styles.sectionIconBox, { backgroundColor: '#f0fdf4' }]}>
+                  <MaterialIcons name="person" size={18} color="#16a34a" />
                 </View>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sectionTitle}>2. OWNER & OPERATOR DETAILS</Text>
+                  <Text style={styles.sectionSubtitle}>Owner name and contact number</Text>
+                </View>
+                <View style={[styles.stepCircle, { backgroundColor: '#16a34a' }]}>
+                  <Text style={styles.stepCircleText}>2</Text>
+                </View>
+              </View>
+              <View style={styles.sectionDivider} />
+
+              <View style={formCols === 2 ? styles.inputRow : undefined}>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
+                  <Text style={styles.label}>OWNER FULL NAME</Text>
+                  <View style={styles.inputWithIcon}>
+                    <MaterialIcons name="account-circle" size={15} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.formInputIcon}
+                      value={ownerName}
+                      onChangeText={setOwnerName}
+                      placeholder="e.g. K. Murugan / NBT Fleet"
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
+                </View>
+                <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
                   <Text style={styles.label}>OWNER PHONE NUMBER</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={ownerPhone}
-                    onChangeText={setOwnerPhone}
-                    placeholder="e.g. 98421 55678"
-                    keyboardType="phone-pad"
-                  />
+                  <View style={styles.inputWithIcon}>
+                    <MaterialIcons name="phone" size={15} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.formInputIcon}
+                      value={ownerPhone}
+                      onChangeText={setOwnerPhone}
+                      placeholder="e.g. 98421 55678"
+                      keyboardType="phone-pad"
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
                 </View>
               </View>
             </View>
@@ -1063,14 +1145,20 @@ export default function VehiclesScreen() {
             {/* ── CARD 3: 6 CORE COMPLIANCE DOCUMENTS (MANUAL ISSUE & EXPIRE DATES) ── */}
             <View style={styles.formCard}>
               <View style={styles.formCardHeader}>
-                <MaterialIcons name="verified" size={20} color={COLORS.primary} />
+                <View style={[styles.sectionIconBox, { backgroundColor: '#fef3c7' }]}>
+                  <MaterialIcons name="verified" size={18} color="#d97706" />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sectionTitle}>3. VEHICLE COMPLIANCE & EXPIRY RECORDS</Text>
                   <Text style={styles.sectionSubtitle}>
-                    Enter the official Issue Date and Expire Date manually. Attach document photos/PDFs as needed.
+                    Enter official Issue & Expire dates manually. Attach document photos or PDFs if needed.
                   </Text>
                 </View>
+                <View style={[styles.stepCircle, { backgroundColor: '#d97706' }]}>
+                  <Text style={styles.stepCircleText}>3</Text>
+                </View>
               </View>
+              <View style={styles.sectionDivider} />
 
               {COMPLIANCE_DOCS.map((docSpec) => {
                 const entry = docEntries[docSpec.key] || { docNumber: '', issueDate: '', expiryDate: '' };
@@ -1097,9 +1185,9 @@ export default function VehiclesScreen() {
                     {/* 2-Column Issue Date & Expire Date Row */}
                     <View style={styles.inputRow}>
                       <View style={[styles.inputGroup, { flex: 1 }]}>
-                        <Text style={styles.label}>ISSUE DATE (YYYY-MM-DD)</Text>
-                        <View style={styles.dateInputWrapper}>
-                          <MaterialIcons name="event" size={16} color="#64748b" style={{ marginRight: 6 }} />
+                        <Text style={styles.label}>📅 ISSUE DATE (YYYY-MM-DD)</Text>
+                        <View style={[styles.dateInputWrapper, { borderColor: '#93c5fd' }]}>
+                          <MaterialIcons name="event" size={16} color="#3b82f6" style={{ marginRight: 6 }} />
                           <TextInput
                             style={styles.dateInput}
                             value={entry.issueDate}
@@ -1111,11 +1199,11 @@ export default function VehiclesScreen() {
                       </View>
 
                       <View style={[styles.inputGroup, { flex: 1 }]}>
-                        <Text style={styles.label}>EXPIRE DATE (YYYY-MM-DD) *</Text>
-                        <View style={styles.dateInputWrapper}>
+                        <Text style={styles.label}>🚨 EXPIRE DATE (YYYY-MM-DD)</Text>
+                        <View style={[styles.dateInputWrapper, { borderColor: badge.borderColor || COLORS.outlineVariant }]}>
                           <MaterialIcons name="event-busy" size={16} color={badge.color} style={{ marginRight: 6 }} />
                           <TextInput
-                            style={styles.dateInput}
+                            style={[styles.dateInput, { color: badge.color || COLORS.textDark }]}
                             value={entry.expiryDate}
                             onChangeText={(val) => handleUpdateDocField(docSpec.key, 'expiryDate', val)}
                             placeholder="YYYY-MM-DD"
@@ -1127,14 +1215,18 @@ export default function VehiclesScreen() {
 
                     {/* Document / Certificate Number */}
                     <View style={styles.inputGroup}>
-                      <Text style={styles.label}>DOCUMENT / CERTIFICATE / POLICY NUMBER</Text>
-                      <TextInput
-                        style={styles.formInputCompact}
-                        value={entry.docNumber}
-                        onChangeText={(val) => handleUpdateDocField(docSpec.key, 'docNumber', val)}
-                        placeholder={docSpec.docNumberPlaceholder}
-                        autoCapitalize="characters"
-                      />
+                      <Text style={styles.label}>🔖 CERTIFICATE / POLICY NUMBER</Text>
+                      <View style={styles.inputWithIcon}>
+                        <MaterialIcons name="badge" size={14} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput
+                          style={styles.formInputIcon}
+                          value={entry.docNumber}
+                          onChangeText={(val) => handleUpdateDocField(docSpec.key, 'docNumber', val)}
+                          placeholder={docSpec.docNumberPlaceholder}
+                          placeholderTextColor="#94a3b8"
+                          autoCapitalize="characters"
+                        />
+                      </View>
                     </View>
 
                     {/* Attachment Row */}
@@ -1167,12 +1259,18 @@ export default function VehiclesScreen() {
             {/* ── CARD 4: RC BOOK PHOTOS ── */}
             <View style={styles.formCard}>
               <View style={styles.formCardHeader}>
-                <MaterialIcons name="credit-card" size={20} color={COLORS.primary} />
+                <View style={[styles.sectionIconBox, { backgroundColor: '#f5f3ff' }]}>
+                  <MaterialIcons name="credit-card" size={18} color="#7c3aed" />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sectionTitle}>4. RC BOOK PHOTOS (FRONT & BACK)</Text>
                   <Text style={styles.sectionSubtitle}>Attach registration certificate scans for quick dispatch verification.</Text>
                 </View>
+                <View style={[styles.stepCircle, { backgroundColor: '#7c3aed' }]}>
+                  <Text style={styles.stepCircleText}>4</Text>
+                </View>
               </View>
+              <View style={styles.sectionDivider} />
 
               <View style={styles.inputRow}>
                 {REGISTRATION_DOCS.map((regDoc) => {
@@ -1649,29 +1747,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.secondary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
     gap: 6,
+    ...SHADOWS.light,
   },
-  addBtnText: { color: '#ffffff', fontSize: 11, fontWeight: 'bold' },
+  addBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
   filterRow: { paddingHorizontal: SPACING.gutter, paddingTop: SPACING.gutter / 2, paddingBottom: 6 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.outlineVariant,
-    borderRadius: 8,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingHorizontal: 12,
     backgroundColor: '#ffffff',
-    height: 44,
+    height: 46,
+    ...SHADOWS.light,
   },
-  searchInput: { flex: 1, fontSize: 13, marginLeft: 6, color: COLORS.textDark },
-  pillScroll: { height: 44, flexGrow: 0, flexShrink: 0 },
-  pillRow: { paddingHorizontal: SPACING.gutter, paddingVertical: 4, gap: 8, alignItems: 'center' },
+  searchInput: { flex: 1, fontSize: 13, marginLeft: 8, color: COLORS.textDark },
+  pillScroll: { height: 46, flexGrow: 0, flexShrink: 0 },
+  pillRow: { paddingHorizontal: SPACING.gutter, paddingVertical: 5, gap: 8, alignItems: 'center' },
   pill: {
     backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     height: 32,
     justifyContent: 'center',
     borderRadius: 999,
@@ -1693,11 +1793,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    padding: 14,
     marginBottom: 12,
+    overflow: 'hidden',
+    flexDirection: 'row',
     ...SHADOWS.light,
   },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  vehicleCardAccent: {
+    width: 4,
+    borderRadius: 0,
+  },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 14, paddingBottom: 0 },
   vehicleNumber: { fontSize: 16, fontWeight: '900', color: COLORS.primary, letterSpacing: 0.5 },
   vehicleMakeModel: { fontSize: 12, color: '#475569', fontWeight: '600', marginTop: 2 },
   pinnedBadge: {
@@ -1709,42 +1814,68 @@ const styles = StyleSheet.create({
     borderColor: '#f59e0b',
   },
   pinnedBadgeText: { fontSize: 9, color: '#b45309', fontWeight: 'bold' },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  statusBadgeText: { fontSize: 10.5, fontWeight: '800' },
-  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  ownerText: { fontSize: 12, color: COLORS.textDark, fontWeight: '700' },
-  ownerPhoneText: { fontSize: 11.5, color: '#64748b' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusBadgeText: { fontSize: 10, fontWeight: '800' },
+  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 14 },
+  ownerIconBox: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' },
+  ownerText: { fontSize: 12, color: COLORS.textDark, fontWeight: '700', flex: 1 },
+  ownerPhoneChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#f1f5f9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  ownerPhoneText: { fontSize: 10.5, color: '#64748b', fontWeight: '600' },
 
-  complianceSectionTitleRow: { marginTop: 12, marginBottom: 6 },
-  complianceSectionTitle: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 0.5 },
-  expiryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  complianceSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, marginBottom: 6, paddingHorizontal: 14 },
+  complianceSectionTitle: { fontSize: 9.5, fontWeight: '800', color: '#64748b', letterSpacing: 0.8 },
+  expiryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, paddingHorizontal: 14 },
   expiryGridItem: {
-    width: '31.5%',
-    minWidth: 95,
-    backgroundColor: '#f8fafc',
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 90,
+    maxWidth: '33%',
     borderRadius: 6,
     padding: 6,
     borderWidth: 1,
   },
   expiryGridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  expiryGridDocName: { fontSize: 9.5, fontWeight: '800' },
-  miniStatusDot: { width: 6, height: 6, borderRadius: 3 },
-  expiryGridDate: { fontSize: 10.5, fontWeight: '700', color: COLORS.textDark, marginTop: 2 },
-  expiryGridDays: { fontSize: 8.5, fontWeight: '700', marginTop: 1 },
-  docAlertRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 },
-  docAlertText: { fontSize: 11, fontWeight: '700' },
+  expiryGridDocName: { fontSize: 9, fontWeight: '800', flex: 1 },
+  miniStatusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  expiryGridDate: { fontSize: 10, fontWeight: '700', color: COLORS.textDark, marginTop: 3 },
+  expiryGridDays: { fontSize: 8, fontWeight: '700', marginTop: 1 },
+  docAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 14 },
+  docAlertText: { fontSize: 11, fontWeight: '700', flex: 1 },
 
   cardActionsRow: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: COLORS.outlineVariant,
-    paddingTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     marginTop: 10,
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  cardActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
-  cardActionBtnText: { fontSize: 11, color: COLORS.primary, fontWeight: 'bold' },
+  cardActionsRight: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  cardActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  cardActionBtnText: { fontSize: 11, color: COLORS.primary, fontWeight: '800' },
+  cardIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    backgroundColor: '#f8fafc',
+  },
   cardActionBtnDanger: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
   cardActionBtnTextDanger: { fontSize: 11, color: '#dc2626', fontWeight: 'bold' },
 
@@ -1754,36 +1885,71 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 56,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
+    minHeight: 62,
+    backgroundColor: COLORS.primary,
+    borderBottomWidth: 0,
     paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  closeBtn: { width: 40, height: 40, justifyContent: 'center' },
-  modalTitle: { fontSize: 15, fontWeight: '900', color: COLORS.primary, letterSpacing: 0.5 },
+  closeBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)' },
+  modalTitle: { fontSize: 14, fontWeight: '900', color: '#ffffff', letterSpacing: 0.5 },
+  modalSubtitle: { fontSize: 10, color: '#93c5fd', marginTop: 1 },
   modalContent: { padding: SPACING.gutter, paddingBottom: 64 },
 
   formCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
     padding: 16,
     marginBottom: 14,
     ...SHADOWS.light,
   },
-  formCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
-  sectionTitle: { fontSize: 13, fontWeight: '900', color: COLORS.primary, letterSpacing: 0.5 },
-  sectionSubtitle: { fontSize: 11, color: COLORS.textMuted, marginTop: 2, lineHeight: 15 },
-  inputGroup: { marginBottom: 10 },
+  sectionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  stepCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  stepCircleText: { color: '#ffffff', fontSize: 11, fontWeight: '900' },
+  sectionDivider: { height: 1, backgroundColor: COLORS.outlineVariant, marginBottom: 14, opacity: 0.5 },
+  formCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  sectionTitle: { fontSize: 12.5, fontWeight: '900', color: COLORS.primary, letterSpacing: 0.3 },
+  sectionSubtitle: { fontSize: 10.5, color: COLORS.textMuted, marginTop: 1, lineHeight: 14 },
+  inputGroup: { marginBottom: 12 },
   inputRow: { flexDirection: 'row', gap: 10 },
-  label: { fontSize: 10, fontWeight: '800', color: '#475569', marginBottom: 4, letterSpacing: 0.5 },
-  formInput: {
-    borderWidth: 1,
+  label: { fontSize: 10, fontWeight: '800', color: '#475569', marginBottom: 5, letterSpacing: 0.4 },
+
+  /* Input with leading icon */
+  inputWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
     borderColor: COLORS.outlineVariant,
-    borderRadius: 6,
-    height: 42,
+    borderRadius: 8,
+    height: 44,
+    backgroundColor: '#f8fafc',
+    paddingRight: 10,
+  },
+  inputIcon: { paddingHorizontal: 10 },
+  formInputIcon: { flex: 1, fontSize: 13, color: COLORS.textDark, fontWeight: '500', height: '100%' },
+
+  formInput: {
+    borderWidth: 1.5,
+    borderColor: COLORS.outlineVariant,
+    borderRadius: 8,
+    height: 44,
     backgroundColor: '#f8fafc',
     paddingHorizontal: 12,
     fontSize: 13,
@@ -1792,8 +1958,8 @@ const styles = StyleSheet.create({
   formInputCompact: {
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
-    borderRadius: 6,
-    height: 38,
+    borderRadius: 8,
+    height: 40,
     backgroundColor: '#f8fafc',
     paddingHorizontal: 10,
     fontSize: 12.5,
@@ -1802,19 +1968,19 @@ const styles = StyleSheet.create({
   dateInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.outlineVariant,
-    borderRadius: 6,
-    height: 40,
+    borderRadius: 8,
+    height: 42,
     backgroundColor: '#ffffff',
     paddingHorizontal: 10,
   },
-  dateInput: { flex: 1, fontSize: 12.5, color: COLORS.textDark, fontWeight: '600' },
+  dateInput: { flex: 1, fontSize: 13, color: COLORS.textDark, fontWeight: '600' },
   dropdownInput: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.outlineVariant,
-    borderRadius: 6,
-    height: 42,
+    borderRadius: 8,
+    height: 44,
     backgroundColor: '#f8fafc',
     paddingHorizontal: 12,
     flexDirection: 'row',
@@ -1850,19 +2016,19 @@ const styles = StyleSheet.create({
 
   /* ── COMPLIANCE CARD IN ADD VEHICLE ── */
   docComplianceCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: '#fafbfc',
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: COLORS.outlineVariant,
-    padding: 12,
+    padding: 14,
     marginBottom: 12,
     ...SHADOWS.light,
   },
-  docComplianceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  docNumberCircle: { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  docNumberCircleText: { color: '#ffffff', fontSize: 10.5, fontWeight: '900' },
-  docComplianceTitle: { fontSize: 12.5, fontWeight: '800', color: COLORS.primary },
-  liveStatusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 1 },
+  docComplianceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  docNumberCircle: { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
+  docNumberCircleText: { color: '#ffffff', fontSize: 11, fontWeight: '900' },
+  docComplianceTitle: { fontSize: 13, fontWeight: '800', color: COLORS.primary, flexShrink: 1 },
+  liveStatusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
   liveStatusPillText: { fontSize: 9.5, fontWeight: '800' },
 
   docAttachmentRow: { marginTop: 4 },
@@ -1913,15 +2079,15 @@ const styles = StyleSheet.create({
 
   submitBtn: {
     backgroundColor: COLORS.primary,
-    height: 50,
-    borderRadius: 8,
+    height: 54,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 8,
     marginBottom: 24,
     ...SHADOWS.medium,
   },
-  submitBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
+  submitBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
 
   /* ── VEHICLE DETAILS SCREEN ── */
   detailVehicleNum: { fontSize: 20, fontWeight: '900', color: COLORS.primary },
