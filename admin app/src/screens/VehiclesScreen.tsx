@@ -437,8 +437,8 @@ export default function VehiclesScreen() {
       Alert.alert('Missing Field', 'Please enter the RC / Vehicle Registration Number.');
       return;
     }
-    if (!chassisNumber.trim() || chassisNumber.trim().length < 5) {
-      Alert.alert('Invalid Chassis Number', 'Please enter the last 5 digits of the chassis number.');
+    if (!chassisNumber.trim() || chassisNumber.trim().length < 4) {
+      Alert.alert('Invalid Chassis Number', 'Please enter the last 4 digits of the chassis number.');
       return;
     }
 
@@ -998,11 +998,11 @@ export default function VehiclesScreen() {
 
               <View style={styles.inputRow}>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>CHASSIS NUMBER (LAST 5 DIGITS) *</Text>
+                  <Text style={styles.label}>CHASSIS NUMBER (LAST 4 DIGITS) *</Text>
                   <TextInput
                     style={styles.formInput}
                     value={chassisNumber}
-                    onChangeText={(val) => setChassisNumber(val.replace(/\D/g, '').slice(0, 5))}
+                    onChangeText={(val) => setChassisNumber(val.replace(/\D/g, '').slice(0, 4))}
                     placeholder="e.g. 84920"
                     keyboardType="number-pad"
                     maxLength={5}
@@ -1259,7 +1259,7 @@ export default function VehiclesScreen() {
                       <Text style={styles.detailValue}>{selectedVehicle.rcNumber || '—'}</Text>
                     </View>
                     <View style={styles.detailGridCol}>
-                      <Text style={styles.detailLabel}>CHASSIS (LAST 5)</Text>
+                      <Text style={styles.detailLabel}>CHASSIS (LAST 4)</Text>
                       <Text style={styles.detailValue}>{selectedVehicle.chassisNumber || '—'}</Text>
                     </View>
                     <View style={styles.detailGridCol}>
