@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -61,107 +62,313 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBT Memo - ${safeDate}</title>
   <style>
-    @page { size: A4 portrait; margin: 0; }
-    *, *::before, *::after { box-sizing: border-box; }
-    html, body { width: 210mm; height: 297mm; margin: 0; padding: 0; background: #ffffff; color: #08124a; overflow: hidden; }
-    body { font-family: 'Helvetica', Arial, sans-serif; }
-    .page { width: 210mm; height: 297mm; padding: 12mm; background: #ffffff; border: 3px solid #102168; border-radius: 8px; position: relative; overflow: hidden; page-break-inside: avoid; }
-    @media print {
-      html, body { width: 210mm; height: 297mm; }
-      body { background: #ffffff; -webkit-print-color-adjust: exact; }
-      .page { width: 100%; height: 100%; margin: 0; border-radius: 0; }
+    @page {
+      size: A4 portrait;
+      margin: 6mm;
     }
-    .header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .logo-area { width: 92px; min-width: 92px; }
-    .logo-circle { width: 92px; height: 92px; border: 3px solid #102168; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; box-sizing: border-box; text-align: center; }
-    .logo-mark { font-size: 24px; font-weight: 900; letter-spacing: 0.14em; }
-    .logo-text { font-size: 8px; line-height: 1.2; font-weight: 700; margin-top: 4px; letter-spacing: 0.1em; }
-    .logo-sub { font-size: 6px; line-height: 1.2; margin-top: 2px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.9; }
-    .header-center { text-align: center; flex: 1; }
-    .signed-by { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; margin-bottom: 2px; }
-    .company-name { font-size: 30px; font-weight: 900; letter-spacing: 0.12em; margin: 0; line-height: 1.05; }
-    .company-subtitle { font-size: 13px; margin: 4px 0 0; font-style: italic; line-height: 1.1; }
-    .address { font-size: 11px; line-height: 1.5; margin-top: 8px; color: #102168; }
-    .contact-right { min-width: 132px; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-    .contact-block { display: flex; align-items: flex-start; gap: 8px; }
-    .phone-circle { width: 26px; height: 26px; border: 2px solid #102168; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; }
-    .contact-text { display: flex; flex-direction: column; align-items: flex-end; font-size: 11px; line-height: 1.2; color: #102168; }
-    .contact-label { font-weight: 700; }
-    .contact-value { font-size: 13px; font-weight: 700; }
-    .divider-row { position: relative; margin-top: 14px; padding-top: 16px; }
-    .divider-line { position: absolute; left: 0; right: 0; top: 12px; border-top: 2px solid #102168; }
-    .memo-badge { position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); background: #ffffff; border: 2px solid #102168; border-radius: 12px; padding: 4px 18px; font-size: 12px; font-weight: 900; letter-spacing: 0.12em; }
-    .body { margin-top: 14mm; display: flex; flex-direction: column; min-height: calc(100% - 104mm); }
-    .date-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; }
-    .date-label { font-weight: 700; }
-    .editable-area { flex: 1; outline: none; font-size: 13px; line-height: 1.35; min-height: calc(100% - 68mm); max-height: calc(100% - 68mm); overflow: hidden; word-break: break-word; overflow-wrap: break-word; }
-    .editable-area:empty::before { content: 'Type memo content here...'; color: #94a3b8; }
-    .memo-content, .memo-content *, .editable-area, .editable-area * { margin: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; margin-block-start: 0 !important; margin-block-end: 0 !important; padding: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; line-height: 1.35 !important; }
-    .memo-content p, .memo-content div, .memo-content blockquote, .memo-content ul, .memo-content ol { margin: 0 !important; padding: 0 !important; margin-block-start: 0 !important; margin-block-end: 0 !important; line-height: 1.35 !important; }
-    .footer { display: flex; justify-content: flex-end; margin-top: 10mm; }
-    .signature-block { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 140px; }
-    .signature-caption { font-size: 10px; font-weight: 900; letter-spacing: 0.08em; }
-    .signature-img { width: 120px; height: auto; display: block; }
-    .signatory-text { font-size: 10px; letter-spacing: 0.08em; margin-top: 2px; }
-    @media print { body { background: #ffffff; } .page { border-color: #102168; } }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #0f172a;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .page {
+      width: 100%;
+      max-width: 198mm;
+      min-height: 278mm;
+      margin: 0 auto;
+      padding: 8mm;
+      background: #ffffff;
+      border: 2.5px solid #0f172a;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-inside: avoid;
+    }
+    @media print {
+      body {
+        background: #ffffff;
+      }
+      .page {
+        width: 100% !important;
+        max-width: none !important;
+        min-height: 280mm !important;
+        margin: 0 !important;
+        padding: 6mm !important;
+        border-width: 2px !important;
+      }
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 8px;
+    }
+    .logo-area {
+      width: 86px;
+      min-width: 86px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-circle {
+      width: 82px;
+      height: 82px;
+      border: 2.5px solid #0f172a;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .logo-mark {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #0f172a;
+      line-height: 1;
+    }
+    .logo-text {
+      font-size: 6.5px;
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-top: 3px;
+      color: #0f172a;
+    }
+    .header-center {
+      text-align: center;
+      flex: 1;
+      padding: 0 4px;
+    }
+    .signed-by {
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 3px;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+    }
+    .company-name {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      margin: 0;
+      line-height: 1.1;
+      color: #0f172a;
+    }
+    .company-subtitle {
+      font-size: 11px;
+      font-weight: 700;
+      margin: 3px 0 0;
+      color: #334155;
+    }
+    .address {
+      font-size: 10px;
+      line-height: 1.4;
+      margin-top: 5px;
+      color: #334155;
+      font-weight: 500;
+    }
+    .contact-right {
+      min-width: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      border: 1.5px solid #0f172a;
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .contact-block {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .contact-text {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      font-size: 9.5px;
+      line-height: 1.25;
+      color: #0f172a;
+    }
+    .contact-label {
+      font-weight: 800;
+      color: #475569;
+    }
+    .contact-value {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .divider-row {
+      position: relative;
+      margin: 8px 0;
+      text-align: center;
+    }
+    .divider-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      border-top: 2px solid #0f172a;
+      transform: translateY(-50%);
+    }
+    .memo-badge {
+      display: inline-block;
+      position: relative;
+      background: #0f172a;
+      color: #ffffff;
+      border-radius: 4px;
+      padding: 3px 18px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      z-index: 1;
+    }
+    .memo-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 4px 0;
+    }
+    .date-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      font-size: 11.5px;
+    }
+    .date-label {
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .date-value {
+      min-width: 140px;
+      border-bottom: 1.5px solid #0f172a;
+      padding-bottom: 2px;
+      font-weight: 700;
+      color: #0f172a;
+      text-align: center;
+    }
+    .editable-area {
+      flex: 1;
+      outline: none;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #0f172a;
+      min-height: 140mm;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    .editable-area:empty::before {
+      content: 'Type memo content here...';
+      color: #94a3b8;
+    }
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+      padding-top: 8px;
+    }
+    .signature-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 180px;
+      border: 1px solid #0f172a;
+      border-radius: 4px;
+      padding: 6px 8px;
+      background: #f8fafc;
+    }
+    .signature-caption {
+      font-size: 9.5px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+    .signature-img {
+      max-height: 40px;
+      width: auto;
+      display: block;
+      margin: 2px auto;
+    }
+    .signatory-text {
+      font-size: 9px;
+      font-weight: 700;
+      color: #475569;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
   <div class="page">
-    <div class="header-top">
-      <div class="logo-area">
-        <div class="logo-circle">
-          <div class="logo-mark">NBT</div>
-          <div class="logo-text">NEW BALAJI TRANSPORT</div>
-          <div class="logo-sub">LOGISTICS SOLUTIONS SINCE 2010</div>
-        </div>
-      </div>
-      <div class="header-center">
-        <div class="signed-by">Sri Ramajayam</div>
-        <div class="company-name">NEW BALAJI TRANSPORT</div>
-        <div class="company-subtitle">(Lorry Suppliers & Commission Agent)</div>
-        <div class="address">
-          3/131, V.K.V. Complex, 1st Floor,<br />
-          Bangalore Bye Pass Road,<br />
-          Post - Kandampatty, Salem - 636 005. (TN)
-        </div>
-      </div>
-      <div class="contact-right">
-        <div class="contact-block">
-          <span class="phone-circle">📞</span>
-          <div class="contact-text">
-            <span class="contact-label">Cell :</span>
-            <span class="contact-value">94433-51789</span>
-            <span class="contact-value">93622-51789</span>
+    <div>
+      <div class="header-top">
+        <div class="logo-area">
+          <div class="logo-circle">
+            <div class="logo-mark">NBT</div>
+            <div class="logo-text">NEW BALAJI TRANSPORT</div>
           </div>
         </div>
-        <div class="contact-block">
-          <span class="phone-circle">📞</span>
-          <div class="contact-text">
-            <span class="contact-label">Offi. :</span>
-            <span class="contact-value">2225575</span>
-            <span class="contact-value">2225576</span>
+        <div class="header-center">
+          <div class="signed-by">Sri Ramajayam</div>
+          <div class="company-name">NEW BALAJI TRANSPORT</div>
+          <div class="company-subtitle">(LORRY SUPPLIERS & COMMISSION AGENT)</div>
+          <div class="address">
+            3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,<br />
+            Kandampatty (Po.), Salem - 636 005. (TN)
+          </div>
+        </div>
+        <div class="contact-right">
+          <div class="contact-block">
+            <div class="contact-text">
+              <span class="contact-label">Cell :</span>
+              <span class="contact-value">94433 51789, 93622 51789</span>
+            </div>
+          </div>
+          <div class="contact-block">
+            <div class="contact-text">
+              <span class="contact-label">Offi. :</span>
+              <span class="contact-value">0427-2225575, 2225576</span>
+            </div>
           </div>
         </div>
       </div>
+      <div class="divider-row">
+        <div class="divider-line"></div>
+        <div class="memo-badge">MEMO</div>
+      </div>
     </div>
-    <div class="divider-row">
-      <div class="divider-line"></div>
-      <div class="memo-badge">MEMO</div>
-    </div>
-    <div class="body">
+    
+    <div class="memo-body">
       <div class="date-row">
         <span class="date-label">Date :</span>
         <div id="dateField" class="date-value" ${editableDateAttributes}>${safeDate}</div>
       </div>
       <div id="memoEditor" class="editable-area memo-content" ${editableAttributes}>${safeContent}</div>
-      <div class="footer">
-        <div class="signature-block">
-          <div class="signature-caption">For NEW BALAJI TRANSPORT</div>
-          <img class="signature-img" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
-          <div class="signatory-text">Authorised Signatory</div>
-        </div>
+    </div>
+
+    <div class="footer">
+      <div class="signature-block">
+        <div class="signature-caption">For NEW BALAJI TRANSPORT</div>
+        <img class="signature-img" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
+        <div class="signatory-text">Authorised Signatory</div>
       </div>
     </div>
   </div>
@@ -672,66 +879,106 @@ const MemoScreen = () => {
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredMemos = useMemo(() => {
+    let list = [...memoDocuments].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase().trim();
+    return list.filter(m =>
+      m.memoId.toLowerCase().includes(q) ||
+      m.date.toLowerCase().includes(q) ||
+      m.contentHtml.toLowerCase().includes(q) ||
+      (m.createdBy && m.createdBy.toLowerCase().includes(q))
+    );
+  }, [memoDocuments, searchQuery]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={[styles.headerRow, !isDesktop && styles.headerRowMobile]}>
-        <View>
-          <Text style={styles.screenTitle}>Memo</Text>
-          <Text style={styles.screenSubtitle}>Create, save and print A4 memo documents</Text>
-        </View>
-        <View style={[styles.tabRow, !isDesktop && styles.tabRowMobile]}>
-          {(['EDITOR', 'ARCHIVE'] as const).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabButton, !isDesktop && styles.tabButtonMobile, activeTab === tab && styles.tabButtonActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.tabButtonText, activeTab === tab && styles.tabButtonTextActive]}>{tab}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* Header Tabs */}
+      <View style={styles.tabHeader}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'EDITOR' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('EDITOR')}
+        >
+          <MaterialIcons name="edit-note" size={20} color={activeTab === 'EDITOR' ? '#ffffff' : '#cbd5e1'} />
+          <Text style={[styles.tabButtonText, activeTab === 'EDITOR' && styles.tabButtonTextActive]}>
+            {selectedMemoId ? 'EDIT MEMO' : 'CREATE MEMO'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'ARCHIVE' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('ARCHIVE')}
+        >
+          <MaterialIcons name="archive" size={20} color={activeTab === 'ARCHIVE' ? '#ffffff' : '#cbd5e1'} />
+          <Text style={[styles.tabButtonText, activeTab === 'ARCHIVE' && styles.tabButtonTextActive]}>
+            MEMO ARCHIVE ({memoDocuments.length})
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === 'EDITOR' ? (
-        <ScrollView contentContainerStyle={styles.editorContent}>
-          <View style={styles.toolbarRow}>
+        <ScrollView contentContainerStyle={styles.editorContent} keyboardShouldPersistTaps="handled">
+          {/* Editing Status Banner */}
+          {selectedMemoId && (
+            <View style={[styles.editingBanner, { width: isDesktop ? pageWidth : '100%' }]}>
+              <View style={styles.editingBannerLeft}>
+                <MaterialIcons name="edit" size={20} color="#1e40af" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.editingBannerTitle}>Editing Saved Memo: {selectedMemoId}</Text>
+                  <Text style={styles.editingBannerSub}>Modify content below and click UPDATE MEMO to save changes.</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.cancelEditBtn} onPress={createNewMemo}>
+                <MaterialIcons name="close" size={16} color="#dc2626" />
+                <Text style={styles.cancelEditBtnText}>New / Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Formatting Toolbar */}
+          <View style={[styles.toolbarRow, { width: isDesktop ? pageWidth : '100%' }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarScroll}>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('bold')}>
-                <MaterialIcons name="format-bold" size={20} color={COLORS.primary} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('bold')} title="Bold">
+                <MaterialIcons name="format-bold" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('italic')}>
-                <MaterialIcons name="format-italic" size={20} color={COLORS.primary} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('italic')} title="Italic">
+                <MaterialIcons name="format-italic" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('underline')}>
-                <MaterialIcons name="format-underlined" size={20} color={COLORS.primary} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('underline')} title="Underline">
+                <MaterialIcons name="format-underlined" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyLeft')}>
-                <MaterialIcons name="format-align-left" size={20} color={COLORS.primary} />
+              <View style={styles.toolbarDivider} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyLeft')} title="Align Left">
+                <MaterialIcons name="format-align-left" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyCenter')}>
-                <MaterialIcons name="format-align-center" size={20} color={COLORS.primary} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyCenter')} title="Align Center">
+                <MaterialIcons name="format-align-center" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyRight')}>
-                <MaterialIcons name="format-align-right" size={20} color={COLORS.primary} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyRight')} title="Align Right">
+                <MaterialIcons name="format-align-right" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertUnorderedList')}>
-                <MaterialIcons name="format-list-bulleted" size={20} color={COLORS.primary} />
+              <View style={styles.toolbarDivider} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertUnorderedList')} title="Bullet List">
+                <MaterialIcons name="format-list-bulleted" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertOrderedList')}>
-                <MaterialIcons name="format-list-numbered" size={20} color={COLORS.primary} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertOrderedList')} title="Numbered List">
+                <MaterialIcons name="format-list-numbered" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => applyWebFontSize(14)}>
+              <View style={styles.toolbarDivider} />
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => applyWebFontSize(13)}>
                 <Text style={styles.toolbarLabel}>A-</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => applyWebFontSize(18)}>
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => applyWebFontSize(16)}>
                 <Text style={styles.toolbarLabel}>A</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => applyWebFontSize(22)}>
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => applyWebFontSize(20)}>
                 <Text style={styles.toolbarLabel}>A+</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
 
+          {/* Memo Page Paper Preview */}
           <View style={[styles.pageWrapper, { width: isDesktop ? pageWidth : '100%', minHeight: isDesktop ? pageHeight : undefined }]}> 
             {isWeb ? (
               <View
@@ -739,40 +986,31 @@ const MemoScreen = () => {
                 onStartShouldSetResponder={() => true}
                 onResponderGrant={focusWebEditor as any}
               > 
-                <View style={[styles.headerTop, !isDesktop && { flexDirection: 'column', alignItems: 'center', gap: 12, borderBottomWidth: 2, borderBottomColor: '#102168', paddingBottom: 14 }]}>
+                <View style={[styles.headerTop, !isDesktop && { flexDirection: 'column', alignItems: 'center', gap: 10, paddingBottom: 10 }]}>
                   <View style={styles.logoArea}>
                     <View style={styles.logoCircle}>
                       <Text style={styles.logoMark}>NBT</Text>
                       <Text style={styles.logoText}>NEW BALAJI TRANSPORT</Text>
-                      <Text style={styles.logoSub}>LOGISTICS SOLUTIONS SINCE 2010</Text>
                     </View>
                   </View>
                   <View style={styles.headerCenter}>
                     <Text style={styles.signedBy}>Sri Ramajayam</Text>
-                    <Text style={[styles.companyName, !isDesktop && { fontSize: 20, lineHeight: 26 }]}>NEW BALAJI</Text>
-                    <Text style={[styles.companyNameSecondary, !isDesktop && { fontSize: 20, lineHeight: 26 }]}>TRANSPORT</Text>
-                    <Text style={styles.companySubtitle}>(Lorry Suppliers & Commission Agent)</Text>
+                    <Text style={[styles.companyName, !isDesktop && { fontSize: 20, letterSpacing: 1 }]}>NEW BALAJI TRANSPORT</Text>
+                    <Text style={styles.companySubtitle}>(LORRY SUPPLIERS & COMMISSION AGENT)</Text>
                     <Text style={styles.address}>
-                      3/131, V.K.V. Complex, 1st Floor,
-                      {'\n'}Bangalore Bye Pass Road,
-                      {'\n'}Post - Kandampatty, Salem - 636 005. (TN)
+                      3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,{'\n'}
+                      Kandampatty (Po.), Salem - 636 005. (TN)
                     </Text>
                   </View>
-                  <View style={[styles.contactRight, !isDesktop && { minWidth: '100%', alignItems: 'center', gap: 6 }]}>
+                  <View style={[styles.contactRight, !isDesktop && { minWidth: '100%', alignItems: 'center', gap: 4 }]}>
                     <View style={styles.contactBlock}>
-                      <Text style={styles.phoneCircle}>☎</Text>
                       <View style={[styles.contactText, !isDesktop && { alignItems: 'center' }]}>
-                        <Text style={styles.contactLabel}>Cell :</Text>
-                        <Text style={styles.contactValue}>94433-51789</Text>
-                        <Text style={styles.contactValue}>93622-51789</Text>
+                        <Text style={styles.contactLabel}>Cell : <Text style={styles.contactValue}>94433 51789, 93622 51789</Text></Text>
                       </View>
                     </View>
                     <View style={styles.contactBlock}>
-                      <Text style={styles.phoneCircle}>☎</Text>
                       <View style={[styles.contactText, !isDesktop && { alignItems: 'center' }]}>
-                        <Text style={styles.contactLabel}>Offi. :</Text>
-                        <Text style={styles.contactValue}>2225575</Text>
-                        <Text style={styles.contactValue}>2225576</Text>
+                        <Text style={styles.contactLabel}>Offi. : <Text style={styles.contactValue}>0427-2225575, 2225576</Text></Text>
                       </View>
                     </View>
                   </View>
@@ -819,7 +1057,7 @@ const MemoScreen = () => {
                           padding: 0 !important;
                           padding-top: 0 !important;
                           padding-bottom: 0 !important;
-                          line-height: 1.35 !important;
+                          line-height: 1.5 !important;
                           box-sizing: border-box !important;
                         }
                         .editable-area p,
@@ -842,7 +1080,7 @@ const MemoScreen = () => {
                           margin-block-start: 0 !important;
                           margin-block-end: 0 !important;
                           padding: 0 !important;
-                          line-height: 1.35 !important;
+                          line-height: 1.5 !important;
                         }
                         .editable-area:empty::before {
                           content: 'Type memo content here...';
@@ -882,7 +1120,6 @@ const MemoScreen = () => {
                     <View style={styles.signatureBlock}>
                       <Text style={styles.signatureCaption}>For NEW BALAJI TRANSPORT</Text>
                       <Image source={{ uri: nbtAuthorisedSignatureBase64 }} style={styles.signatureImgWeb} resizeMode="contain" />
-                      <View style={styles.signatureLine} />
                       <Text style={styles.signatureText}>Authorised Signatory</Text>
                     </View>
                   </View>
@@ -908,75 +1145,163 @@ const MemoScreen = () => {
             )}
           </View>
 
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={[styles.primaryButton, styles.saveButton]} onPress={saveMemo} disabled={isSaving}>
-              {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>SAVE MEMO</Text>}
+          {/* Action Bar matching GC Note Style */}
+          <View style={[styles.formBottomBar, { width: isDesktop ? pageWidth : '100%' }, !isDesktop && { flexDirection: 'column', gap: 10, height: 'auto', marginBottom: 32 }]}>
+            <TouchableOpacity
+              style={[styles.actionBtnLarge, selectedMemoId ? styles.updateBtnStyle : styles.saveBtnStyle, isSaving && { opacity: 0.6 }]}
+              onPress={saveMemo}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <>
+                  <MaterialIcons name={selectedMemoId ? "check-circle" : "save"} size={18} color="#ffffff" />
+                  <Text style={styles.actionBtnLargeText}>{selectedMemoId ? "UPDATE MEMO" : "SAVE MEMO"}</Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.primaryButton, styles.downloadButton]} onPress={downloadPdf} disabled={isSaving}>
-              {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>⬇ DOWNLOAD PDF</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.primaryButton, styles.printButton]} onPress={printMemo} disabled={isSaving}>
-              {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>🖨 PRINT</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.secondaryButton]} onPress={createNewMemo} disabled={isSaving}>
-              <Text style={styles.secondaryButtonText}>NEW MEMO</Text>
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.metaRow}>
-            <Text style={styles.metaText}>Memo ID: {memoId}</Text>
-            <Text style={styles.metaText}>Date: {date}</Text>
+            <TouchableOpacity
+              style={[styles.actionBtnLarge, styles.downloadBtnStyle]}
+              onPress={downloadPdf}
+              disabled={isSaving}
+            >
+              <MaterialIcons name="file-download" size={18} color="#ffffff" />
+              <Text style={styles.actionBtnLargeText}>DOWNLOAD PDF</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtnLarge, styles.printBtnStyle]}
+              onPress={printMemo}
+              disabled={isSaving}
+            >
+              <MaterialIcons name="print" size={18} color="#ffffff" />
+              <Text style={styles.actionBtnLargeText}>PRINT</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtnLarge, styles.newBtnStyle]}
+              onPress={createNewMemo}
+              disabled={isSaving}
+            >
+              <MaterialIcons name="add" size={18} color={COLORS.primary} />
+              <Text style={[styles.actionBtnLargeText, { color: COLORS.primary }]}>NEW MEMO</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={styles.archiveContent}>
-          {isLoading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          ) : (
-            <FlatList
-              data={[...memoDocuments].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0))}
-              keyExtractor={(item) => item.memoId}
-              renderItem={({ item }) => (
-                <View style={styles.memoCard}>
-                  <View style={[styles.memoCardRow, !isDesktop && { flexDirection: 'column', gap: 12 }]}>
-                    <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.memoCardId}>{item.memoId}</Text>
-                        {item.isPinned && (
-                          <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#f59e0b' }}>
-                            <Text style={{ fontSize: 9, color: '#b45309', fontWeight: 'bold' }}>📌 PINNED</Text>
-                          </View>
-                        )}
+        /* ARCHIVE TAB */
+        <View style={{ flex: 1 }}>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <MaterialIcons name="search" size={20} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search memos by ID, date, content..."
+                placeholderTextColor={COLORS.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <MaterialIcons name="close" size={18} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.archiveContent}>
+            {isLoading ? (
+              <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+            ) : (
+              <FlatList
+                data={filteredMemos}
+                keyExtractor={(item) => item.memoId}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <View style={styles.memoCard}>
+                    <View style={[styles.memoCardRow, !isDesktop && { flexDirection: 'column', gap: 10 }]}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <Text style={styles.memoCardId}>{item.memoId}</Text>
+                          {item.isPinned && (
+                            <View style={styles.pinnedBadge}>
+                              <Text style={styles.pinnedBadgeText}>📌 PINNED</Text>
+                            </View>
+                          )}
+                          <Text style={styles.memoCardDate}>{item.date}</Text>
+                        </View>
+                        <Text style={styles.memoCardMeta}>
+                          Created by: <Text style={{ fontWeight: '600', color: COLORS.textDark }}>{item.createdBy || 'Admin'}</Text>
+                          {item.updatedAt ? `  •  Updated: ${new Date(item.updatedAt).toLocaleDateString()}` : ''}
+                        </Text>
                       </View>
-                      <Text style={styles.memoCardMeta}>Date: {item.date}</Text>
-                      <Text style={styles.memoCardMeta}>Created by: {item.createdBy}</Text>
-                      <Text style={styles.memoCardMeta}>Updated: {new Date(item.updatedAt).toLocaleString()}</Text>
+
+                      {/* Action buttons */}
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={styles.cardActionBtn}
+                          onPress={async () => { await db.togglePinMemo(item.id); loadMemoDocuments(); }}
+                        >
+                          <MaterialIcons name="push-pin" size={16} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
+                          <Text style={[styles.cardActionBtnText, { color: item.isPinned ? '#d97706' : COLORS.textMuted }]}>
+                            {item.isPinned ? 'UNPIN' : 'PIN'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.cardActionBtn, { borderColor: '#bfdbfe', backgroundColor: '#eff6ff' }]}
+                          onPress={() => openMemoForEdit(item)}
+                        >
+                          <MaterialIcons name="edit" size={16} color="#2563eb" />
+                          <Text style={[styles.cardActionBtnText, { color: '#2563eb' }]}>EDIT</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.cardActionBtn}
+                          onPress={() => downloadExistingMemo(item)}
+                        >
+                          <MaterialIcons name="file-download" size={16} color="#0e7490" />
+                          <Text style={[styles.cardActionBtnText, { color: '#0e7490' }]}>PDF</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.cardActionBtn}
+                          onPress={() => printExistingMemo(item)}
+                        >
+                          <MaterialIcons name="print" size={16} color={COLORS.secondary} />
+                          <Text style={[styles.cardActionBtnText, { color: COLORS.secondary }]}>PRINT</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.cardActionBtn}
+                          onPress={() => deleteMemo(item)}
+                        >
+                          <MaterialIcons name="delete-outline" size={16} color="#ef4444" />
+                          <Text style={[styles.cardActionBtnText, { color: '#ef4444' }]}>DELETE</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <View style={[styles.memoCardActions, !isDesktop && { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-start', gap: 8 }]}>
-                      <TouchableOpacity style={[styles.cardActionButton, { backgroundColor: item.isPinned ? '#d97706' : COLORS.surfaceContainerHigh }]} onPress={async () => { await db.togglePinMemo(item.id); loadMemoDocuments(); }}>
-                        <Text style={[styles.cardActionText, { color: item.isPinned ? '#ffffff' : COLORS.textDark }]}>{item.isPinned ? '📌 UNPIN' : '📌 PIN'}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.cardActionButton} onPress={() => openMemoForEdit(item)}>
-                        <Text style={styles.cardActionText}>VIEW / EDIT</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.cardActionButton} onPress={() => downloadExistingMemo(item)}>
-                        <Text style={styles.cardActionText}>DOWNLOAD</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.cardActionButton} onPress={() => printExistingMemo(item)}>
-                        <Text style={styles.cardActionText}>PRINT</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.cardActionButton, styles.cardActionDanger]} onPress={() => deleteMemo(item)}>
-                        <Text style={styles.cardActionText}>DELETE</Text>
-                      </TouchableOpacity>
-                    </View>
+
+                    <Text style={styles.memoCardPreview} numberOfLines={2}>
+                      {formatMemoPreview(item.contentHtml) || 'No text content.'}
+                    </Text>
                   </View>
-                  <Text style={styles.memoCardPreview}>{formatMemoPreview(item.contentHtml)}</Text>
-                </View>
-              )}
-              ListEmptyComponent={<Text style={styles.emptyText}>No saved memos yet.</Text>}
-            />
-          )}
-        </ScrollView>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                    <MaterialIcons name="description" size={48} color="#cbd5e1" />
+                    <Text style={styles.emptyText}>
+                      {searchQuery ? 'No memos match your search.' : 'No saved memos yet. Create one in the editor!'}
+                    </Text>
+                  </View>
+                }
+              />
+            )}
+          </ScrollView>
+        </View>
       )}
 
       {/* Attractive Custom Modal Confirmation Dialog */}
@@ -1057,83 +1382,220 @@ const MemoScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  headerRow: { paddingHorizontal: SPACING.gutter, paddingTop: SPACING.gutter, paddingBottom: SPACING.base, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  headerRowMobile: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
-  screenTitle: { fontSize: 24, fontWeight: '900', color: COLORS.primary },
-  screenSubtitle: { marginTop: 4, fontSize: 13, color: COLORS.textMuted },
-  tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tabRowMobile: { width: '100%', flexWrap: 'nowrap' },
-  tabButton: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: COLORS.surfaceContainerLow },
-  tabButtonMobile: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
-  tabButtonActive: { backgroundColor: COLORS.primary },
-  tabButtonText: { color: COLORS.textMuted, fontWeight: '700', fontSize: 12 },
-  tabButtonTextActive: { color: '#ffffff' },
-  editorContent: { alignItems: 'center', paddingBottom: 40 },
-  archiveContent: { paddingHorizontal: SPACING.gutter, paddingBottom: 40 },
-  toolbarRow: { width: '100%', paddingHorizontal: SPACING.gutter, marginBottom: 12 },
-  toolbarScroll: { alignItems: 'center', paddingVertical: 4 },
-  toolbarButton: { marginRight: 10, width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.outline },
-  toolbarLabel: { fontSize: 16, fontWeight: '700', color: COLORS.primary },
-  pageWrapper: { backgroundColor: 'transparent', borderRadius: 22, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', padding: 0 },
-  memoPage: { flex: 1, width: '100%', backgroundColor: '#ffffff', borderRadius: 24, padding: 20, borderWidth: 3, borderColor: '#102168', overflow: 'hidden' },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 14, paddingBottom: 14, borderBottomWidth: 2, borderBottomColor: '#102168' },
-  logoArea: { width: 100, minWidth: 100, alignItems: 'center', justifyContent: 'center' },
-  logoCircle: { width: 100, height: 100, borderWidth: 3, borderColor: '#102168', borderRadius: 50, alignItems: 'center', justifyContent: 'center', padding: 8 },
-  logoMark: { fontSize: 22, fontWeight: '900', letterSpacing: 3, color: '#102168' },
-  logoText: { fontSize: 8, lineHeight: 10, fontWeight: '700', letterSpacing: 1, marginTop: 4, textAlign: 'center', color: '#102168' },
-  logoSub: { fontSize: 6, lineHeight: 8, fontWeight: '700', letterSpacing: 1, marginTop: 2, opacity: 0.9, color: '#102168', textAlign: 'center' },
-  headerCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  signedBy: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 6, color: '#102168' },
-  companyName: { fontSize: 26, fontWeight: '900', letterSpacing: 2, lineHeight: 34, textAlign: 'center', color: '#102168' },
-  companyNameSecondary: { fontSize: 26, fontWeight: '900', letterSpacing: 2, lineHeight: 34, textAlign: 'center', color: '#102168' },
-  companySubtitle: { fontSize: 13, fontStyle: 'italic', marginTop: 4, textAlign: 'center', color: '#102168' },
-  address: { fontSize: 11, lineHeight: 18, marginTop: 8, color: '#102168', textAlign: 'center' },
-  contactRight: { minWidth: 140, alignItems: 'flex-end', gap: 10 },
-  contactBlock: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  phoneCircle: { width: 26, height: 26, borderWidth: 2, borderColor: '#102168', borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  tabHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#1e293b',
+    padding: 6,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  tabButtonActive: {
+    backgroundColor: '#0f172a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  tabButtonText: {
+    color: '#94a3b8',
+    fontWeight: 'bold',
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  tabButtonTextActive: {
+    color: '#ffffff',
+  },
+  editorContent: { alignItems: 'center', padding: SPACING.gutter, paddingBottom: 60 },
+  archiveContent: { padding: SPACING.gutter, paddingBottom: 60 },
+  searchContainer: {
+    paddingHorizontal: SPACING.gutter,
+    paddingTop: SPACING.gutter,
+    paddingBottom: 4,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    ...SHADOWS.light,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textDark,
+    padding: 0,
+  },
+  editingBanner: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#93c5fd',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 10,
+    ...SHADOWS.light,
+  },
+  editingBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  editingBannerTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1e40af',
+  },
+  editingBannerSub: {
+    fontSize: 11,
+    color: '#3b82f6',
+    marginTop: 2,
+  },
+  cancelEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fee2e2',
+    borderColor: '#fca5a5',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  cancelEditBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#dc2626',
+  },
+  toolbarRow: { marginBottom: 12 },
+  toolbarScroll: { alignItems: 'center', gap: 6, paddingVertical: 2 },
+  toolbarButton: { width: 36, height: 36, borderRadius: 8, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.outline },
+  toolbarDivider: { width: 1, height: 24, backgroundColor: '#cbd5e1', marginHorizontal: 4 },
+  toolbarLabel: { fontSize: 13, fontWeight: '800', color: COLORS.primary },
+  pageWrapper: { backgroundColor: 'transparent', borderRadius: 12, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
+  memoPage: { flex: 1, width: '100%', backgroundColor: '#ffffff', borderRadius: 8, padding: 18, borderWidth: 2.5, borderColor: '#0f172a', overflow: 'hidden' },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 10 },
+  logoArea: { width: 86, minWidth: 86, alignItems: 'center', justifyContent: 'center' },
+  logoCircle: { width: 82, height: 82, borderWidth: 2.5, borderColor: '#0f172a', borderRadius: 41, alignItems: 'center', justifyContent: 'center', padding: 4 },
+  logoMark: { fontSize: 24, fontWeight: '900', letterSpacing: 1, color: '#0f172a' },
+  logoText: { fontSize: 6.5, lineHeight: 8, fontWeight: '800', letterSpacing: 0.5, marginTop: 2, textAlign: 'center', color: '#0f172a' },
+  headerCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  signedBy: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2, color: '#0f172a' },
+  companyName: { fontSize: 24, fontWeight: '900', letterSpacing: 1.5, lineHeight: 28, textAlign: 'center', color: '#0f172a' },
+  companySubtitle: { fontSize: 11, fontWeight: '700', marginTop: 2, textAlign: 'center', color: '#334155' },
+  address: { fontSize: 10, lineHeight: 14, marginTop: 4, color: '#334155', textAlign: 'center', fontWeight: '500' },
+  contactRight: { minWidth: 140, alignItems: 'flex-end', gap: 4, borderWidth: 1.5, borderColor: '#0f172a', borderRadius: 6, padding: 6 },
+  contactBlock: { flexDirection: 'row', alignItems: 'center' },
   contactText: { alignItems: 'flex-end' },
-  contactLabel: { fontWeight: '700', color: '#102168', fontSize: 12 },
-  contactValue: { fontSize: 13, fontWeight: '700', color: '#102168' },
-  dividerRow: { position: 'relative', marginTop: 18, paddingTop: 20 },
-  dividerLine: { position: 'absolute', left: 0, right: 0, top: 12, borderTopWidth: 2, borderTopColor: '#102168' },
-  memoBadge: { position: 'absolute', left: '50%', top: 0, transform: [{ translateX: -50 }, { translateY: -50 }], backgroundColor: '#ffffff', borderWidth: 2, borderColor: '#102168', borderRadius: 16, paddingHorizontal: 22, paddingVertical: 6 },
-  memoBadgeText: { fontSize: 13, fontWeight: '900', letterSpacing: 1.4, color: '#102168' },
-  body: { marginTop: 26, flex: 1, overflow: 'hidden' },
-  dateRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 16 },
-  dateLabel: { fontWeight: '700', color: '#102168', fontSize: 12 },
-  dateValue: { minWidth: 200, borderBottomWidth: 2, borderBottomColor: '#102168', paddingBottom: 2, color: '#102168', fontSize: 12 },
-  dateText: { color: '#102168', fontSize: 12 },
-  editableArea: { flex: 1, fontSize: 13, lineHeight: 18, color: '#08124a', padding: 4, backgroundColor: 'transparent' },
-  memoText: { fontSize: 12, lineHeight: 17, color: '#08124a' },
-  footer: { width: '100%', flexDirection: 'row', justifyContent: 'flex-end', marginTop: 42, paddingBottom: 8, paddingRight: 16 },
-  signatureBlock: { alignItems: 'flex-end', gap: 4, maxWidth: 180 },
-  signatureCaption: { fontSize: 10, fontWeight: '900', letterSpacing: 1, color: '#102168' },
-  signatureImgWeb: { width: 140, height: 60 },
-  signatureLine: { width: 140, borderBottomWidth: 1, borderBottomColor: '#102168', marginTop: -10 },
-  signatureText: { fontSize: 10, color: '#102168', marginTop: 6 },
+  contactLabel: { fontWeight: '700', color: '#475569', fontSize: 10 },
+  contactValue: { fontSize: 10.5, fontWeight: '800', color: '#0f172a' },
+  dividerRow: { position: 'relative', marginVertical: 8, alignItems: 'center', justifyContent: 'center' },
+  dividerLine: { position: 'absolute', left: 0, right: 0, top: '50%', borderTopWidth: 2, borderTopColor: '#0f172a' },
+  memoBadge: { backgroundColor: '#0f172a', borderRadius: 4, paddingHorizontal: 18, paddingVertical: 3 },
+  memoBadgeText: { fontSize: 11, fontWeight: '900', letterSpacing: 1.5, color: '#ffffff' },
+  body: { marginTop: 10, flex: 1, overflow: 'hidden' },
+  dateRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 12 },
+  dateLabel: { fontWeight: '800', color: '#0f172a', fontSize: 11.5 },
+  dateValue: { minWidth: 140, borderBottomWidth: 1.5, borderBottomColor: '#0f172a', paddingBottom: 2, color: '#0f172a', fontSize: 11.5, fontWeight: '700', textAlign: 'center' },
+  dateText: { color: '#0f172a', fontSize: 11.5, fontWeight: '700' },
+  editableArea: { flex: 1, fontSize: 13, lineHeight: 20, color: '#0f172a', padding: 4, backgroundColor: 'transparent', minHeight: 280 },
+  memoText: { fontSize: 13, lineHeight: 20, color: '#0f172a' },
+  footer: { width: '100%', flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20, paddingBottom: 4 },
+  signatureBlock: { alignItems: 'center', width: 170, borderWidth: 1, borderColor: '#0f172a', borderRadius: 4, padding: 6, backgroundColor: '#f8fafc' },
+  signatureCaption: { fontSize: 9.5, fontWeight: '800', color: '#0f172a', marginBottom: 2 },
+  signatureImgWeb: { width: 120, height: 40, marginVertical: 2 },
+  signatureText: { fontSize: 9, fontWeight: '700', color: '#475569', marginTop: 2 },
   webView: { flex: 1, width: '100%' },
-  actionRow: { width: '100%', flexWrap: 'wrap', gap: 12, paddingHorizontal: SPACING.gutter, marginTop: 18, flexDirection: 'row', justifyContent: 'center' },
-  primaryButton: { minWidth: 130, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  saveButton: { backgroundColor: COLORS.primary },
-  downloadButton: { backgroundColor: '#0e7490' },
-  printButton: { backgroundColor: '#7c3aed' },
-  primaryButtonText: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
-  secondaryButton: { minWidth: 120, paddingVertical: 14, paddingHorizontal: 18, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.outline },
-  secondaryButtonText: { color: COLORS.primary, fontWeight: '700' },
-  metaRow: { width: '100%', paddingHorizontal: SPACING.gutter, marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
-  metaText: { color: COLORS.textMuted, fontSize: 12 },
+  formBottomBar: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnLarge: {
+    flex: 1,
+    height: 46,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    ...SHADOWS.light,
+  },
+  saveBtnStyle: {
+    backgroundColor: '#047857',
+  },
+  updateBtnStyle: {
+    backgroundColor: '#2563eb',
+  },
+  downloadBtnStyle: {
+    backgroundColor: '#0e7490',
+  },
+  printBtnStyle: {
+    backgroundColor: '#6d28d9',
+  },
+  newBtnStyle: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  actionBtnLargeText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
   overflowWarning: { position: 'absolute', bottom: 12, left: 12, right: 12, backgroundColor: '#fef3c7', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#fde68a' },
   overflowText: { color: '#92400e', fontSize: 12, textAlign: 'center' },
-  memoCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 16, marginBottom: 14, ...SHADOWS.light },
-  memoCardRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
-  memoCardId: { fontSize: 14, fontWeight: '700', color: COLORS.primary, marginBottom: 6 },
-  memoCardMeta: { fontSize: 12, color: COLORS.textMuted },
-  memoCardActions: { alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 },
-  cardActionButton: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: COLORS.primary },
-  cardActionDanger: { backgroundColor: '#b91c1c' },
-  cardActionText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
-  memoCardPreview: { marginTop: 12, fontSize: 12, color: COLORS.textMuted, lineHeight: 18 },
-  emptyText: { width: '100%', textAlign: 'center', marginTop: 32, color: COLORS.textMuted, fontSize: 14 },
+  memoCard: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.outline, ...SHADOWS.light },
+  memoCardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  memoCardId: { fontSize: 14, fontWeight: '800', color: COLORS.primary },
+  memoCardDate: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  pinnedBadge: { backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#f59e0b' },
+  pinnedBadgeText: { fontSize: 9, color: '#b45309', fontWeight: 'bold' },
+  memoCardMeta: { fontSize: 11, color: COLORS.textMuted, marginTop: 4 },
+  actionRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  cardActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.outline,
+    backgroundColor: COLORS.surface,
+  },
+  cardActionBtnText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.textDark,
+  },
+  memoCardPreview: { marginTop: 10, fontSize: 12, color: '#475569', lineHeight: 18, backgroundColor: '#f8fafc', padding: 8, borderRadius: 6 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 48, gap: 12 },
+  emptyText: { textAlign: 'center', color: COLORS.textMuted, fontSize: 13 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
