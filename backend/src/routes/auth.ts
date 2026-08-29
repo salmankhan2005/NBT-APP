@@ -19,10 +19,6 @@ function getMailTransporter() {
     if (gmailUser && gmailPass) {
       mailTransporter = nodemailer.createTransport({
         service: 'gmail',
-        pool: true,             // Enable SMTP connection pooling
-        maxConnections: 3,      // Maintain up to 3 concurrent connections
-        maxMessages: 100,       // Max 100 emails per connection
-        rateLimit: 10,          // Limit connection rate
         auth: {
           user: gmailUser,
           pass: gmailPass,
@@ -205,44 +201,47 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: 'Email service not configured on server' });
     }
 
-    // Fire email delivery in the background asynchronously so the client doesn't wait
-    transporter.sendMail({
-      from: `"NBT Admin Security" <${process.env.GMAIL_USER}>`,
-      to: cleanEmail,
-      subject: '🔐 NBT Admin PIN Reset — Verification Code',
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
-          <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:24px;text-align:center">
-            <h2 style="color:#fff;margin:0;font-size:20px;letter-spacing:1px">NEW BALAJI TRANSPORT</h2>
-            <p style="color:#bfdbfe;margin:4px 0 0;font-size:12px">ADMIN COMMAND CONSOLE</p>
-          </div>
-          <div style="padding:28px 32px">
-            <h3 style="color:#1e293b;margin:0 0 8px">Security PIN Reset OTP</h3>
-            <p style="color:#475569;font-size:14px;margin:0 0 20px">Use the verification code below to reset your Admin Security PIN. This code is valid for <strong>5 minutes</strong>.</p>
-            <div style="background:#f8fafc;border:2px dashed #3b82f6;border-radius:10px;padding:20px;text-align:center;margin-bottom:20px">
-              <p style="margin:0 0 6px;font-size:12px;color:#64748b;font-weight:600;letter-spacing:1px">YOUR VERIFICATION CODE</p>
-              <p style="margin:0;font-size:40px;font-weight:900;letter-spacing:12px;color:#1e40af">${otp}</p>
+    try {
+      await transporter.sendMail({
+        from: `"NBT Admin Security" <${process.env.GMAIL_USER}>`,
+        to: cleanEmail,
+        subject: '🔐 NBT Admin PIN Reset — Verification Code',
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+            <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:24px;text-align:center">
+              <h2 style="color:#fff;margin:0;font-size:20px;letter-spacing:1px">NEW BALAJI TRANSPORT</h2>
+              <p style="color:#bfdbfe;margin:4px 0 0;font-size:12px">ADMIN COMMAND CONSOLE</p>
             </div>
-            <p style="color:#94a3b8;font-size:12px;margin:0">If you did not request this, please ignore this email. Do not share this code with anyone.</p>
+            <div style="padding:28px 32px">
+              <h3 style="color:#1e293b;margin:0 0 8px">Security PIN Reset OTP</h3>
+              <p style="color:#475569;font-size:14px;margin:0 0 20px">Use the verification code below to reset your Admin Security PIN. This code is valid for <strong>5 minutes</strong>.</p>
+              <div style="background:#f8fafc;border:2px dashed #3b82f6;border-radius:10px;padding:20px;text-align:center;margin-bottom:20px">
+                <p style="margin:0 0 6px;font-size:12px;color:#64748b;font-weight:600;letter-spacing:1px">YOUR VERIFICATION CODE</p>
+                <p style="margin:0;font-size:40px;font-weight:900;letter-spacing:12px;color:#1e40af">${otp}</p>
+              </div>
+              <p style="color:#94a3b8;font-size:12px;margin:0">If you did not request this, please ignore this email. Do not share this code with anyone.</p>
+            </div>
+            <div style="background:#f1f5f9;padding:14px 32px;text-align:center">
+              <p style="margin:0;font-size:11px;color:#94a3b8">New Balaji Transport • Admin Security System</p>
+            </div>
           </div>
-          <div style="background:#f1f5f9;padding:14px 32px;text-align:center">
-            <p style="margin:0;font-size:11px;color:#94a3b8">New Balaji Transport • Admin Security System</p>
-          </div>
-        </div>
-      `,
-      text: `Your NBT Admin PIN Reset OTP is: ${otp}\nThis code is valid for 5 minutes.\nIf you did not request this, ignore this email.`,
-    }).then(() => {
+        `,
+        text: `Your NBT Admin PIN Reset OTP is: ${otp}\nThis code is valid for 5 minutes.\nIf you did not request this, ignore this email.`,
+      });
+
       req.log.info(`[Email OTP] Successfully delivered to ${cleanEmail.replace(/(.{2}).*@/, '$1***@')}`);
-    }).catch((emailErr: any) => {
-      req.log.error({ err: emailErr }, '[Email OTP] Async email delivery failed');
-    });
 
-    req.log.info(`[Email OTP] Initiated delivery to ${cleanEmail.replace(/(.{2}).*@/, '$1***@')} | Purpose: ${purpose || 'admin_pin_reset'}`);
-
-    return reply.code(200).send({
-      success: true,
-      message: `Verification code sent to ${cleanEmail.replace(/(.{3}).*@(.{2}).*?(\..+)$/, '$1***@$2***$3')}`,
-    });
+      return reply.code(200).send({
+        success: true,
+        message: `Verification code sent to ${cleanEmail.replace(/(.{3}).*@(.{2}).*?(\..+)$/, '$1***@$2***$3')}`,
+      });
+    } catch (emailErr: any) {
+      req.log.error({ err: emailErr }, '[Email OTP] Email delivery failed');
+      return reply.code(500).send({
+        error: 'Email delivery failed',
+        message: emailErr?.message || 'SMTP server rejected connection.',
+      });
+    }
   });
 
   // ── POST /api/auth/admin/logout — server-side token revocation ────────────
