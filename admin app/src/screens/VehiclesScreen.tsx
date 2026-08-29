@@ -803,8 +803,8 @@ export default function VehiclesScreen() {
                     {
                       borderColor: badge.borderColor || COLORS.outlineVariant,
                       backgroundColor: badge.bg,
-                      flexBasis: expiryItemBasis,
-                      maxWidth: isSmallPhone ? '48%' : isPhone ? '32%' : '32%',
+                      flexBasis: isSmallPhone ? '46%' : '30%',
+                      maxWidth: isSmallPhone ? '50%' : '33.3%',
                     },
                   ]}
                 >
@@ -814,8 +814,8 @@ export default function VehiclesScreen() {
                     </Text>
                     <View style={[styles.miniStatusDot, { backgroundColor: badge.color }]} />
                   </View>
-                  <Text style={[styles.expiryGridDate, !expiryVal && { color: '#94a3b8', fontStyle: 'italic' }]} numberOfLines={1}>
-                    {expiryVal ? expiryVal : 'Not set'}
+                  <Text style={[styles.expiryGridDate, !expiryVal && { color: '#94a3b8', fontStyle: 'italic' }]} numberOfLines={2}>
+                    {expiryVal ? expiryVal.replace('T00:00:00.000Z', '').replace('T00:00:00', '') : 'Not set'}
                   </Text>
                   <Text style={[styles.expiryGridDays, { color: badge.color }]} numberOfLines={1}>{badge.daysText}</Text>
                 </View>
@@ -852,9 +852,9 @@ export default function VehiclesScreen() {
 
         {/* ── CARD ACTION TOOLBAR ── */}
         <View style={[styles.cardActionsRow, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
-          <TouchableOpacity onPress={() => openDetails(item)} style={[styles.cardActionBtn, isSmallPhone && { flex: 1 }]}>
+          <TouchableOpacity onPress={() => openDetails(item)} style={[styles.cardActionBtn, { flex: 1 }]}>
             <MaterialIcons name="visibility" size={14} color={COLORS.primary} />
-            <Text style={styles.cardActionBtnText}>DETAILS & DOCS</Text>
+            <Text style={styles.cardActionBtnText} numberOfLines={1}>DETAILS & DOCS</Text>
           </TouchableOpacity>
 
           <View style={styles.cardActionsRight}>
@@ -1784,8 +1784,8 @@ const styles = StyleSheet.create({
     ...SHADOWS.light,
   },
   searchInput: { flex: 1, fontSize: 13, marginLeft: 8, color: COLORS.textDark },
-  pillScroll: { height: 46, flexGrow: 0, flexShrink: 0 },
-  pillRow: { paddingHorizontal: SPACING.gutter, paddingVertical: 5, gap: 8, alignItems: 'center' },
+  pillScroll: { flexGrow: 0, flexShrink: 0, maxHeight: 48 },
+  pillRow: { paddingHorizontal: SPACING.gutter, paddingVertical: 7, gap: 8, alignItems: 'center' },
   pill: {
     backgroundColor: '#ffffff',
     paddingHorizontal: 14,
@@ -1813,13 +1813,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
     flexDirection: 'row',
+    width: '100%',
     ...SHADOWS.light,
   },
   vehicleCardAccent: {
     width: 4,
     borderRadius: 0,
+    flexShrink: 0,
   },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 14, paddingBottom: 0 },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 0 },
   vehicleNumber: { fontSize: 16, fontWeight: '900', color: COLORS.primary, letterSpacing: 0.5 },
   vehicleMakeModel: { fontSize: 12, color: '#475569', fontWeight: '600', marginTop: 2 },
   pinnedBadge: {
@@ -1834,55 +1836,57 @@ const styles = StyleSheet.create({
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusBadgeText: { fontSize: 10, fontWeight: '800' },
-  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 14 },
-  ownerIconBox: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center' },
-  ownerText: { fontSize: 12, color: COLORS.textDark, fontWeight: '700', flex: 1 },
-  ownerPhoneChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#f1f5f9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  ownerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 12, flexWrap: 'wrap' },
+  ownerIconBox: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  ownerText: { fontSize: 12, color: COLORS.textDark, fontWeight: '700', flexShrink: 1 },
+  ownerPhoneChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#f1f5f9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0 },
   ownerPhoneText: { fontSize: 10.5, color: '#64748b', fontWeight: '600' },
 
-  complianceSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, marginBottom: 6, paddingHorizontal: 14 },
+  complianceSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, marginBottom: 6, paddingHorizontal: 12 },
   complianceSectionTitle: { fontSize: 9.5, fontWeight: '800', color: '#64748b', letterSpacing: 0.8 },
-  expiryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, paddingHorizontal: 14 },
+  expiryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12 },
   expiryGridItem: {
     flexGrow: 1,
     flexBasis: '30%',
-    minWidth: 90,
-    maxWidth: '33%',
-    borderRadius: 6,
-    padding: 6,
+    minWidth: 88,
+    borderRadius: 7,
+    padding: 7,
     borderWidth: 1,
   },
-  expiryGridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  expiryGridDocName: { fontSize: 9, fontWeight: '800', flex: 1 },
-  miniStatusDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
-  expiryGridDate: { fontSize: 10, fontWeight: '700', color: COLORS.textDark, marginTop: 3 },
-  expiryGridDays: { fontSize: 8, fontWeight: '700', marginTop: 1 },
-  docAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 14 },
+  expiryGridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  expiryGridDocName: { fontSize: 9, fontWeight: '800', flex: 1, flexShrink: 1 },
+  miniStatusDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0, marginLeft: 2 },
+  expiryGridDate: { fontSize: 10, fontWeight: '700', color: COLORS.textDark, marginTop: 2 },
+  expiryGridDays: { fontSize: 8.5, fontWeight: '700', marginTop: 2 },
+  docAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 12, marginTop: 2 },
   docAlertText: { fontSize: 11, fontWeight: '700', flex: 1 },
 
   cardActionsRow: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: COLORS.outlineVariant,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginTop: 10,
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
-  cardActionsRight: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  cardActionsRight: { flexDirection: 'row', gap: 8, alignItems: 'center', flexShrink: 0 },
   cardActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 6,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
+    flex: 1,
+    justifyContent: 'center',
   },
-  cardActionBtnText: { fontSize: 11, color: COLORS.primary, fontWeight: '800' },
+  cardActionBtnText: { fontSize: 11, color: COLORS.primary, fontWeight: '800', flexShrink: 1 },
   cardIconBtn: {
     width: 32,
     height: 32,
