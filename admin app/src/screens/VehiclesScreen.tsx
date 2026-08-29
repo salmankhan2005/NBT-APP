@@ -751,132 +751,134 @@ export default function VehiclesScreen() {
         {/* Colored left accent bar */}
         <View style={[styles.vehicleCardAccent, { backgroundColor: statusColor }]} />
 
-        <TouchableOpacity onPress={() => openDetails(item)} activeOpacity={0.85} style={{ flex: 1 }}>
-          {/* Card Top Row */}
-          <View style={[styles.cardHeaderRow, isPhone && { flexWrap: 'wrap', gap: 6 }]}>
-            <View style={{ flex: 1, minWidth: isPhone ? '100%' : 160 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <Text style={[styles.vehicleNumber, isPhone && { fontSize: 14 }]}>{item.vehicleNumber}</Text>
-                {item.isPinned && (
-                  <View style={styles.pinnedBadge}>
-                    <Text style={styles.pinnedBadgeText}>📌 PINNED</Text>
-                  </View>
-                )}
+        <View style={{ flex: 1, flexDirection: 'column' }}>
+          <TouchableOpacity onPress={() => openDetails(item)} activeOpacity={0.85} style={{ flex: 1 }}>
+            {/* Card Top Row */}
+            <View style={[styles.cardHeaderRow, isPhone && { flexWrap: 'wrap', gap: 6 }]}>
+              <View style={{ flex: 1, minWidth: isPhone ? '100%' : 160 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={[styles.vehicleNumber, isPhone && { fontSize: 14 }]}>{item.vehicleNumber}</Text>
+                  {item.isPinned && (
+                    <View style={styles.pinnedBadge}>
+                      <Text style={styles.pinnedBadgeText}>📌 PINNED</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.vehicleMakeModel} numberOfLines={1}>
+                  {item.vehicleMake || 'Truck'} • {item.vehicleType}{item.vehicleModel ? ` (${item.vehicleModel})` : ''}
+                </Text>
               </View>
-              <Text style={styles.vehicleMakeModel} numberOfLines={1}>
-                {item.vehicleMake || 'Truck'} • {item.vehicleType}{item.vehicleModel ? ` (${item.vehicleModel})` : ''}
+              <View style={[styles.statusBadge, { backgroundColor: statusColor + '18', borderColor: statusColor + '44', borderWidth: 1 }]}>
+                <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                <Text style={[styles.statusBadgeText, { color: statusColor }]}>{item.status}</Text>
+              </View>
+            </View>
+
+            {/* Owner Row */}
+            <View style={[styles.ownerRow, isPhone && { flexWrap: 'wrap', gap: 4 }]}>
+              <View style={styles.ownerIconBox}>
+                <MaterialIcons name="person" size={12} color={COLORS.primary} />
+              </View>
+              <Text style={styles.ownerText} numberOfLines={1}>{item.ownerName || 'Owner not set'}</Text>
+              {item.ownerPhone ? (
+                <View style={styles.ownerPhoneChip}>
+                  <MaterialIcons name="phone" size={10} color="#64748b" />
+                  <Text style={styles.ownerPhoneText}>{item.ownerPhone}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* ── 6 COMPLIANCE EXPIRY BADGES ── */}
+            <View style={styles.complianceSectionTitleRow}>
+              <MaterialIcons name="verified" size={11} color="#64748b" />
+              <Text style={styles.complianceSectionTitle}>COMPLIANCE EXPIRY DATES</Text>
+            </View>
+            <View style={styles.expiryGrid}>
+              {COMPLIANCE_DOCS.map((docSpec) => {
+                const expiryVal = (item[docSpec.expiryField] as string) || (docSpec.key === 'NATIONAL_PERMIT' ? item.permitExpiryDate : '');
+                const badge = getExpiryBadgeInfo(expiryVal);
+                return (
+                  <View
+                    key={docSpec.key}
+                    style={[
+                      styles.expiryGridItem,
+                      {
+                        borderColor: badge.borderColor || COLORS.outlineVariant,
+                        backgroundColor: badge.bg,
+                        flexBasis: isPhone ? '46%' : '30%',
+                        maxWidth: isPhone ? '50%' : '33.3%',
+                      },
+                    ]}
+                  >
+                    <View style={styles.expiryGridHeader}>
+                      <Text style={[styles.expiryGridDocName, { color: docSpec.color }]} numberOfLines={1}>
+                        {docSpec.num}. {docSpec.shortTitle}
+                      </Text>
+                      <View style={[styles.miniStatusDot, { backgroundColor: badge.color }]} />
+                    </View>
+                    <Text style={[styles.expiryGridDate, !expiryVal && { color: '#94a3b8', fontStyle: 'italic' }]} numberOfLines={2}>
+                      {expiryVal ? expiryVal.replace('T00:00:00.000Z', '').replace('T00:00:00', '') : 'Not set'}
+                    </Text>
+                    <Text style={[styles.expiryGridDays, { color: badge.color }]} numberOfLines={1}>{badge.daysText}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Overall Doc Alert */}
+            <View style={[styles.docAlertRow, {
+              backgroundColor: overallDocStatus === 'VALID' ? '#f0fdf4' : overallDocStatus === 'EXPIRED' ? '#fef2f2' : '#fffbeb',
+              borderColor: overallDocStatus === 'VALID' ? '#86efac' : overallDocStatus === 'EXPIRED' ? '#fca5a5' : '#fde68a',
+              borderWidth: 1,
+              borderRadius: 6,
+              paddingHorizontal: 8,
+              paddingVertical: 5,
+              marginTop: 10,
+            }]}>
+              <MaterialIcons
+                name={overallDocStatus === 'VALID' ? 'check-circle' : overallDocStatus === 'EXPIRED' ? 'error' : 'warning-amber'}
+                size={14}
+                color={overallDocStatus === 'VALID' ? '#16a34a' : overallDocStatus === 'EXPIRED' ? '#dc2626' : '#d97706'}
+              />
+              <Text
+                style={[
+                  styles.docAlertText,
+                  { color: overallDocStatus === 'VALID' ? '#16a34a' : overallDocStatus === 'EXPIRED' ? '#dc2626' : '#d97706' },
+                ]}
+                numberOfLines={1}
+              >
+                {overallDocLabel}
               </Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + '18', borderColor: statusColor + '44', borderWidth: 1 }]}>
-              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-              <Text style={[styles.statusBadgeText, { color: statusColor }]}>{item.status}</Text>
-            </View>
-          </View>
-
-          {/* Owner Row */}
-          <View style={[styles.ownerRow, isPhone && { flexWrap: 'wrap', gap: 4 }]}>
-            <View style={styles.ownerIconBox}>
-              <MaterialIcons name="person" size={12} color={COLORS.primary} />
-            </View>
-            <Text style={styles.ownerText} numberOfLines={1}>{item.ownerName || 'Owner not set'}</Text>
-            {item.ownerPhone ? (
-              <View style={styles.ownerPhoneChip}>
-                <MaterialIcons name="phone" size={10} color="#64748b" />
-                <Text style={styles.ownerPhoneText}>{item.ownerPhone}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* ── 6 COMPLIANCE EXPIRY BADGES ── */}
-          <View style={styles.complianceSectionTitleRow}>
-            <MaterialIcons name="verified" size={11} color="#64748b" />
-            <Text style={styles.complianceSectionTitle}>COMPLIANCE EXPIRY DATES</Text>
-          </View>
-          <View style={styles.expiryGrid}>
-            {COMPLIANCE_DOCS.map((docSpec) => {
-              const expiryVal = (item[docSpec.expiryField] as string) || (docSpec.key === 'NATIONAL_PERMIT' ? item.permitExpiryDate : '');
-              const badge = getExpiryBadgeInfo(expiryVal);
-              return (
-                <View
-                  key={docSpec.key}
-                  style={[
-                    styles.expiryGridItem,
-                    {
-                      borderColor: badge.borderColor || COLORS.outlineVariant,
-                      backgroundColor: badge.bg,
-                      flexBasis: isPhone ? '46%' : '30%',
-                      maxWidth: isPhone ? '50%' : '33.3%',
-                    },
-                  ]}
-                >
-                  <View style={styles.expiryGridHeader}>
-                    <Text style={[styles.expiryGridDocName, { color: docSpec.color }]} numberOfLines={1}>
-                      {docSpec.num}. {docSpec.shortTitle}
-                    </Text>
-                    <View style={[styles.miniStatusDot, { backgroundColor: badge.color }]} />
-                  </View>
-                  <Text style={[styles.expiryGridDate, !expiryVal && { color: '#94a3b8', fontStyle: 'italic' }]} numberOfLines={2}>
-                    {expiryVal ? expiryVal.replace('T00:00:00.000Z', '').replace('T00:00:00', '') : 'Not set'}
-                  </Text>
-                  <Text style={[styles.expiryGridDays, { color: badge.color }]} numberOfLines={1}>{badge.daysText}</Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Overall Doc Alert */}
-          <View style={[styles.docAlertRow, {
-            backgroundColor: overallDocStatus === 'VALID' ? '#f0fdf4' : overallDocStatus === 'EXPIRED' ? '#fef2f2' : '#fffbeb',
-            borderColor: overallDocStatus === 'VALID' ? '#86efac' : overallDocStatus === 'EXPIRED' ? '#fca5a5' : '#fde68a',
-            borderWidth: 1,
-            borderRadius: 6,
-            paddingHorizontal: 8,
-            paddingVertical: 5,
-            marginTop: 10,
-          }]}>
-            <MaterialIcons
-              name={overallDocStatus === 'VALID' ? 'check-circle' : overallDocStatus === 'EXPIRED' ? 'error' : 'warning-amber'}
-              size={14}
-              color={overallDocStatus === 'VALID' ? '#16a34a' : overallDocStatus === 'EXPIRED' ? '#dc2626' : '#d97706'}
-            />
-            <Text
-              style={[
-                styles.docAlertText,
-                { color: overallDocStatus === 'VALID' ? '#16a34a' : overallDocStatus === 'EXPIRED' ? '#dc2626' : '#d97706' },
-              ]}
-              numberOfLines={1}
-            >
-              {overallDocLabel}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* ── CARD ACTION TOOLBAR ── */}
-        <View style={[styles.cardActionsRow, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
-          <TouchableOpacity onPress={() => openDetails(item)} style={[styles.cardActionBtn, { flex: 1 }]}>
-            <MaterialIcons name="visibility" size={14} color={COLORS.primary} />
-            <Text style={styles.cardActionBtnText} numberOfLines={1}>DETAILS & DOCS</Text>
           </TouchableOpacity>
 
-          <View style={styles.cardActionsRight}>
-            <TouchableOpacity
-              onPress={async () => {
-                await db.togglePinVehicle(item.vehicle_id);
-                fetchVehicles(false);
-              }}
-              style={[styles.cardIconBtn, item.isPinned && { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}
-              accessibilityLabel="Pin Vehicle"
-            >
-              <MaterialIcons name="push-pin" size={15} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
+          {/* ── CARD ACTION TOOLBAR ── */}
+          <View style={[styles.cardActionsRow, isPhone && { flexWrap: 'wrap', gap: 6 }]}>
+            <TouchableOpacity onPress={() => openDetails(item)} style={[styles.cardActionBtn, { flex: 1 }]}>
+              <MaterialIcons name="visibility" size={14} color={COLORS.primary} />
+              <Text style={styles.cardActionBtnText} numberOfLines={1}>DETAILS & DOCS</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => handleDeleteVehicle(item.vehicle_id)}
-              style={[styles.cardIconBtn, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}
-              accessibilityLabel="Delete Vehicle"
-            >
-              <MaterialIcons name="delete-outline" size={15} color="#dc2626" />
-            </TouchableOpacity>
+            <View style={styles.cardActionsRight}>
+              <TouchableOpacity
+                onPress={async () => {
+                  await db.togglePinVehicle(item.vehicle_id);
+                  fetchVehicles(false);
+                }}
+                style={[styles.cardIconBtn, item.isPinned && { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}
+                accessibilityLabel="Pin Vehicle"
+              >
+                <MaterialIcons name="push-pin" size={15} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleDeleteVehicle(item.vehicle_id)}
+                style={[styles.cardIconBtn, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}
+                accessibilityLabel="Delete Vehicle"
+              >
+                <MaterialIcons name="delete-outline" size={15} color="#dc2626" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
