@@ -198,10 +198,55 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Missing OTP' });
     }
 
+    const emailjsServiceId = process.env.EMAILJS_SERVICE_ID || 'service_wyey32h';
+    const emailjsTemplateId = process.env.EMAILJS_TEMPLATE_ID || 'template_ge8z93p';
+    const emailjsPublicKey = process.env.EMAILJS_PUBLIC_KEY;
+    const emailjsPrivateKey = process.env.EMAILJS_PRIVATE_KEY;
+
+    if (emailjsPublicKey && emailjsPrivateKey) {
+      // Use EmailJS HTTP REST API (Works on Render Free tier over standard HTTPS port 443)
+      try {
+        const emailjsRes = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            service_id: emailjsServiceId,
+            template_id: emailjsTemplateId,
+            user_id: emailjsPublicKey,
+            accessToken: emailjsPrivateKey,
+            template_params: {
+              otp: otp,
+              to_email: cleanEmail,
+            },
+          }),
+        });
+
+        if (!emailjsRes.ok) {
+          const errMsg = await emailjsRes.text();
+          throw new Error(errMsg || 'EmailJS rejected send request');
+        }
+
+        req.log.info(`[Email OTP] EmailJS successfully delivered to ${cleanEmail.replace(/(.{2}).*@/, '$1***@')}`);
+        return reply.code(200).send({
+          success: true,
+          message: `Verification code sent to ${cleanEmail.replace(/(.{3}).*@(.{2}).*?(\..+)$/, '$1***@$2***$3')}`,
+        });
+      } catch (emailjsErr: any) {
+        req.log.error({ err: emailjsErr }, '[Email OTP] EmailJS delivery failed');
+        return reply.code(500).send({
+          error: 'EmailJS delivery failed',
+          message: emailjsErr?.message || 'EmailJS server rejected request.',
+        });
+      }
+    }
+
+    // Fallback to Nodemailer SMTP (requires SMTP ports 465/587 to be unblocked)
     const transporter = getMailTransporter();
     if (!transporter) {
       req.log.error('[Email OTP] Gmail credentials not configured (GMAIL_USER / GMAIL_APP_PASSWORD missing)');
-      return reply.code(500).send({ error: 'Email service not configured on server' });
+      return reply.code(500).send({ error: 'Email service credentials missing on server' });
     }
 
     try {
