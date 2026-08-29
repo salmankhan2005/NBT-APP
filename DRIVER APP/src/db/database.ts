@@ -862,9 +862,68 @@ class DatabaseService {
     const rawOdoPhoto = odometerPhotoUri ? sanitizeInput(odometerPhotoUri) : '';
     const initialOdoPhotoUrl = normalizeImageUrl(rawOdoPhoto) || rawOdoPhoto;
 
+    let hostedPhotoUrl: string | undefined = undefined;
+    if (rawOdoPhoto) {
+      try {
+        console.log('[DriverDB] Uploading odometer photo...');
+        const uploaded = await this.uploadLocalImage(rawOdoPhoto);
+        if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+          hostedPhotoUrl = uploaded;
+          console.log('[DriverDB] Odometer photo ready:', hostedPhotoUrl.substring(0, 80));
+        } else {
+          console.warn('[DriverDB] Odometer photo upload returned nothing useful');
+        }
+      } catch (err) {
+        console.warn('[DriverDB] startTrip image upload error:', err);
+      }
+    }
+
+    if (this.currentToken) {
+      try {
+        const startRes = await fetch(`${API_HOST}/api/trips/${tripId}/start`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.currentToken}`
+          },
+          body: JSON.stringify({
+            driverName: sanitizeInput(driverName),
+            odometer,
+            ...(hostedPhotoUrl ? { odometerPhotoUrl: hostedPhotoUrl } : {}),
+            dieselLevel,
+            gps: {
+              latitude: gps.latitude,
+              longitude: gps.longitude,
+              city: sanitizeInput(gps.city),
+              address: sanitizeInput(gps.address)
+            }
+          })
+        });
+        console.log('[DriverDB] startTrip PATCH status:', startRes.status);
+
+        if (hostedPhotoUrl && startRes.ok) {
+          try {
+            const photoRes = await fetch(`${API_HOST}/api/trips/${tripId}/photo`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${this.currentToken}`
+              },
+              body: JSON.stringify({ photoUrl: hostedPhotoUrl, photoField: 'odometer_start_url' })
+            });
+            console.log('[DriverDB] Photo URL saved to DB, status:', photoRes.status);
+          } catch (photoErr) {
+            console.warn('[DriverDB] Photo patch failed:', photoErr);
+          }
+        }
+      } catch (err) {
+        console.warn('[DriverDB] startTrip API sync error:', err);
+      }
+    }
+
     trip.driverName            = sanitizeInput(driverName);
     trip.odometerStart         = odometer;
-    trip.odometerStartPhotoUri = initialOdoPhotoUrl || undefined;
+    trip.odometerStartPhotoUri = hostedPhotoUrl || initialOdoPhotoUrl || undefined;
     trip.dieselStart           = dieselLevel;
     trip.status                = 'in_transit';
     trip.currentGPS            = {
@@ -878,72 +937,7 @@ class DatabaseService {
     trip.startDate = now.toLocaleDateString();
     trip.startTime = now.toLocaleTimeString();
 
-    // Update UI & local storage INSTANTLY (0ms!)
     await this.notify();
-
-    // Run image upload & backend API sync asynchronously in background
-    (async () => {
-      try {
-        // Step 1: Upload image FIRST, await it fully
-        let hostedPhotoUrl: string | undefined = undefined;
-        if (rawOdoPhoto) {
-          console.log('[DriverDB] Uploading odometer photo...');
-          const uploaded = await this.uploadLocalImage(rawOdoPhoto);
-          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-            hostedPhotoUrl = uploaded;
-            trip.odometerStartPhotoUri = hostedPhotoUrl;
-            await this.notify();
-            console.log('[DriverDB] Odometer photo ready:', hostedPhotoUrl.substring(0, 80));
-          } else {
-            console.warn('[DriverDB] Odometer photo upload returned nothing useful');
-          }
-        }
-
-        // Step 2: Call PATCH /start with photo URL included (upload is already done)
-        if (this.currentToken) {
-          const startRes = await fetch(`${API_HOST}/api/trips/${tripId}/start`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${this.currentToken}`
-            },
-            body: JSON.stringify({
-              driverName: trip.driverName,
-              odometer,
-              ...(hostedPhotoUrl ? { odometerPhotoUrl: hostedPhotoUrl } : {}),
-              dieselLevel,
-              gps: {
-                latitude: gps.latitude,
-                longitude: gps.longitude,
-                city: sanitizeInput(gps.city),
-                address: sanitizeInput(gps.address)
-              }
-            })
-          });
-          console.log('[DriverDB] startTrip PATCH status:', startRes.status);
-
-          // Step 3: Dedicated photo patch as a safety net
-          if (hostedPhotoUrl) {
-            try {
-              const photoRes = await fetch(`${API_HOST}/api/trips/${tripId}/photo`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${this.currentToken}`
-                },
-                body: JSON.stringify({ photoUrl: hostedPhotoUrl, photoField: 'odometer_start_url' })
-              });
-              console.log('[DriverDB] Photo URL saved to DB, status:', photoRes.status);
-            } catch (photoErr) {
-              console.warn('[DriverDB] Photo patch failed:', photoErr);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[DriverDB] startTrip background sync error:', err);
-      }
-    })();
-
     return true;
   }
 
@@ -1167,52 +1161,55 @@ class DatabaseService {
         : undefined,
     };
 
-    // Update local trip state and UI INSTANTLY (0ms!)
-    trip.expenses.push(newExpense);
-    await this.notify();
+    // Upload all receipt photos in parallel sequentially
+    const hostedUrls: string[] = [];
+    try {
+      await Promise.all(
+        rawReceiptUris.map(async (rawUri) => {
+          const uploaded = await this.uploadLocalImage(rawUri);
+          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+            hostedUrls.push(uploaded);
+          }
+        })
+      );
+    } catch (e) {
+      console.warn('[DriverDB] Image upload failed in addExpense:', e);
+    }
 
-    // Perform image uploads and backend API sync asynchronously in background
-    (async () => {
+    if (hostedUrls.length > 0) {
+      newExpense.receiptUri  = hostedUrls[0];
+      newExpense.receiptUris = hostedUrls;
+    }
+
+    if (this.currentToken) {
       try {
-        // Upload all receipt photos in parallel
-        const hostedUrls: string[] = [];
-        await Promise.all(
-          rawReceiptUris.map(async (rawUri) => {
-            const uploaded = await this.uploadLocalImage(rawUri);
-            if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-              hostedUrls.push(uploaded);
-            }
+        const response = await fetch(`${API_HOST}/api/trips/${tripId}/expenses`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.currentToken}`
+          },
+          body: JSON.stringify({
+            category:    expense.category,
+            amount:      expense.amount,
+            reason:      expense.reason ? sanitizeInput(expense.reason) : undefined,
+            liters:      expense.liters,
+            location:    expense.location,
+            receiptUrl:  hostedUrls[0] || undefined,
+            receiptUrls: hostedUrls.length > 0 ? hostedUrls : undefined,
           })
-        );
-
-        if (hostedUrls.length > 0) {
-          newExpense.receiptUri  = hostedUrls[0];
-          newExpense.receiptUris = hostedUrls;
-          await this.notify();
-        }
-
-        if (this.currentToken) {
-          await fetch(`${API_HOST}/api/trips/${tripId}/expenses`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${this.currentToken}`
-            },
-            body: JSON.stringify({
-              category:    expense.category,
-              amount:      expense.amount,
-              reason:      expense.reason ? sanitizeInput(expense.reason) : undefined,
-              liters:      expense.liters,
-              location:    expense.location,
-              receiptUrl:  hostedUrls[0] || undefined,
-              receiptUrls: hostedUrls.length > 0 ? hostedUrls : undefined,
-            })
-          });
+        });
+        if (!response.ok) {
+          console.warn('[DriverDB] addExpense API responded with error:', response.status);
         }
       } catch (err) {
-        console.warn('[DriverDB] addExpense background sync error:', err);
+        console.warn('[DriverDB] addExpense API sync error:', err);
       }
-    })();
+    }
+
+    // Update local trip state and UI at the end
+    trip.expenses.push(newExpense);
+    await this.notify();
 
     return newExpense;
   }
@@ -1231,7 +1228,47 @@ class DatabaseService {
     const rawPhoto = podPhotoUri ? sanitizeInput(podPhotoUri) : '';
     const initialPhotoUrl = normalizeImageUrl(rawPhoto) || rawPhoto;
 
-    trip.podPhotoUri  = initialPhotoUrl || undefined;
+    let finalPhotoUrl: string | undefined = undefined;
+    if (rawPhoto) {
+      try {
+        const uploaded = await this.uploadPodPhoto(rawPhoto);
+        if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+          finalPhotoUrl = uploaded;
+        }
+      } catch (err) {
+        console.warn('[DriverDB] uploadPOD image upload failed:', err);
+      }
+    }
+
+    if (this.currentToken) {
+      try {
+        const response = await fetch(`${API_HOST}/api/trips/${tripId}/pod`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.currentToken}`
+          },
+          body: JSON.stringify({
+            podPhotoUrl: finalPhotoUrl || null,
+            podSignature: sanitizeInput(signature) || 'Signed',
+            podNotes: sanitizeInput(notes),
+            gps: {
+              latitude: gps.latitude,
+              longitude: gps.longitude,
+              city: sanitizeInput(gps.city),
+              address: sanitizeInput(gps.address)
+            }
+          })
+        });
+        if (!response.ok) {
+          console.warn('[DriverDB] uploadPOD API responded with error:', response.status);
+        }
+      } catch (err) {
+        console.warn('[DriverDB] uploadPOD API sync error:', err);
+      }
+    }
+
+    trip.podPhotoUri  = finalPhotoUrl || initialPhotoUrl || undefined;
     trip.podSignature = sanitizeInput(signature);
     trip.podNotes     = sanitizeInput(notes);
     trip.status       = 'REACHED_DESTINATION';
@@ -1243,47 +1280,7 @@ class DatabaseService {
       lastUpdated: new Date().toLocaleTimeString(),
     };
 
-    // Update UI & local storage INSTANTLY (0ms!)
     await this.notify();
-
-    // Run image upload & backend API sync asynchronously in background
-    (async () => {
-      try {
-        let finalPhotoUrl: string | undefined = undefined;
-        if (rawPhoto) {
-          const uploaded = await this.uploadPodPhoto(rawPhoto);
-          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-            finalPhotoUrl = uploaded;
-            trip.podPhotoUri = finalPhotoUrl;
-            await this.notify();
-          }
-        }
-
-        if (this.currentToken) {
-          await fetch(`${API_HOST}/api/trips/${tripId}/pod`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${this.currentToken}`
-            },
-            body: JSON.stringify({
-              podPhotoUrl: finalPhotoUrl || null,
-              podSignature: sanitizeInput(signature) || 'Signed',
-              podNotes: sanitizeInput(notes),
-              gps: {
-                latitude: gps.latitude,
-                longitude: gps.longitude,
-                city: sanitizeInput(gps.city),
-                address: sanitizeInput(gps.address)
-              }
-            })
-          });
-        }
-      } catch (err) {
-        console.warn('[DriverDB] uploadPOD background sync error:', err);
-      }
-    })();
-
     return true;
   }
 
@@ -1322,9 +1319,43 @@ class DatabaseService {
     const rawEndPhoto = odometerEndPhotoUri ? sanitizeInput(odometerEndPhotoUri) : '';
     const initialEndPhotoUrl = normalizeImageUrl(rawEndPhoto) || rawEndPhoto;
 
+    let hostedEndPhotoUrl: string | undefined = undefined;
+    if (rawEndPhoto) {
+      try {
+        const uploaded = await this.uploadLocalImage(rawEndPhoto);
+        if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+          hostedEndPhotoUrl = uploaded;
+        }
+      } catch (err) {
+        console.warn('[DriverDB] completeTrip image upload failed:', err);
+      }
+    }
+
+    if (this.currentToken) {
+      try {
+        const response = await fetch(`${API_HOST}/api/trips/${tripId}/complete`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.currentToken}`
+          },
+          body: JSON.stringify({
+            odometerEnd,
+            odometerEndPhotoUrl: hostedEndPhotoUrl,
+            dieselEnd
+          })
+        });
+        if (!response.ok) {
+          console.warn('[DriverDB] completeTrip API responded with error:', response.status);
+        }
+      } catch (err) {
+        console.warn('[DriverDB] completeTrip API sync error:', err);
+      }
+    }
+
     trip.status              = 'completed';
     trip.odometerEnd         = odometerEnd;
-    trip.odometerEndPhotoUri = initialEndPhotoUrl || undefined;
+    trip.odometerEndPhotoUri = hostedEndPhotoUrl || initialEndPhotoUrl || undefined;
     trip.dieselEnd           = dieselEnd;
     const now = new Date();
     trip.endDate = now.toLocaleDateString();
@@ -1333,41 +1364,7 @@ class DatabaseService {
     this.completedTrips.unshift({ ...trip });
     await AsyncStorage.setItem(COMPLETED_TRIPS_KEY, JSON.stringify(this.completedTrips));
 
-    // Update UI INSTANTLY (0ms!)
     await this.notify();
-
-    // Run image upload & backend API sync asynchronously in background
-    (async () => {
-      try {
-        let hostedEndPhotoUrl: string | undefined = undefined;
-        if (rawEndPhoto) {
-          const uploaded = await this.uploadLocalImage(rawEndPhoto);
-          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-            hostedEndPhotoUrl = uploaded;
-            trip.odometerEndPhotoUri = hostedEndPhotoUrl;
-            await this.notify();
-          }
-        }
-
-        if (this.currentToken) {
-          await fetch(`${API_HOST}/api/trips/${tripId}/complete`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${this.currentToken}`
-            },
-            body: JSON.stringify({
-              odometerEnd,
-              odometerEndPhotoUrl: hostedEndPhotoUrl,
-              dieselEnd
-            })
-          });
-        }
-      } catch (err) {
-        console.warn('[DriverDB] completeTrip background sync error:', err);
-      }
-    })();
-
     return true;
   }
 
