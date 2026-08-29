@@ -752,10 +752,10 @@ export default function VehiclesScreen() {
 
         <TouchableOpacity onPress={() => openDetails(item)} activeOpacity={0.85} style={{ flex: 1 }}>
           {/* Card Top Row */}
-          <View style={[styles.cardHeaderRow, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
-            <View style={{ flex: 1, minWidth: isSmallPhone ? '100%' : 160 }}>
+          <View style={[styles.cardHeaderRow, isPhone && { flexWrap: 'wrap', gap: 6 }]}>
+            <View style={{ flex: 1, minWidth: isPhone ? '100%' : 160 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <Text style={[styles.vehicleNumber, isSmallPhone && { fontSize: 14 }]}>{item.vehicleNumber}</Text>
+                <Text style={[styles.vehicleNumber, isPhone && { fontSize: 14 }]}>{item.vehicleNumber}</Text>
                 {item.isPinned && (
                   <View style={styles.pinnedBadge}>
                     <Text style={styles.pinnedBadgeText}>📌 PINNED</Text>
@@ -773,7 +773,7 @@ export default function VehiclesScreen() {
           </View>
 
           {/* Owner Row */}
-          <View style={[styles.ownerRow, isSmallPhone && { flexWrap: 'wrap', gap: 4 }]}>
+          <View style={[styles.ownerRow, isPhone && { flexWrap: 'wrap', gap: 4 }]}>
             <View style={styles.ownerIconBox}>
               <MaterialIcons name="person" size={12} color={COLORS.primary} />
             </View>
@@ -803,8 +803,8 @@ export default function VehiclesScreen() {
                     {
                       borderColor: badge.borderColor || COLORS.outlineVariant,
                       backgroundColor: badge.bg,
-                      flexBasis: isSmallPhone ? '46%' : '30%',
-                      maxWidth: isSmallPhone ? '50%' : '33.3%',
+                      flexBasis: isPhone ? '46%' : '30%',
+                      maxWidth: isPhone ? '50%' : '33.3%',
                     },
                   ]}
                 >
