@@ -1040,8 +1040,9 @@ export default function VehiclesScreen() {
                   style={styles.formInput}
                   value={rcNumber}
                   onChangeText={(val) => {
-                    setRcNumber(val.toUpperCase());
-                    if (!vehicleNumber) setVehicleNumber(val.toUpperCase());
+                    const upper = val.toUpperCase();
+                    setRcNumber(upper);
+                    setVehicleNumber(upper);
                   }}
                   placeholder="e.g. TN 38 AB 1234"
                   autoCapitalize="characters"
