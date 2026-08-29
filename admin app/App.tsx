@@ -101,12 +101,16 @@ function AppContent() {
   // Mobile drawer open state
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  // Initialize Admin Authentication State
   useEffect(() => {
-    // Warm up the Render backend in the background so cold starts are handled early
-    fetch(`${API_HOST}/health`).catch(() => {});
-
     const init = async () => {
+      // Warm up the Render backend in the background so cold starts are handled early
+      try {
+        if (API_HOST) {
+          fetch(`${API_HOST}/health`).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[Warm-up] Failed to initiate fetch:', err);
+      }
       try {
         await db.loadSession();
         const savedTab = await AsyncStorage.getItem('admin_active_tab');
