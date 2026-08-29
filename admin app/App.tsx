@@ -18,7 +18,7 @@ import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-
 import { MaterialIcons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { COLORS, SPACING, SHADOWS } from './src/theme';
-import { db } from './src/db/database';
+import { db, API_HOST } from './src/db/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Hold splash screen during boot initialization
@@ -99,6 +99,9 @@ function AppContent() {
 
   // Initialize Admin Authentication State
   useEffect(() => {
+    // Warm up the Render backend in the background so cold starts are handled early
+    fetch(`${API_HOST}/health`).catch(() => {});
+
     const init = async () => {
       try {
         await db.loadSession();
