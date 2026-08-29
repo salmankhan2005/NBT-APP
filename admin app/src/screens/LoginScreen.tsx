@@ -24,7 +24,10 @@ import { db } from '../db/database';
 const CORRECT_LOGIN_ID = 'NBT';
 const DEFAULT_PIN = '8520';
 const PIN_STORAGE_KEY = 'nbt_admin_pin';
-const REGISTERED_ADMIN_PHONES = ['7418698082', '9789271721'];
+const REGISTERED_ADMIN_EMAILS = [
+  'krithickpranav906@gmail.com',
+  'newbalajitransports1@gmail.com',
+];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Screen = 'LOGIN' | 'FORGOT_PIN' | 'VERIFY_OTP' | 'SET_NEW_PIN';
@@ -34,12 +37,13 @@ function generateOtp(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-function maskPhoneNumber(phone: string): string {
-  const clean = phone.replace(/\D/g, '').slice(-10);
-  if (clean.length === 10) {
-    return `+91 ******${clean.slice(-4)}`;
-  }
-  return phone;
+function maskEmail(email: string): string {
+  const [user, domain] = email.split('@');
+  if (!domain) return email;
+  const masked = user.slice(0, 3) + '***';
+  const domainParts = domain.split('.');
+  const maskedDomain = domainParts[0].slice(0, 2) + '***.' + domainParts.slice(1).join('.');
+  return `${masked}@${maskedDomain}`;
 }
 
 interface LoginScreenProps {
@@ -76,8 +80,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [loginLoading, setLoginLoading] = useState(false);
   const pinInputRef = useRef<TextInput>(null);
 
-  // ── Forgot PIN / Phone Number / OTP ──
-  const [phoneNumber, setPhoneNumber] = useState('');
+  // ── Forgot PIN / Email / OTP ──
+  const [emailInput, setEmailInput] = useState('');
   const [otp, setOtp] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -148,20 +152,20 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setLoginLoading(false);
   }, [loginId, pin, onLoginSuccess, triggerShake]);
 
-  // ── Forgot PIN: Send OTP with Registered Phone Validation ──
+  // ── Forgot PIN: Send OTP with Registered Email Validation ──
   const handleSendOtp = useCallback(async () => {
     setOtpError('');
-    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+    const cleanEmail = emailInput.trim().toLowerCase();
 
-    if (!cleanPhone) {
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       triggerShake();
-      setOtpError('Please enter your 10-digit registered mobile number.');
+      setOtpError('Please enter a valid registered admin email address.');
       return;
     }
 
-    if (!REGISTERED_ADMIN_PHONES.includes(cleanPhone)) {
+    if (!REGISTERED_ADMIN_EMAILS.includes(cleanEmail)) {
       triggerShake();
-      setOtpError('Phone number not registered. Please enter a valid registered Admin number.');
+      setOtpError('Email not registered. Please use a valid registered Admin email address.');
       return;
     }
 
@@ -170,19 +174,28 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setOtp(generatedOtp);
 
     try {
-      // Simulated / background SMS API trigger
-      await fetch('https://nbt-app.onrender.com/api/send-otp', {
+      const res = await fetch('https://nbt-app.onrender.com/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone, otp: generatedOtp, purpose: 'admin_pin_reset' }),
-      }).catch(() => {});
-    } catch {}
+        body: JSON.stringify({ email: cleanEmail, otp: generatedOtp, purpose: 'admin_pin_reset' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSendingOtp(false);
+        setOtpError(data?.error || 'Failed to send OTP email. Please try again.');
+        return;
+      }
+    } catch {
+      setSendingOtp(false);
+      setOtpError('Network error. Please check your connection and try again.');
+      return;
+    }
 
     setSendingOtp(false);
     setOtpSent(true);
     setOtpResendTimer(60);
     setScreen('VERIFY_OTP');
-  }, [phoneNumber, triggerShake]);
+  }, [emailInput, triggerShake]);
 
   // ── Verify OTP ──
   const handleVerifyOtp = useCallback(() => {
@@ -216,7 +229,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setSavingPin(false);
 
     // Reset all forgot-PIN state
-    setPhoneNumber('');
+    setEmailInput('');
     setOtp('');
     setOtpInput('');
     setOtpSent(false);
@@ -339,7 +352,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
               {/* Forgot PIN Link */}
               <TouchableOpacity
-                onPress={() => { setScreen('FORGOT_PIN'); setLoginError(''); setPhoneNumber(''); setOtpSent(false); setOtp(''); setOtpInput(''); }}
+                onPress={() => { setScreen('FORGOT_PIN'); setLoginError(''); setEmailInput(''); setOtpSent(false); setOtp(''); setOtpInput(''); }}
                 style={styles.forgotPinBtn}
                 activeOpacity={0.7}
               >
@@ -408,10 +421,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               <View style={styles.infoBanner}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <MaterialIcons name="verified-user" size={18} color="#1d4ed8" />
-                  <Text style={styles.infoBannerTitle}>Security Phone Verification</Text>
+                  <Text style={styles.infoBannerTitle}>Security Email Verification</Text>
                 </View>
                 <Text style={styles.infoBannerDesc}>
-                  Enter your registered Admin mobile number (7418698082 or 9789271721) to receive a secure 4-digit verification OTP.
+                  Enter your registered Admin email address to receive a secure 4-digit verification OTP.
                 </Text>
               </View>
 
@@ -420,21 +433,21 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               {/* Registered Phone Input */}
               <View style={styles.inputGroup}>
                 <View style={styles.labelRow}>
-                  <Text style={styles.inputLabel}>REGISTERED MOBILE NUMBER *</Text>
-                  <Text style={styles.labelHint}>7418698082 / 9789271721</Text>
+                  <Text style={styles.inputLabel}>REGISTERED EMAIL ADDRESS *</Text>
                 </View>
                 <View style={styles.inputRow}>
                   <View style={styles.inputIconBox}>
-                    <MaterialIcons name="phone-android" size={20} color={COLORS.primary} />
+                    <MaterialIcons name="email" size={20} color={COLORS.primary} />
                   </View>
                   <TextInput
                     style={styles.textInput}
-                    value={phoneNumber}
-                    onChangeText={(v) => { setPhoneNumber(v.replace(/\D/g, '').slice(0, 10)); setOtpError(''); }}
-                    placeholder="Enter 10-digit mobile number"
+                    value={emailInput}
+                    onChangeText={(v) => { setEmailInput(v.trim()); setOtpError(''); }}
+                    placeholder="Enter registered admin email"
                     placeholderTextColor="#94a3b8"
-                    keyboardType="phone-pad"
-                    maxLength={10}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     returnKeyType="done"
                     onSubmitEditing={handleSendOtp}
                     autoFocus
@@ -452,8 +465,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <MaterialIcons name="sms" size={18} color="#fff" />
-                    <Text style={styles.primaryBtnText}>SEND VERIFICATION OTP</Text>
+                    <MaterialIcons name="email" size={18} color="#fff" />
+                    <Text style={styles.primaryBtnText}>SEND OTP TO EMAIL</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -497,11 +510,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               <View style={styles.divider} />
 
               <View style={styles.otpSentBanner}>
-                <MaterialIcons name="sms" size={20} color="#16a34a" />
+                <MaterialIcons name="email" size={20} color="#16a34a" />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.otpSentTitle}>SMS Sent to {maskPhoneNumber(phoneNumber)}</Text>
+                  <Text style={styles.otpSentTitle}>Email Sent to {maskEmail(emailInput)}</Text>
                   <Text style={styles.otpSentText}>
-                    Please enter the 4-digit verification code sent to your mobile number via SMS.
+                    Please check your inbox and enter the 4-digit verification code.
                   </Text>
                 </View>
               </View>
@@ -538,7 +551,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               >
                 <MaterialIcons name="refresh" size={16} color={COLORS.secondary} />
                 <Text style={styles.resendText}>
-                  {otpResendTimer > 0 ? `Resend SMS in ${otpResendTimer}s` : 'Resend SMS OTP'}
+                  {otpResendTimer > 0 ? `Resend Email in ${otpResendTimer}s` : 'Resend Email OTP'}
                 </Text>
               </TouchableOpacity>
 

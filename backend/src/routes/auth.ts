@@ -1,7 +1,14 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import argon2 from 'argon2';
+import nodemailer from 'nodemailer';
 import { sql } from '../db/client';
 import { LoginSchema } from '../middleware/validate';
+
+// ─── Registered admin emails (only these can receive OTP) ─────────────────────
+const REGISTERED_ADMIN_EMAILS = [
+  'krithickpranav906@gmail.com',
+  'newbalajitransports1@gmail.com',
+];
 
 /**
  * Auth routes — no JWT required on login, JWT required on logout.
@@ -151,99 +158,78 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.code(401).send({ error: 'Invalid credentials', message: 'Invalid Admin username or password.' });
   });
 
-  // ── POST /api/auth/send-otp — Send SMS OTP to registered admin mobile ────
+  // ── POST /api/auth/send-otp — Send Email OTP to registered admin email ────
   app.post('/send-otp', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { phone, otp, purpose } = (req.body as any) || {};
-    const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+    const { email, otp, purpose } = (req.body as any) || {};
+    const cleanEmail = String(email || '').trim().toLowerCase();
 
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      return reply.code(400).send({ error: 'Invalid phone number' });
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return reply.code(400).send({ error: 'Invalid email address' });
+    }
+
+    // Only allow registered admin emails
+    if (!REGISTERED_ADMIN_EMAILS.includes(cleanEmail)) {
+      return reply.code(403).send({ error: 'Email not registered as admin' });
     }
 
     if (!otp) {
       return reply.code(400).send({ error: 'Missing OTP' });
     }
 
-    // Check if SMS gateway credentials exist (Fast2SMS, 2Factor, Twilio, or generic webhook)
-    const fast2smsKey = process.env.FAST2SMS_API_KEY;
-    const twoFactorKey = process.env.TWOFACTOR_API_KEY;
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-    const customSmsUrl = process.env.SMS_GATEWAY_URL;
+    const gmailUser = process.env.GMAIL_USER;
+    const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
-    let smsDispatched = false;
-    let gatewayUsed = 'none';
-
-    try {
-      if (fast2smsKey) {
-        // Fast2SMS integration (India)
-        const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
-          method: 'POST',
-          headers: {
-            'authorization': fast2smsKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            route: 'otp',
-            variables_values: String(otp),
-            numbers: cleanPhone,
-          }),
-        });
-        if (res.ok) {
-          smsDispatched = true;
-          gatewayUsed = 'Fast2SMS';
-        }
-      } else if (twoFactorKey) {
-        // 2Factor.in integration (India)
-        const res = await fetch(`https://2factor.in/API/V1/${twoFactorKey}/SMS/${cleanPhone}/${otp}/OTP1`);
-        if (res.ok) {
-          smsDispatched = true;
-          gatewayUsed = '2Factor';
-        }
-      } else if (twilioSid && twilioToken && twilioFrom) {
-        // Twilio SMS integration
-        const authHeader = 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
-        const bodyParams = new URLSearchParams({
-          To: `+91${cleanPhone}`,
-          From: twilioFrom,
-          Body: `Your NBT Admin verification code is: ${otp}. Valid for 5 minutes.`,
-        });
-        const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
-          method: 'POST',
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: bodyParams.toString(),
-        });
-        if (res.ok) {
-          smsDispatched = true;
-          gatewayUsed = 'Twilio';
-        }
-      } else if (customSmsUrl) {
-        // Custom SMS gateway / webhook
-        const res = await fetch(customSmsUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: cleanPhone, otp, message: `Your NBT verification code is: ${otp}` }),
-        });
-        if (res.ok) {
-          smsDispatched = true;
-          gatewayUsed = 'CustomGateway';
-        }
-      }
-    } catch (smsErr) {
-      req.log.warn({ err: smsErr }, 'SMS dispatch attempt error');
+    if (!gmailUser || !gmailPass) {
+      req.log.error('[Email OTP] Gmail credentials not configured (GMAIL_USER / GMAIL_APP_PASSWORD missing)');
+      return reply.code(500).send({ error: 'Email service not configured on server' });
     }
 
-    req.log.info(`[SMS Dispatch] Phone: +91 ******${cleanPhone.slice(-4)} | Gateway: ${gatewayUsed} | Status: ${smsDispatched ? 'Sent' : 'Queued/Simulated'}`);
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: gmailUser,
+          pass: gmailPass,
+        },
+      });
 
-    return reply.code(200).send({
-      success: true,
-      message: `Verification code dispatched via SMS to +91 ******${cleanPhone.slice(-4)}`,
-      gateway: gatewayUsed,
-    });
+      await transporter.sendMail({
+        from: `"NBT Admin Security" <${gmailUser}>`,
+        to: cleanEmail,
+        subject: '🔐 NBT Admin PIN Reset — Verification Code',
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+            <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:24px;text-align:center">
+              <h2 style="color:#fff;margin:0;font-size:20px;letter-spacing:1px">NEW BALAJI TRANSPORT</h2>
+              <p style="color:#bfdbfe;margin:4px 0 0;font-size:12px">ADMIN COMMAND CONSOLE</p>
+            </div>
+            <div style="padding:28px 32px">
+              <h3 style="color:#1e293b;margin:0 0 8px">Security PIN Reset OTP</h3>
+              <p style="color:#475569;font-size:14px;margin:0 0 20px">Use the verification code below to reset your Admin Security PIN. This code is valid for <strong>5 minutes</strong>.</p>
+              <div style="background:#f8fafc;border:2px dashed #3b82f6;border-radius:10px;padding:20px;text-align:center;margin-bottom:20px">
+                <p style="margin:0 0 6px;font-size:12px;color:#64748b;font-weight:600;letter-spacing:1px">YOUR VERIFICATION CODE</p>
+                <p style="margin:0;font-size:40px;font-weight:900;letter-spacing:12px;color:#1e40af">${otp}</p>
+              </div>
+              <p style="color:#94a3b8;font-size:12px;margin:0">If you did not request this, please ignore this email. Do not share this code with anyone.</p>
+            </div>
+            <div style="background:#f1f5f9;padding:14px 32px;text-align:center">
+              <p style="margin:0;font-size:11px;color:#94a3b8">New Balaji Transport • Admin Security System</p>
+            </div>
+          </div>
+        `,
+        text: `Your NBT Admin PIN Reset OTP is: ${otp}\nThis code is valid for 5 minutes.\nIf you did not request this, ignore this email.`,
+      });
+
+      req.log.info(`[Email OTP] Sent to ${cleanEmail.replace(/(.{2}).*@/, '$1***@')} | Purpose: ${purpose || 'admin_pin_reset'}`);
+
+      return reply.code(200).send({
+        success: true,
+        message: `Verification code sent to ${cleanEmail.replace(/(.{3}).*@(.{2}).*?(\..+)$/, '$1***@$2***$3')}`,
+      });
+    } catch (emailErr: any) {
+      req.log.error({ err: emailErr }, '[Email OTP] Failed to send email');
+      return reply.code(500).send({ error: 'Failed to send verification email. Please try again.' });
+    }
   });
 
   // ── POST /api/auth/admin/logout — server-side token revocation ────────────
