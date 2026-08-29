@@ -24,6 +24,7 @@ import { db } from '../db/database';
 const CORRECT_LOGIN_ID = 'NBT';
 const DEFAULT_PIN = '8520';
 const PIN_STORAGE_KEY = 'nbt_admin_pin';
+const REGISTERED_ADMIN_PHONES = ['7418698082', '9789271721'];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Screen = 'LOGIN' | 'FORGOT_PIN' | 'VERIFY_OTP' | 'SET_NEW_PIN';
@@ -31,6 +32,14 @@ type Screen = 'LOGIN' | 'FORGOT_PIN' | 'VERIFY_OTP' | 'SET_NEW_PIN';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateOtp(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function maskPhoneNumber(phone: string): string {
+  const clean = phone.replace(/\D/g, '').slice(-10);
+  if (clean.length === 10) {
+    return `+91 ******${clean.slice(-4)}`;
+  }
+  return phone;
 }
 
 interface LoginScreenProps {
@@ -67,7 +76,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [loginLoading, setLoginLoading] = useState(false);
   const pinInputRef = useRef<TextInput>(null);
 
-  // ── Forgot PIN / OTP ──
+  // ── Forgot PIN / Phone Number / OTP ──
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -138,10 +148,24 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setLoginLoading(false);
   }, [loginId, pin, onLoginSuccess, triggerShake]);
 
-  // ── Forgot PIN: Send OTP ──
+  // ── Forgot PIN: Send OTP with Registered Phone Validation ──
   const handleSendOtp = useCallback(async () => {
-    setSendingOtp(true);
     setOtpError('');
+    const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+
+    if (!cleanPhone) {
+      triggerShake();
+      setOtpError('Please enter your 10-digit registered mobile number.');
+      return;
+    }
+
+    if (!REGISTERED_ADMIN_PHONES.includes(cleanPhone)) {
+      triggerShake();
+      setOtpError('Phone number not registered. Please enter a valid registered Admin number.');
+      return;
+    }
+
+    setSendingOtp(true);
     const generatedOtp = generateOtp();
     setOtp(generatedOtp);
 
@@ -150,7 +174,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       await fetch('https://nbt-app.onrender.com/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otp: generatedOtp, purpose: 'admin_pin_reset' }),
+        body: JSON.stringify({ phone: cleanPhone, otp: generatedOtp, purpose: 'admin_pin_reset' }),
       }).catch(() => {});
     } catch {}
 
@@ -162,10 +186,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     // Display alert with verification OTP for instant access
     Alert.alert(
       'Security Verification OTP',
-      `Your 4-digit verification OTP code is:\n\n${generatedOtp}\n\nPlease enter this code to reset your Security PIN.`,
+      `OTP code sent to +91 ${cleanPhone}:\n\n${generatedOtp}\n\nPlease enter this 4-digit code to reset your Admin PIN.`,
       [{ text: 'ENTER OTP' }]
     );
-  }, []);
+  }, [phoneNumber, triggerShake]);
 
   // ── Verify OTP ──
   const handleVerifyOtp = useCallback(() => {
@@ -199,6 +223,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setSavingPin(false);
 
     // Reset all forgot-PIN state
+    setPhoneNumber('');
     setOtp('');
     setOtpInput('');
     setOtpSent(false);
@@ -321,7 +346,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
               {/* Forgot PIN Link */}
               <TouchableOpacity
-                onPress={() => { setScreen('FORGOT_PIN'); setLoginError(''); setOtpSent(false); setOtp(''); setOtpInput(''); }}
+                onPress={() => { setScreen('FORGOT_PIN'); setLoginError(''); setPhoneNumber(''); setOtpSent(false); setOtp(''); setOtpInput(''); }}
                 style={styles.forgotPinBtn}
                 activeOpacity={0.7}
               >
@@ -359,7 +384,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  SCREEN 2: FORGOT PIN (REQUEST OTP)
+  //  SCREEN 2: FORGOT PIN (REQUEST OTP VIA REGISTERED PHONE)
   // ─────────────────────────────────────────────────────────────────────────
   if (screen === 'FORGOT_PIN') {
     return (
@@ -388,16 +413,41 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
               {/* Security info banner */}
               <View style={styles.infoBanner}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <MaterialIcons name="verified-user" size={18} color="#1d4ed8" />
-                  <Text style={styles.infoBannerTitle}>Security Verification</Text>
+                  <Text style={styles.infoBannerTitle}>Security Phone Verification</Text>
                 </View>
                 <Text style={styles.infoBannerDesc}>
-                  To recover and reset your Admin Security PIN, tap the button below to generate a secure 4-digit verification OTP.
+                  Enter your registered Admin mobile number (7418698082 or 9789271721) to receive a secure 4-digit verification OTP.
                 </Text>
               </View>
 
-              {otpError ? renderErrorBox(otpError) : null}
+              {renderErrorBox(otpError)}
+
+              {/* Registered Phone Input */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <Text style={styles.inputLabel}>REGISTERED MOBILE NUMBER *</Text>
+                  <Text style={styles.labelHint}>7418698082 / 9789271721</Text>
+                </View>
+                <View style={styles.inputRow}>
+                  <View style={styles.inputIconBox}>
+                    <MaterialIcons name="phone-android" size={20} color={COLORS.primary} />
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={phoneNumber}
+                    onChangeText={(v) => { setPhoneNumber(v.replace(/\D/g, '').slice(0, 10)); setOtpError(''); }}
+                    placeholder="Enter 10-digit mobile number"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSendOtp}
+                    autoFocus
+                  />
+                </View>
+              </View>
 
               <TouchableOpacity
                 style={[styles.primaryBtn, sendingOtp && { opacity: 0.7 }, { backgroundColor: COLORS.secondary }]}
@@ -409,8 +459,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <>
-                    <MaterialIcons name="lock-reset" size={18} color="#fff" />
-                    <Text style={styles.primaryBtnText}>GENERATE VERIFICATION OTP</Text>
+                    <MaterialIcons name="sms" size={18} color="#fff" />
+                    <Text style={styles.primaryBtnText}>SEND VERIFICATION OTP</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -418,7 +468,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
             <View style={styles.footer}>
               <MaterialIcons name="lock" size={14} color="#64748b" />
-              <Text style={styles.footerText}>OTP is strictly valid for authorized administrative personnel</Text>
+              <Text style={styles.footerText}>OTP is strictly valid for registered administrative numbers</Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -439,7 +489,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <View style={cardStyle}>
               <TouchableOpacity onPress={() => setScreen('FORGOT_PIN')} style={styles.backRow} activeOpacity={0.7}>
                 <MaterialIcons name="arrow-back" size={18} color={COLORS.primary} />
-                <Text style={styles.backText}>Back to PIN Recovery</Text>
+                <Text style={styles.backText}>Change Mobile Number</Text>
               </TouchableOpacity>
 
               <View style={styles.cardHeader}>
@@ -448,7 +498,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>Verify Security Code</Text>
-                  <Text style={styles.cardSubtitle}>Enter 4-digit code generated for administrative verification</Text>
+                  <Text style={styles.cardSubtitle}>Enter 4-digit code sent to your registered number</Text>
                 </View>
               </View>
               <View style={styles.divider} />
@@ -456,7 +506,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               <View style={styles.otpSentBanner}>
                 <MaterialIcons name="check-circle" size={18} color="#16a34a" />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.otpSentTitle}>Verification OTP Generated</Text>
+                  <Text style={styles.otpSentTitle}>OTP Sent to {maskPhoneNumber(phoneNumber)}</Text>
                   <Text style={styles.otpSentText}>
                     Please enter the 4-digit code below to proceed with PIN reset.
                   </Text>
