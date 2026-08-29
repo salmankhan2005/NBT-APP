@@ -803,24 +803,24 @@ class AdminDatabase {
   private currentUsername: string | null = null;
 
   // Drivers Data
-  private mockDrivers: Driver[] = [...INITIAL_SEED_DRIVERS];
+  private mockDrivers: Driver[] = [];
 
   // Vehicles List (legacy — kept for GPS screen compatibility)
   private mockVehicles: Vehicle[] = [];
 
   // Managed Vehicles — default seeded
-  private managedVehicles: ManagedVehicle[] = [...INITIAL_SEED_MANAGED_VEHICLES];
+  private managedVehicles: ManagedVehicle[] = [];
 
   // Vehicle Documents — starts empty
   private vehicleDocuments: VehicleDocument[] = [];
 
-  private mockFleetVehicles: FleetVehicle[] = [...INITIAL_SEED_FLEET_VEHICLES];
+  private mockFleetVehicles: FleetVehicle[] = [];
 
   // Trips Database
-  private mockTrips: Trip[] = [...INITIAL_SEED_TRIPS];
+  private mockTrips: Trip[] = [];
 
-  private mockGcNotes: GcNote[] = [...INITIAL_SEED_GC_NOTES];
-  private mockMemoDocuments: MemoDocument[] = [...INITIAL_SEED_MEMOS];
+  private mockGcNotes: GcNote[] = [];
+  private mockMemoDocuments: MemoDocument[] = [];
   private readonly gcStorageKey = 'nbt_gc_notes';
   private readonly memoStorageKey = 'nbt_memo_documents';
 
@@ -875,35 +875,25 @@ class AdminDatabase {
       const savedTrips = await AsyncStorage.getItem('nbt_trips_cache');
       if (savedTrips) {
         const parsed = JSON.parse(savedTrips);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.mockTrips = parsed;
           this._lastSavedTripsJson = savedTrips;
-        } else {
-          this.mockTrips = [...INITIAL_SEED_TRIPS];
         }
-      } else {
-        this.mockTrips = [...INITIAL_SEED_TRIPS];
-        await this.saveTrips();
       }
 
       const savedVehicles = await AsyncStorage.getItem('nbt_managed_vehicles');
       if (savedVehicles) {
         const parsed = JSON.parse(savedVehicles);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.managedVehicles = parsed;
           this._lastSavedVehiclesJson = savedVehicles;
-        } else {
-          this.managedVehicles = [...INITIAL_SEED_MANAGED_VEHICLES];
         }
-      } else {
-        this.managedVehicles = [...INITIAL_SEED_MANAGED_VEHICLES];
-        await this.saveVehicles();
       }
 
       const savedDocs = await AsyncStorage.getItem('nbt_vehicle_documents');
       if (savedDocs) {
         const parsed = JSON.parse(savedDocs);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.vehicleDocuments = parsed;
           this._lastSavedDocsJson = savedDocs;
         }
@@ -912,17 +902,13 @@ class AdminDatabase {
       const savedDrivers = await AsyncStorage.getItem('nbt_drivers_cache');
       if (savedDrivers) {
         const parsed = JSON.parse(savedDrivers);
-        if (Array.isArray(parsed) && parsed.length > 0) this.mockDrivers = parsed;
-        else this.mockDrivers = [...INITIAL_SEED_DRIVERS];
-      } else {
-        this.mockDrivers = [...INITIAL_SEED_DRIVERS];
-        await this.saveDrivers();
+        if (Array.isArray(parsed)) this.mockDrivers = parsed;
       }
 
       const savedExpenses = await AsyncStorage.getItem('nbt_expenses_cache');
       if (savedExpenses) {
         const parsed = JSON.parse(savedExpenses);
-        if (Array.isArray(parsed) && parsed.length > 0) this.mockExpenses = parsed;
+        if (Array.isArray(parsed)) this.mockExpenses = parsed;
       }
     } catch (e) {
       console.warn('Failed to load local cached storage', e);
@@ -2270,15 +2256,10 @@ class AdminDatabase {
       const raw = await AsyncStorage.getItem(this.gcStorageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) this.mockGcNotes = parsed;
-        else this.mockGcNotes = [...INITIAL_SEED_GC_NOTES];
-      } else {
-        this.mockGcNotes = [...INITIAL_SEED_GC_NOTES];
-        await this.persistGcNotes();
+        if (Array.isArray(parsed)) this.mockGcNotes = parsed;
       }
     } catch (e) {
       console.warn('Failed to load GC notes:', e);
-      this.mockGcNotes = [...INITIAL_SEED_GC_NOTES];
     }
   }
 
@@ -2445,15 +2426,10 @@ class AdminDatabase {
       const raw = await AsyncStorage.getItem(this.memoStorageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) this.mockMemoDocuments = parsed;
-        else this.mockMemoDocuments = [...INITIAL_SEED_MEMOS];
-      } else {
-        this.mockMemoDocuments = [...INITIAL_SEED_MEMOS];
-        await this.persistMemoDocuments();
+        if (Array.isArray(parsed)) this.mockMemoDocuments = parsed;
       }
     } catch (e) {
       console.warn('Failed to load memo documents:', e);
-      this.mockMemoDocuments = [...INITIAL_SEED_MEMOS];
     }
   }
 
