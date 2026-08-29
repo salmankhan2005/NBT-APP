@@ -490,26 +490,24 @@ export default function VehiclesScreen() {
         const allDocKeys = [...COMPLIANCE_DOCS.map((d) => d.key), ...REGISTRATION_DOCS.map((d) => d.key)];
         for (const key of allDocKeys) {
           const entry = docEntries[key];
-          if (entry && (entry.fileUri || entry.docNumber || entry.issueDate || entry.expiryDate)) {
+          if (entry && (entry.fileUri || entry.docNumber.trim() || entry.issueDate.trim() || entry.expiryDate.trim())) {
             const spec = COMPLIANCE_DOCS.find((d) => d.key === key);
             const regSpec = REGISTRATION_DOCS.find((d) => d.key === key);
             const docLabel = spec ? spec.title : regSpec ? regSpec.label : key;
 
             try {
-              if (entry.fileUri) {
-                await db.addVehicleDocument({
-                  vehicle_id: createdVehicleId,
-                  docType: key,
-                  docLabel,
-                  docNumber: entry.docNumber.trim(),
-                  issueDate: entry.issueDate.trim(),
-                  expiryDate: entry.expiryDate.trim(),
-                  fileUri: entry.fileUri,
-                  fileName: entry.fileName || `${key}.pdf`,
-                  fileType: entry.fileType || 'application/octet-stream',
-                  uploadedBy: 'Admin',
-                });
-              }
+              await db.addVehicleDocument({
+                vehicle_id: createdVehicleId,
+                docType: key,
+                docLabel,
+                docNumber: entry.docNumber.trim(),
+                issueDate: entry.issueDate.trim(),
+                expiryDate: entry.expiryDate.trim(),
+                fileUri: entry.fileUri || '',
+                fileName: entry.fileName || (entry.fileUri ? `${key}.pdf` : ''),
+                fileType: entry.fileType || (entry.fileUri ? 'application/octet-stream' : ''),
+                uploadedBy: 'Admin',
+              });
             } catch (err) {
               console.warn(`Error uploading document ${key}:`, err);
             }
