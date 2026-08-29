@@ -165,6 +165,7 @@ export default function VehiclesScreen() {
   const [search, setSearch] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>('ALL');
   const [documentFilter, setDocumentFilter] = useState<DocumentFilter>('ALL');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Modal States
   const [modalVisible, setModalVisible] = useState(false);
@@ -902,49 +903,79 @@ export default function VehiclesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Filter Row */}
-      <View style={styles.filterRow}>
-        <View style={styles.searchBox}>
-          <MaterialIcons name="search" size={18} color={COLORS.outline} />
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search vehicle number, owner, make, status..."
-            placeholderTextColor={COLORS.outline}
+      {/* Search & Filters Toggle Row (Only on mobile) */}
+      {!isDesktop && (
+        <TouchableOpacity
+          style={styles.filterToggleBar}
+          onPress={() => setFiltersExpanded(!filtersExpanded)}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <MaterialIcons name="filter-list" size={18} color={COLORS.primary} />
+            <Text style={styles.filterToggleText}>
+              {filtersExpanded ? 'Hide Search & Filters' : 'Show Search & Filters'}
+            </Text>
+            {(search || vehicleFilter !== 'ALL' || documentFilter !== 'ALL') ? (
+              <View style={styles.activeFilterBadge}>
+                <Text style={styles.activeFilterBadgeText}>Active</Text>
+              </View>
+            ) : null}
+          </View>
+          <MaterialIcons
+            name={filtersExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+            size={20}
+            color={COLORS.primary}
           />
+        </TouchableOpacity>
+      )}
+
+      {(isDesktop || filtersExpanded) && (
+        <View style={!isDesktop && styles.mobileFiltersContainer}>
+          {/* Filter Row */}
+          <View style={styles.filterRow}>
+            <View style={styles.searchBox}>
+              <MaterialIcons name="search" size={18} color={COLORS.outline} />
+              <TextInput
+                style={styles.searchInput}
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search vehicle number, owner, make, status..."
+                placeholderTextColor={COLORS.outline}
+              />
+            </View>
+          </View>
+
+          {/* Status Filters */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll} contentContainerStyle={styles.pillRow}>
+            {(['ALL', 'AVAILABLE', 'ON TRIP', 'UNDER MAINTENANCE', 'INACTIVE'] as VehicleFilter[]).map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.pill, vehicleFilter === option && styles.pillActive]}
+                onPress={() => setVehicleFilter(option)}
+              >
+                <Text style={[styles.pillText, vehicleFilter === option && styles.pillTextActive]}>
+                  {option === 'ALL' ? 'All Vehicles' : option}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Document Expiry Filters */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll} contentContainerStyle={styles.pillRow}>
+            {(['ALL', 'VALID', 'EXPIRING_SOON', 'EXPIRED', 'MISSING'] as DocumentFilter[]).map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.pill, documentFilter === option && styles.pillActive]}
+                onPress={() => setDocumentFilter(option)}
+              >
+                <Text style={[styles.pillText, documentFilter === option && styles.pillTextActive]}>
+                  {option === 'ALL' ? 'All Document Statuses' : option.replace('_', ' ')}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      </View>
-
-      {/* Status Filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll} contentContainerStyle={styles.pillRow}>
-        {(['ALL', 'AVAILABLE', 'ON TRIP', 'UNDER MAINTENANCE', 'INACTIVE'] as VehicleFilter[]).map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.pill, vehicleFilter === option && styles.pillActive]}
-            onPress={() => setVehicleFilter(option)}
-          >
-            <Text style={[styles.pillText, vehicleFilter === option && styles.pillTextActive]}>
-              {option === 'ALL' ? 'All Vehicles' : option}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Document Expiry Filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll} contentContainerStyle={styles.pillRow}>
-        {(['ALL', 'VALID', 'EXPIRING_SOON', 'EXPIRED', 'MISSING'] as DocumentFilter[]).map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.pill, documentFilter === option && styles.pillActive]}
-            onPress={() => setDocumentFilter(option)}
-          >
-            <Text style={[styles.pillText, documentFilter === option && styles.pillTextActive]}>
-              {option === 'ALL' ? 'All Document Statuses' : option.replace('_', ' ')}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      )}
 
       {loading ? (
         <View style={styles.centerBox}>
@@ -1784,6 +1815,39 @@ const styles = StyleSheet.create({
     ...SHADOWS.light,
   },
   searchInput: { flex: 1, fontSize: 13, marginLeft: 8, color: COLORS.textDark },
+  filterToggleBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.gutter,
+    paddingVertical: 10,
+    backgroundColor: '#eff6ff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#bfdbfe',
+  },
+  filterToggleText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  activeFilterBadge: {
+    backgroundColor: COLORS.secondary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  activeFilterBadgeText: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  mobileFiltersContainer: {
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.outlineVariant,
+    paddingBottom: 10,
+  },
   pillScroll: { flexGrow: 0, flexShrink: 0, maxHeight: 48 },
   pillRow: { paddingHorizontal: SPACING.gutter, paddingVertical: 7, gap: 8, alignItems: 'center' },
   pill: {
