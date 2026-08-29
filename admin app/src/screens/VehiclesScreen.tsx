@@ -151,13 +151,15 @@ const createInitialDocEntries = (): Record<string, DocFormEntry> => ({
 
 export default function VehiclesScreen() {
   const { width } = useWindowDimensions();
-  const isTablet = width >= 600;
+  const isSmallPhone = width < 380;
+  const isPhone = width < 600;
+  const isTablet = width >= 600 && width < 880;
   const isDesktop = width >= 880;
   const numColumns = isDesktop ? 2 : 1;
   // Form columns: 2 on tablet/desktop for side-by-side inputs
-  const formCols = isTablet ? 2 : 1;
+  const formCols = isTablet || isDesktop ? 2 : 1;
   // Max width for modal content on wide screens
-  const modalMaxWidth = Math.min(width, 720);
+  const modalMaxWidth = Math.min(width, 760);
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<ManagedVehicle[]>([]);
   const [search, setSearch] = useState('');
@@ -741,6 +743,8 @@ export default function VehiclesScreen() {
         : 'All Compliance Valid';
     const statusColor = getStatusColor(item.status);
 
+    const expiryItemBasis = isSmallPhone ? '47%' : isPhone ? '31%' : '31%';
+
     return (
       <View style={[styles.vehicleCard, isDesktop && { flex: 1, marginHorizontal: 4 }]}>
         {/* Colored left accent bar */}
@@ -748,17 +752,17 @@ export default function VehiclesScreen() {
 
         <TouchableOpacity onPress={() => openDetails(item)} activeOpacity={0.85} style={{ flex: 1 }}>
           {/* Card Top Row */}
-          <View style={styles.cardHeaderRow}>
-            <View style={{ flex: 1 }}>
+          <View style={[styles.cardHeaderRow, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
+            <View style={{ flex: 1, minWidth: isSmallPhone ? '100%' : 160 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <Text style={styles.vehicleNumber}>{item.vehicleNumber}</Text>
+                <Text style={[styles.vehicleNumber, isSmallPhone && { fontSize: 14 }]}>{item.vehicleNumber}</Text>
                 {item.isPinned && (
                   <View style={styles.pinnedBadge}>
                     <Text style={styles.pinnedBadgeText}>📌 PINNED</Text>
                   </View>
                 )}
               </View>
-              <Text style={styles.vehicleMakeModel}>
+              <Text style={styles.vehicleMakeModel} numberOfLines={1}>
                 {item.vehicleMake || 'Truck'} • {item.vehicleType}{item.vehicleModel ? ` (${item.vehicleModel})` : ''}
               </Text>
             </View>
@@ -769,11 +773,11 @@ export default function VehiclesScreen() {
           </View>
 
           {/* Owner Row */}
-          <View style={styles.ownerRow}>
+          <View style={[styles.ownerRow, isSmallPhone && { flexWrap: 'wrap', gap: 4 }]}>
             <View style={styles.ownerIconBox}>
               <MaterialIcons name="person" size={12} color={COLORS.primary} />
             </View>
-            <Text style={styles.ownerText}>{item.ownerName || 'Owner not set'}</Text>
+            <Text style={styles.ownerText} numberOfLines={1}>{item.ownerName || 'Owner not set'}</Text>
             {item.ownerPhone ? (
               <View style={styles.ownerPhoneChip}>
                 <MaterialIcons name="phone" size={10} color="#64748b" />
@@ -792,11 +796,18 @@ export default function VehiclesScreen() {
               const expiryVal = (item[docSpec.expiryField] as string) || (docSpec.key === 'NATIONAL_PERMIT' ? item.permitExpiryDate : '');
               const badge = getExpiryBadgeInfo(expiryVal);
               return (
-                <View key={docSpec.key} style={[
-                  styles.expiryGridItem,
-                  { borderColor: badge.borderColor || COLORS.outlineVariant, backgroundColor: badge.bg },
-                  isTablet && { minWidth: 110 },
-                ]}>
+                <View
+                  key={docSpec.key}
+                  style={[
+                    styles.expiryGridItem,
+                    {
+                      borderColor: badge.borderColor || COLORS.outlineVariant,
+                      backgroundColor: badge.bg,
+                      flexBasis: expiryItemBasis,
+                      maxWidth: isSmallPhone ? '48%' : isPhone ? '32%' : '32%',
+                    },
+                  ]}
+                >
                   <View style={styles.expiryGridHeader}>
                     <Text style={[styles.expiryGridDocName, { color: docSpec.color }]} numberOfLines={1}>
                       {docSpec.num}. {docSpec.shortTitle}
@@ -832,6 +843,7 @@ export default function VehiclesScreen() {
                 styles.docAlertText,
                 { color: overallDocStatus === 'VALID' ? '#16a34a' : overallDocStatus === 'EXPIRED' ? '#dc2626' : '#d97706' },
               ]}
+              numberOfLines={1}
             >
               {overallDocLabel}
             </Text>
@@ -839,8 +851,8 @@ export default function VehiclesScreen() {
         </TouchableOpacity>
 
         {/* ── CARD ACTION TOOLBAR ── */}
-        <View style={styles.cardActionsRow}>
-          <TouchableOpacity onPress={() => openDetails(item)} style={styles.cardActionBtn}>
+        <View style={[styles.cardActionsRow, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
+          <TouchableOpacity onPress={() => openDetails(item)} style={[styles.cardActionBtn, isSmallPhone && { flex: 1 }]}>
             <MaterialIcons name="visibility" size={14} color={COLORS.primary} />
             <Text style={styles.cardActionBtnText}>DETAILS & DOCS</Text>
           </TouchableOpacity>
@@ -852,11 +864,16 @@ export default function VehiclesScreen() {
                 fetchVehicles(false);
               }}
               style={[styles.cardIconBtn, item.isPinned && { backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}
+              accessibilityLabel="Pin Vehicle"
             >
               <MaterialIcons name="push-pin" size={15} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => handleDeleteVehicle(item.vehicle_id)} style={[styles.cardIconBtn, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}>
+            <TouchableOpacity
+              onPress={() => handleDeleteVehicle(item.vehicle_id)}
+              style={[styles.cardIconBtn, { borderColor: '#fca5a5', backgroundColor: '#fef2f2' }]}
+              accessibilityLabel="Delete Vehicle"
+            >
               <MaterialIcons name="delete-outline" size={15} color="#dc2626" />
             </TouchableOpacity>
           </View>
@@ -1167,8 +1184,8 @@ export default function VehiclesScreen() {
                 return (
                   <View key={docSpec.key} style={styles.docComplianceCard}>
                     {/* Header Row for Document Item */}
-                    <View style={styles.docComplianceHeader}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <View style={[styles.docComplianceHeader, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 150 }}>
                         <View style={[styles.docNumberCircle, { backgroundColor: docSpec.color }]}>
                           <Text style={styles.docNumberCircleText}>{docSpec.num}</Text>
                         </View>
@@ -1182,9 +1199,9 @@ export default function VehiclesScreen() {
                       </View>
                     </View>
 
-                    {/* 2-Column Issue Date & Expire Date Row */}
-                    <View style={styles.inputRow}>
-                      <View style={[styles.inputGroup, { flex: 1 }]}>
+                    {/* Responsive Issue Date & Expire Date Row (stacked on mobile to avoid label wrapping) */}
+                    <View style={isPhone ? styles.inputCol : styles.inputRow}>
+                      <View style={[styles.inputGroup, !isPhone && { flex: 1 }]}>
                         <Text style={styles.label}>📅 ISSUE DATE (YYYY-MM-DD)</Text>
                         <View style={[styles.dateInputWrapper, { borderColor: '#93c5fd' }]}>
                           <MaterialIcons name="event" size={16} color="#3b82f6" style={{ marginRight: 6 }} />
@@ -1198,7 +1215,7 @@ export default function VehiclesScreen() {
                         </View>
                       </View>
 
-                      <View style={[styles.inputGroup, { flex: 1 }]}>
+                      <View style={[styles.inputGroup, !isPhone && { flex: 1 }]}>
                         <Text style={styles.label}>🚨 EXPIRE DATE (YYYY-MM-DD)</Text>
                         <View style={[styles.dateInputWrapper, { borderColor: badge.borderColor || COLORS.outlineVariant }]}>
                           <MaterialIcons name="event-busy" size={16} color={badge.color} style={{ marginRight: 6 }} />
@@ -1272,11 +1289,11 @@ export default function VehiclesScreen() {
               </View>
               <View style={styles.sectionDivider} />
 
-              <View style={styles.inputRow}>
+              <View style={isPhone ? styles.inputCol : styles.inputRow}>
                 {REGISTRATION_DOCS.map((regDoc) => {
                   const entry = docEntries[regDoc.key];
                   return (
-                    <View key={regDoc.key} style={[styles.rcUploadBox, { flex: 1 }]}>
+                    <View key={regDoc.key} style={[styles.rcUploadBox, !isPhone && { flex: 1 }, isPhone && { marginBottom: 10 }]}>
                       <Text style={styles.rcUploadLabel}>{regDoc.label}</Text>
                       {entry?.fileUri ? (
                         <View style={styles.rcPreviewContainer}>
@@ -1334,14 +1351,14 @@ export default function VehiclesScreen() {
             <View style={{ width: 40 }} />
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalContent}>
+          <ScrollView contentContainerStyle={[styles.modalContent, (isTablet || isDesktop) && { alignSelf: 'center', width: '100%', maxWidth: modalMaxWidth }]}>
             {selectedVehicle && (
               <>
                 {/* Vehicle Passport Card */}
                 <View style={styles.formCard}>
-                  <View style={styles.cardHeaderRow}>
-                    <View>
-                      <Text style={styles.detailVehicleNum}>{selectedVehicle.vehicleNumber}</Text>
+                  <View style={[styles.cardHeaderRow, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
+                    <View style={{ flex: 1, minWidth: 160 }}>
+                      <Text style={[styles.detailVehicleNum, isSmallPhone && { fontSize: 18 }]}>{selectedVehicle.vehicleNumber}</Text>
                       <Text style={styles.detailVehicleSub}>
                         {selectedVehicle.vehicleMake} • {selectedVehicle.vehicleType} {selectedVehicle.vehicleModel ? `(${selectedVehicle.vehicleModel})` : ''}
                       </Text>
@@ -1352,27 +1369,27 @@ export default function VehiclesScreen() {
                   </View>
 
                   <View style={styles.detailInfoGrid}>
-                    <View style={styles.detailGridCol}>
+                    <View style={[styles.detailGridCol, { width: isSmallPhone ? '100%' : isPhone ? '48%' : isTablet ? '31%' : '23%' }]}>
                       <Text style={styles.detailLabel}>RC NUMBER</Text>
                       <Text style={styles.detailValue}>{selectedVehicle.rcNumber || '—'}</Text>
                     </View>
-                    <View style={styles.detailGridCol}>
+                    <View style={[styles.detailGridCol, { width: isSmallPhone ? '100%' : isPhone ? '48%' : isTablet ? '31%' : '23%' }]}>
                       <Text style={styles.detailLabel}>CHASSIS (LAST 4)</Text>
                       <Text style={styles.detailValue}>{selectedVehicle.chassisNumber || '—'}</Text>
                     </View>
-                    <View style={styles.detailGridCol}>
+                    <View style={[styles.detailGridCol, { width: isSmallPhone ? '100%' : isPhone ? '48%' : isTablet ? '31%' : '23%' }]}>
                       <Text style={styles.detailLabel}>OWNER</Text>
                       <Text style={styles.detailValue}>{selectedVehicle.ownerName || '—'}</Text>
                     </View>
-                    <View style={styles.detailGridCol}>
+                    <View style={[styles.detailGridCol, { width: isSmallPhone ? '100%' : isPhone ? '48%' : isTablet ? '31%' : '23%' }]}>
                       <Text style={styles.detailLabel}>PHONE</Text>
                       <Text style={styles.detailValue}>{selectedVehicle.ownerPhone || '—'}</Text>
                     </View>
-                    <View style={styles.detailGridCol}>
+                    <View style={[styles.detailGridCol, { width: isSmallPhone ? '100%' : isPhone ? '48%' : isTablet ? '31%' : '23%' }]}>
                       <Text style={styles.detailLabel}>YEAR</Text>
                       <Text style={styles.detailValue}>{selectedVehicle.yearOfManufacture || '—'}</Text>
                     </View>
-                    <View style={styles.detailGridCol}>
+                    <View style={[styles.detailGridCol, { width: isSmallPhone ? '100%' : isPhone ? '48%' : isTablet ? '31%' : '23%' }]}>
                       <Text style={styles.detailLabel}>RECORD CREATED</Text>
                       <Text style={styles.detailValue}>{selectedVehicle.createdAt ? selectedVehicle.createdAt.slice(0, 10) : '—'}</Text>
                     </View>
@@ -1400,8 +1417,8 @@ export default function VehiclesScreen() {
                     return (
                       <View key={docSpec.key} style={styles.docDetailCard}>
                         {/* Header */}
-                        <View style={styles.docDetailCardHeader}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <View style={[styles.docDetailCardHeader, isSmallPhone && { flexWrap: 'wrap', gap: 6 }]}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 150 }}>
                             <View style={[styles.docNumberCircle, { backgroundColor: docSpec.color }]}>
                               <Text style={styles.docNumberCircleText}>{docSpec.num}</Text>
                             </View>
@@ -1414,13 +1431,13 @@ export default function VehiclesScreen() {
                         </View>
 
                         {/* Dates Grid */}
-                        <View style={styles.datesDisplayGrid}>
-                          <View style={styles.dateBox}>
+                        <View style={[styles.datesDisplayGrid, isSmallPhone && { flexDirection: 'column', gap: 6, paddingVertical: 6 }]}>
+                          <View style={[styles.dateBox, isSmallPhone && { alignItems: 'flex-start', paddingVertical: 2 }]}>
                             <Text style={styles.dateBoxLabel}>ISSUE DATE</Text>
                             <Text style={styles.dateBoxValue}>{formatDisplayDate(issueDateVal || latestDoc?.issueDate)}</Text>
                           </View>
 
-                          <View style={[styles.dateBox, { borderLeftWidth: 1, borderLeftColor: COLORS.outlineVariant }]}>
+                          <View style={[styles.dateBox, !isSmallPhone && { borderLeftWidth: 1, borderLeftColor: COLORS.outlineVariant }, isSmallPhone && { alignItems: 'flex-start', paddingVertical: 2 }]}>
                             <Text style={styles.dateBoxLabel}>EXPIRE DATE</Text>
                             <Text style={[styles.dateBoxValue, { color: badge.color, fontWeight: '800' }]}>
                               {formatDisplayDate(expiryDateVal || latestDoc?.expiryDate)}
@@ -1428,7 +1445,7 @@ export default function VehiclesScreen() {
                             <Text style={[styles.dateBoxDays, { color: badge.color }]}>{badge.daysText}</Text>
                           </View>
 
-                          <View style={[styles.dateBox, { borderLeftWidth: 1, borderLeftColor: COLORS.outlineVariant }]}>
+                          <View style={[styles.dateBox, !isSmallPhone && { borderLeftWidth: 1, borderLeftColor: COLORS.outlineVariant }, isSmallPhone && { alignItems: 'flex-start', paddingVertical: 2 }]}>
                             <Text style={styles.dateBoxLabel}>DOC / POLICY #</Text>
                             <Text style={styles.dateBoxValue}>{latestDoc?.docNumber || '—'}</Text>
                           </View>
@@ -1453,9 +1470,9 @@ export default function VehiclesScreen() {
                         ) : null}
 
                         {/* Action buttons row */}
-                        <View style={styles.docDetailActionsRow}>
+                        <View style={[styles.docDetailActionsRow, { flexWrap: 'wrap' }]}>
                           <TouchableOpacity
-                            style={styles.docActionBtnPrimary}
+                            style={[styles.docActionBtnPrimary, isSmallPhone && { flex: 1, minWidth: 140 }]}
                             onPress={() => openEditDocDatesModal(docSpec, latestDoc || null, selectedVehicle)}
                           >
                             <MaterialIcons name="edit" size={15} color={COLORS.primary} />
@@ -1496,12 +1513,12 @@ export default function VehiclesScreen() {
                 {/* RC Book Registration Files */}
                 <View style={styles.formCard}>
                   <Text style={styles.sectionTitle}>RC REGISTRATION PHOTOS</Text>
-                  <View style={styles.inputRow}>
+                  <View style={isPhone ? styles.inputCol : styles.inputRow}>
                     {REGISTRATION_DOCS.map((regDoc) => {
                       const docs = vehicleDocuments.filter((d) => d.docType === regDoc.key);
                       const latest = docs[0];
                       return (
-                        <View key={regDoc.key} style={[styles.rcDetailBox, { flex: 1 }]}>
+                        <View key={regDoc.key} style={[styles.rcDetailBox, !isPhone && { flex: 1 }, isPhone && { marginBottom: 10 }]}>
                           <Text style={styles.rcDetailLabel}>{regDoc.label}</Text>
                           {latest?.fileUri ? (
                             <View style={styles.rcDetailFileBox}>
@@ -1561,15 +1578,15 @@ export default function VehiclesScreen() {
          ═══════════════════════════════════════════════════════════════════════ */}
       <Modal visible={docActionModalVisible} animationType="fade" transparent onRequestClose={() => setDocActionModalVisible(false)}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.editDocModalCard}>
+          <View style={[styles.editDocModalCard, { width: '100%', maxWidth: Math.min(width - 24, 480) }]}>
             <View style={styles.editDocModalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                 {activeDocSpec ? (
                   <View style={[styles.docNumberCircle, { backgroundColor: activeDocSpec.color }]}>
                     <Text style={styles.docNumberCircleText}>{activeDocSpec.num}</Text>
                   </View>
                 ) : null}
-                <Text style={styles.editDocModalTitle}>
+                <Text style={styles.editDocModalTitle} numberOfLines={1}>
                   EDIT {activeDocSpec?.title || 'DOCUMENT'}
                 </Text>
               </View>
@@ -1599,8 +1616,8 @@ export default function VehiclesScreen() {
               />
             </View>
 
-            <View style={styles.inputRow}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
+            <View style={isPhone ? styles.inputCol : styles.inputRow}>
+              <View style={[styles.inputGroup, !isPhone && { flex: 1 }]}>
                 <Text style={styles.label}>ISSUE DATE (YYYY-MM-DD)</Text>
                 <View style={styles.dateInputWrapper}>
                   <MaterialIcons name="event" size={16} color="#64748b" style={{ marginRight: 6 }} />
@@ -1613,7 +1630,7 @@ export default function VehiclesScreen() {
                 </View>
               </View>
 
-              <View style={[styles.inputGroup, { flex: 1 }]}>
+              <View style={[styles.inputGroup, !isPhone && { flex: 1 }]}>
                 <Text style={styles.label}>EXPIRE DATE (YYYY-MM-DD) *</Text>
                 <View style={styles.dateInputWrapper}>
                   <MaterialIcons name="event-busy" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
@@ -1929,6 +1946,7 @@ const styles = StyleSheet.create({
   sectionSubtitle: { fontSize: 10.5, color: COLORS.textMuted, marginTop: 1, lineHeight: 14 },
   inputGroup: { marginBottom: 12 },
   inputRow: { flexDirection: 'row', gap: 10 },
+  inputCol: { flexDirection: 'column', gap: 8 },
   label: { fontSize: 10, fontWeight: '800', color: '#475569', marginBottom: 5, letterSpacing: 0.4 },
 
   /* Input with leading icon */

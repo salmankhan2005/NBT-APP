@@ -578,7 +578,10 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.gutter,
-    paddingBottom: 32,
+    paddingBottom: 48,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
   pageHeaderCard: {
     flexDirection: 'row',

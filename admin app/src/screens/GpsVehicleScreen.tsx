@@ -1309,6 +1309,9 @@ const styles = StyleSheet.create({
   formContent: {
     padding: SPACING.gutter,
     paddingBottom: 48,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
   formSectionLabel: {
     flexDirection: 'row',
@@ -1423,6 +1426,9 @@ const styles = StyleSheet.create({
   detailContent: {
     padding: SPACING.gutter,
     paddingBottom: 48,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
   gpsStatusBanner: {
     flexDirection: 'row',
