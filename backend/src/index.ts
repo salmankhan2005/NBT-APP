@@ -279,7 +279,7 @@ async function bootstrap() {
       cb(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   // ── Rate limiting — global ─────────────────────────────────────────────
