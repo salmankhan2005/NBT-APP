@@ -34,6 +34,8 @@ export async function lorryBookingRoutes(app: FastifyInstance) {
 
     const fromPoint = String(body.fromPoint || '').trim();
     const destinationPoint = String(body.destinationPoint || '').trim();
+    const name = String(body.name || '').trim();
+    const vehicleNumber = String(body.vehicleNumber || '').trim().toUpperCase();
 
     if (!fromPoint || !destinationPoint) {
       return reply.code(400).send({ success: false, error: 'From Point and Destination Point are required.' });
@@ -58,7 +60,7 @@ export async function lorryBookingRoutes(app: FastifyInstance) {
       const result = await sql`
         WITH inserted_entry AS (
           INSERT INTO lorry_booking_entries (
-            id, profit_date, from_point, destination_point,
+            id, profit_date, name, vehicle_number, from_point, destination_point,
             load_freight, lorry_freight, gross_freight,
             coolie, commission_freight, total_freight,
             expenses, profit, created_at, updated_at
@@ -66,6 +68,8 @@ export async function lorryBookingRoutes(app: FastifyInstance) {
           VALUES (
             gen_random_uuid()::text,
             ${businessDate},
+            ${name},
+            ${vehicleNumber},
             ${fromPoint},
             ${destinationPoint},
             ${loadFreight},
@@ -109,7 +113,7 @@ export async function lorryBookingRoutes(app: FastifyInstance) {
     const query = req.query as Record<string, unknown>;
     const limit = Math.min(Number(query.limit || 50), 100);
     const rows = await sql`
-      SELECT id, profit_date, from_point, destination_point,
+      SELECT id, profit_date, name, vehicle_number, from_point, destination_point,
              load_freight, lorry_freight, gross_freight,
              coolie, commission_freight, total_freight,
              expenses, profit, created_at

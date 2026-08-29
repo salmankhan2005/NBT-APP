@@ -177,6 +177,8 @@ async function bootstrap() {
       CREATE TABLE IF NOT EXISTS lorry_booking_entries (
         id TEXT PRIMARY KEY,
         profit_date DATE NOT NULL,
+        name TEXT NOT NULL DEFAULT '',
+        vehicle_number TEXT NOT NULL DEFAULT '',
         from_point TEXT NOT NULL DEFAULT '',
         destination_point TEXT NOT NULL DEFAULT '',
         load_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -192,6 +194,9 @@ async function bootstrap() {
       )
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_lorry_booking_entries_date ON lorry_booking_entries(profit_date)`;
+    // Auto-migrate: lorry_booking_entries name and vehicle_number columns
+    await sql`ALTER TABLE lorry_booking_entries ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''`;
+    await sql`ALTER TABLE lorry_booking_entries ADD COLUMN IF NOT EXISTS vehicle_number TEXT NOT NULL DEFAULT ''`;
     // Auto-migrate: fix vehicle_documents rows where is_active is null (set to true)
     await sql`UPDATE vehicle_documents SET is_active = true WHERE is_active IS NULL`;
     // Auto-migrate: fix empty string pod fields to null

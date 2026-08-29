@@ -315,6 +315,8 @@ async function migrate() {
     CREATE TABLE IF NOT EXISTS lorry_booking_entries (
       id TEXT PRIMARY KEY,
       profit_date DATE NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
+      vehicle_number TEXT NOT NULL DEFAULT '',
       from_point TEXT NOT NULL DEFAULT '',
       destination_point TEXT NOT NULL DEFAULT '',
       load_freight NUMERIC(12,2) NOT NULL DEFAULT 0,
