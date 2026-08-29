@@ -85,9 +85,13 @@ function AppContent() {
   const [appStage, setAppStage] = useState<'LANDING' | 'SPLASH' | 'LOGIN' | 'MAIN'>('LANDING');
 
   const [adminTab, _setAdminTab] = useState<AdminTab>('DASHBOARD');
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
+    DASHBOARD: true,
+  });
   const setAdminTab = (tab: AdminTab) => {
     _setAdminTab(tab);
     AsyncStorage.setItem('admin_active_tab', tab).catch(() => {});
+    setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
   };
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
@@ -108,6 +112,7 @@ function AppContent() {
         const savedTab = await AsyncStorage.getItem('admin_active_tab');
         if (savedTab) {
           _setAdminTab(savedTab as AdminTab);
+          setVisitedTabs((prev) => ({ ...prev, [savedTab]: true }));
         }
         // If a valid session exists, skip landing page and go straight to main
         if (db.isAuthenticated()) {
@@ -155,63 +160,86 @@ function AppContent() {
   }
 
   if (appStage === 'LOGIN') {
-    return <LoginScreen onLoginSuccess={() => setAppStage('MAIN')} />;
+    return <LoginScreen onLoginSuccess={() => {
+      setVisitedTabs((prev) => ({ ...prev, [adminTab]: true }));
+      setAppStage('MAIN');
+    }} />;
   }
 
   const renderScreen = () => {
     return (
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1, display: adminTab === 'DASHBOARD' ? 'flex' : 'none' }}>
-          <DashboardScreen
-            onCreateTripPress={() => setAdminTab('CREATE_TRIP')}
-            onNavigateToTrips={() => setAdminTab('TRIPS')}
-          />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'TRIPS' ? 'flex' : 'none' }}>
-          <TripsScreen />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'LORRY_BOOKING' ? 'flex' : 'none' }}>
-          <LorryBookingScreen />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'CREATE_TRIP' ? 'flex' : 'none' }}>
-          <CreateTripScreen onTripCreated={() => setAdminTab('TRIPS')} />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'LIVE' ? 'flex' : 'none' }}>
-          <LiveStatusScreen />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'GC' ? 'flex' : 'none' }}>
-          <GcScreen />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'MEMO' ? 'flex' : 'none' }}>
-          <MemoScreen />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'VEHICLES' ? 'flex' : 'none' }}>
-          {!isDesktop && (
-            <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setAdminTab('MENU')}>
-              <MaterialIcons name="chevron-left" size={20} color={COLORS.primary} />
-              <Text style={styles.backToMenuText}>BACK TO MENU</Text>
-            </TouchableOpacity>
-          )}
-          <VehiclesScreen />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'SETTINGS' ? 'flex' : 'none' }}>
-          {!isDesktop && (
-            <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setAdminTab('MENU')}>
-              <MaterialIcons name="chevron-left" size={20} color={COLORS.primary} />
-              <Text style={styles.backToMenuText}>BACK TO MENU</Text>
-            </TouchableOpacity>
-          )}
-          <SettingsScreen onLogout={handleLogout} />
-        </View>
-        <View style={{ flex: 1, display: adminTab === 'GPS_VEHICLES' ? 'flex' : 'none' }}>
-          {!isDesktop && (
-            <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setAdminTab('MENU')}>
-              <MaterialIcons name="chevron-left" size={20} color={COLORS.primary} />
-              <Text style={styles.backToMenuText}>BACK TO MENU</Text>
-            </TouchableOpacity>
-          )}
-          <GpsVehicleScreen />
-        </View>
+        {visitedTabs['DASHBOARD'] && (
+          <View style={{ flex: 1, display: adminTab === 'DASHBOARD' ? 'flex' : 'none' }}>
+            <DashboardScreen
+              onCreateTripPress={() => setAdminTab('CREATE_TRIP')}
+              onNavigateToTrips={() => setAdminTab('TRIPS')}
+            />
+          </View>
+        )}
+        {visitedTabs['TRIPS'] && (
+          <View style={{ flex: 1, display: adminTab === 'TRIPS' ? 'flex' : 'none' }}>
+            <TripsScreen />
+          </View>
+        )}
+        {visitedTabs['LORRY_BOOKING'] && (
+          <View style={{ flex: 1, display: adminTab === 'LORRY_BOOKING' ? 'flex' : 'none' }}>
+            <LorryBookingScreen />
+          </View>
+        )}
+        {visitedTabs['CREATE_TRIP'] && (
+          <View style={{ flex: 1, display: adminTab === 'CREATE_TRIP' ? 'flex' : 'none' }}>
+            <CreateTripScreen onTripCreated={() => setAdminTab('TRIPS')} />
+          </View>
+        )}
+        {visitedTabs['LIVE'] && (
+          <View style={{ flex: 1, display: adminTab === 'LIVE' ? 'flex' : 'none' }}>
+            <LiveStatusScreen />
+          </View>
+        )}
+        {visitedTabs['GC'] && (
+          <View style={{ flex: 1, display: adminTab === 'GC' ? 'flex' : 'none' }}>
+            <GcScreen />
+          </View>
+        )}
+        {visitedTabs['MEMO'] && (
+          <View style={{ flex: 1, display: adminTab === 'MEMO' ? 'flex' : 'none' }}>
+            <MemoScreen />
+          </View>
+        )}
+        {visitedTabs['VEHICLES'] && (
+          <View style={{ flex: 1, display: adminTab === 'VEHICLES' ? 'flex' : 'none' }}>
+            {!isDesktop && (
+              <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setAdminTab('MENU')}>
+                <MaterialIcons name="chevron-left" size={20} color={COLORS.primary} />
+                <Text style={styles.backToMenuText}>BACK TO MENU</Text>
+              </TouchableOpacity>
+            )}
+            <VehiclesScreen />
+          </View>
+        )}
+        {visitedTabs['SETTINGS'] && (
+          <View style={{ flex: 1, display: adminTab === 'SETTINGS' ? 'flex' : 'none' }}>
+            {!isDesktop && (
+              <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setAdminTab('MENU')}>
+                <MaterialIcons name="chevron-left" size={20} color={COLORS.primary} />
+                <Text style={styles.backToMenuText}>BACK TO MENU</Text>
+              </TouchableOpacity>
+            )}
+            <SettingsScreen onLogout={handleLogout} />
+          </View>
+        )}
+        {visitedTabs['GPS_VEHICLES'] && (
+          <View style={{ flex: 1, display: adminTab === 'GPS_VEHICLES' ? 'flex' : 'none' }}>
+            {!isDesktop && (
+              <TouchableOpacity style={styles.backToMenuBtn} onPress={() => setAdminTab('MENU')}>
+                <MaterialIcons name="chevron-left" size={20} color={COLORS.primary} />
+                <Text style={styles.backToMenuText}>BACK TO MENU</Text>
+              </TouchableOpacity>
+            )}
+            <GpsVehicleScreen />
+          </View>
+        )}
         {adminTab === 'MENU' && (
           <ScrollView style={styles.menuContainer} contentContainerStyle={styles.menuContent}>
             <Text style={styles.menuTitle}>Control Center Registries</Text>
