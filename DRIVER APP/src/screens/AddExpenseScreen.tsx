@@ -43,7 +43,8 @@ export default function AddExpenseScreen({
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [capturedLocation, setCapturedLocation] = useState<GPSLocation | null>(null);
-  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [receiptImages, setReceiptImages] = useState<string[]>([]); // up to 10 photos
+  const MAX_RECEIPT_PHOTOS = 10;
   const [loadingGps, setLoadingGps] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -189,6 +190,10 @@ export default function AddExpenseScreen({
   };
 
   const handlePickImage = async () => {
+    if (receiptImages.length >= MAX_RECEIPT_PHOTOS) {
+      Alert.alert('Limit Reached', `You can attach a maximum of ${MAX_RECEIPT_PHOTOS} photos per expense.`);
+      return;
+    }
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (permission.status !== 'granted') {
       Alert.alert('Permission Denied', 'Camera permission is required.');
@@ -201,19 +206,27 @@ export default function AddExpenseScreen({
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setReceiptImage(result.assets[0].uri);
+      setReceiptImages(prev => [...prev, result.assets[0].uri].slice(0, MAX_RECEIPT_PHOTOS));
     }
   };
 
   const handleChooseGalleryImage = async () => {
+    if (receiptImages.length >= MAX_RECEIPT_PHOTOS) {
+      Alert.alert('Limit Reached', `You can attach a maximum of ${MAX_RECEIPT_PHOTOS} photos per expense.`);
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.5,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setReceiptImage(result.assets[0].uri);
+      setReceiptImages(prev => [...prev, result.assets[0].uri].slice(0, MAX_RECEIPT_PHOTOS));
     }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setReceiptImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleVoiceInput = async () => {
@@ -279,7 +292,8 @@ export default function AddExpenseScreen({
         reason: selectedCategory === 'FUEL' ? `Fuel Bunk: ${bunkLocation}` : reason,
         liters: selectedCategory === 'FUEL' ? parseFloat(liters) : undefined,
         location: capturedLocation,
-        receiptUri: receiptImage || undefined,
+        receiptUri:  receiptImages[0] || undefined,
+        receiptUris: receiptImages.length > 0 ? receiptImages : undefined,
       };
 
       await db.addExpense(trip.id, newExpense);
@@ -310,7 +324,7 @@ export default function AddExpenseScreen({
     setAmount('');
     setReason('');
     setCapturedLocation(null);
-    setReceiptImage(null);
+    setReceiptImages([]);
     setLiters('');
     setBunkLocation('');
   };
@@ -591,29 +605,47 @@ export default function AddExpenseScreen({
                 )}
               </View>
 
-              {/* Receipt Image Upload Button */}
+              {/* Receipt Photos Upload (up to 10) */}
               <View style={styles.imagePickerContainer}>
-                <TouchableOpacity style={styles.uploadBtn} onPress={handlePickImage}>
-                  <MaterialIcons name="photo-camera" size={24} color={COLORS.primary} />
-                  <Text style={styles.uploadBtnText}>TAKE BILL PHOTO</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.uploadBtn} onPress={handleChooseGalleryImage}>
-                  <MaterialIcons name="photo-library" size={24} color={COLORS.primary} />
-                  <Text style={styles.uploadBtnText}>CHOOSE FROM GALLERY</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}>
+                  <TouchableOpacity
+                    style={[styles.uploadBtn, { flex: 1 }]}
+                    onPress={handlePickImage}
+                    disabled={receiptImages.length >= MAX_RECEIPT_PHOTOS}
+                  >
+                    <MaterialIcons name="photo-camera" size={22} color={receiptImages.length >= MAX_RECEIPT_PHOTOS ? COLORS.textMuted : COLORS.primary} />
+                    <Text style={[styles.uploadBtnText, receiptImages.length >= MAX_RECEIPT_PHOTOS && { color: COLORS.textMuted }]}>TAKE BILL PHOTO</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.uploadBtn, { flex: 1 }]}
+                    onPress={handleChooseGalleryImage}
+                    disabled={receiptImages.length >= MAX_RECEIPT_PHOTOS}
+                  >
+                    <MaterialIcons name="photo-library" size={22} color={receiptImages.length >= MAX_RECEIPT_PHOTOS ? COLORS.textMuted : COLORS.primary} />
+                    <Text style={[styles.uploadBtnText, receiptImages.length >= MAX_RECEIPT_PHOTOS && { color: COLORS.textMuted }]}>CHOOSE GALLERY</Text>
+                  </TouchableOpacity>
+                </View>
 
-                {receiptImage ? (
-                  <View style={styles.imageWrapper}>
-                    <Image source={{ uri: receiptImage }} style={styles.receiptThumb} />
-                    <TouchableOpacity
-                      style={styles.removeImageBtn}
-                      onPress={() => setReceiptImage(null)}
-                    >
-                      <MaterialIcons name="cancel" size={20} color={COLORS.error} />
-                    </TouchableOpacity>
+                <Text style={styles.uploadInfo}>
+                  {receiptImages.length === 0
+                    ? 'Optional: Attach up to 10 bill / receipt photos'
+                    : `${receiptImages.length} / ${MAX_RECEIPT_PHOTOS} photo${receiptImages.length > 1 ? 's' : ''} attached`}
+                </Text>
+
+                {receiptImages.length > 0 && (
+                  <View style={styles.receiptGrid}>
+                    {receiptImages.map((uri, index) => (
+                      <View key={index} style={styles.imageWrapper}>
+                        <Image source={{ uri }} style={styles.receiptThumb} />
+                        <TouchableOpacity
+                          style={styles.removeImageBtn}
+                          onPress={() => handleRemoveImage(index)}
+                        >
+                          <MaterialIcons name="cancel" size={20} color={COLORS.error} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
                   </View>
-                ) : (
-                  <Text style={styles.uploadInfo}>Optional: Upload fuel invoice or expense receipt</Text>
                 )}
               </View>
 
@@ -1005,9 +1037,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     alignSelf: 'center',
   },
+  receiptGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    justifyContent: 'flex-start',
+  },
   receiptThumb: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     borderRadius: 8,
   },
   removeImageBtn: {

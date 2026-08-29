@@ -554,11 +554,12 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
   const renderTripItem = ({ item }: { item: Trip }) => {
     const totalExpenses = item.expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
     const expCount = item.expenses?.length || 0;
+    const isSmall = width < 380;
     return (
       <View style={[styles.tripCard, isDesktop && { flex: 1, marginHorizontal: 4 }]}>
         <TouchableOpacity onPress={() => handleOpenDetails(item)}>
-          <View style={styles.cardHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={[styles.cardHeader, isSmall && { flexWrap: 'wrap', gap: 6 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={styles.tripIdText}>{item.id}</Text>
               {item.isPinned && (
                 <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#f59e0b' }}>
@@ -566,7 +567,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                 </View>
               )}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '15' }]}>
                 <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>{item.status.replace('_', ' ')}</Text>
               </View>
@@ -580,21 +581,21 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
 
           <View style={styles.cardInfoRow}>
             <MaterialIcons name="local-shipping" size={16} color={COLORS.textMuted} />
-            <Text style={styles.cardInfoText}>{item.vehicleNumber} ({item.vehicleType})</Text>
+            <Text style={styles.cardInfoText} numberOfLines={1}>{item.vehicleNumber} ({item.vehicleType})</Text>
           </View>
           
           <View style={styles.cardInfoRow}>
             <MaterialIcons name="person" size={16} color={COLORS.textMuted} />
-            <Text style={styles.cardInfoText}>{item.driverName} (PIN: {item.driverPin || '****'})</Text>
+            <Text style={styles.cardInfoText} numberOfLines={1}>{item.driverName} (PIN: {item.driverPin || '****'})</Text>
           </View>
 
           <View style={styles.routeContainer}>
-            <Text style={styles.routePoint}>{item.startingPoint}</Text>
+            <Text style={styles.routePoint} numberOfLines={1}>{item.startingPoint}</Text>
             <MaterialIcons name="arrow-forward" size={14} color={COLORS.textMuted} style={styles.routeArrow} />
-            <Text style={styles.routePoint}>{item.destination}</Text>
+            <Text style={styles.routePoint} numberOfLines={1}>{item.destination}</Text>
           </View>
 
-          <View style={styles.cardFooter}>
+          <View style={[styles.cardFooter, isSmall && { flexWrap: 'wrap', gap: 6 }]}>
             <Text style={styles.footerLabel}>Freight: <Text style={styles.footerValue}>₹{(item.agreedFreight || 0).toLocaleString()}</Text></Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {expCount > 0 && (
@@ -609,7 +610,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
         </TouchableOpacity>
 
         {/* ── CARD ACTION TOOLS (EDIT, PIN, DOWNLOAD, DELETE) ── */}
-        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: COLORS.outlineVariant, paddingTop: 8, marginTop: 8, justifyContent: 'space-around' }}>
+        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: COLORS.outlineVariant, paddingTop: 8, marginTop: 8, justifyContent: 'space-around', flexWrap: 'wrap', gap: 4 }}>
           <TouchableOpacity onPress={() => handleOpenEdit(item)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4 }}>
             <MaterialIcons name="edit" size={16} color={COLORS.primary} />
             <Text style={{ fontSize: 11, color: COLORS.primary, fontWeight: 'bold' }}>EDIT</Text>
@@ -931,7 +932,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     {selectedTrip.odometerStartPhotoUri.startsWith('file://') || selectedTrip.odometerStartPhotoUri.startsWith('content://') ? (
                       <View style={{ padding: 14, backgroundColor: '#f1f5f9', borderRadius: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center' }}>
                         <MaterialIcons name="cloud-off" size={28} color={COLORS.primary} />
-                        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
                         <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, textAlign: 'center' }}>Start a new trip to test live Supabase Storage image preview!</Text>
                       </View>
                     ) : (
@@ -985,7 +986,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     {selectedTrip.odometerEndPhotoUri.startsWith('file://') || selectedTrip.odometerEndPhotoUri.startsWith('content://') ? (
                       <View style={{ padding: 14, backgroundColor: '#f1f5f9', borderRadius: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center' }}>
                         <MaterialIcons name="cloud-off" size={28} color={COLORS.primary} />
-                        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
                       </View>
                     ) : (
                       <>

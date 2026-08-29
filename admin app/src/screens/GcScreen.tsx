@@ -31,6 +31,7 @@ export default function GcScreen() {
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState<GcNote[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingGcId, setEditingGcId] = useState<string | null>(null);
   
   // Create GC Form Fields
   const [noteNumber, setNoteNumber] = useState('');
@@ -159,8 +160,10 @@ export default function GcScreen() {
   }, []);
 
   useEffect(() => {
-    setNoteNumber(getPreviewGcNoteNumber(gcDate));
-  }, [gcDate, notes]);
+    if (!editingGcId) {
+      setNoteNumber(getPreviewGcNoteNumber(gcDate));
+    }
+  }, [gcDate, notes, editingGcId]);
 
   useEffect(() => {
     if (activeTab === 'ARCHIVE') {
@@ -335,6 +338,49 @@ export default function GcScreen() {
     handlePrintPDF(note.id, note);
   };
 
+  const resetFormFields = () => {
+    setEditingGcId(null);
+    setNoteNumber(getPreviewGcNoteNumber(gcDate));
+    setGcDate(new Date().toISOString().split('T')[0]);
+    setBillNumber('');
+    setFrom('');
+    setTo('');
+    setTruckNumber('');
+    setConsignor('');
+    setConsignee('');
+    setConsignorGst('');
+    setConsigneeGst('');
+    setGstinNumber('33AMTPR8487P2ZM');
+    setPanNumber('AMTPR8487P');
+    setItems(Array.from({ length: 6 }, () => ({ articlesCount: '', description: '', weight: '', value: '' })));
+    setFreight('');
+    setLessAdvance('0');
+    setTaxOption('NONE');
+    setCgstPercent(0);
+    setSgstPercent(0);
+    setIgstPercent(0);
+    setPayableAt('');
+    setPaymentType('');
+    setTaxPayee('Consignor');
+    setDeliveryAt('Door Delivery');
+    setDriverName('');
+    setDriverSignature('');
+    setDlNumber('');
+    setLorryOwner('');
+    setBankAccountName('New Balaji Transport');
+    setBankAccountNumber('118715000014102');
+    setBankIfsc('KVBLO001187');
+    setBankName('Karur Vysya Bank');
+    setBankBranch('Salem - 636 002');
+    setAddressLine1('3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,');
+    setAddressLine2('Kandampatty (Po.), Salem - 636 005. (TN)');
+    setPhone1('94433 51789');
+    setPhone2('93622 51789');
+    setPhone3('97892 71721');
+    setBankDetails('');
+    setTerms('');
+  };
+
   const handleSaveGC = async () => {
     const filledItems: GcItem[] = items
       .filter(item => item.description.trim() || item.articlesCount.trim() || item.weight.trim() || item.value.trim())
@@ -404,66 +450,52 @@ export default function GcScreen() {
         terms: terms.trim(),
       };
 
-      const res = await db.createGcNote(gcData);
-      if (res.success && res.gcNote) {
-        const savedGcId = res.gcNote.id || res.gcNote.noteNumber;
-        showConfirmDialog(
-          'GC Saved Successfully!',
-          `Note ${savedGcId} has been archived & saved to database.`,
-          undefined,
-          'success',
-          'Great!'
-        );
+      if (editingGcId) {
+        const res = await db.updateGcNote(editingGcId, gcData);
+        if (res.success && res.gcNote) {
+          const updatedGcId = res.gcNote.noteNumber || res.gcNote.id || editingGcId;
+          showConfirmDialog(
+            'GC Updated Successfully!',
+            `Note ${updatedGcId} has been updated in database.`,
+            undefined,
+            'success',
+            'Great!'
+          );
 
-        // Clear creation form
-        setNoteNumber('');
-        setGcDate(new Date().toISOString().split('T')[0]);
-        setBillNumber('');
-        setFrom('');
-        setTo('');
-        setTruckNumber('');
-        setConsignor('');
-        setConsignee('');
-        setConsignorGst('');
-        setConsigneeGst('');
-        setGstinNumber('33AMTPR8487P2ZM');
-        setPanNumber('AMTPR8487P');
-        setItems(Array.from({ length: 6 }, () => ({ articlesCount: '', description: '', weight: '', value: '' })));
-        setFreight('');
-        setLessAdvance('0');
-        setTaxOption('NONE');
-        setCgstPercent(0);
-        setSgstPercent(0);
-        setIgstPercent(0);
-        setPayableAt('');
-        setPaymentType('');
-        setTaxPayee('Consignor');
-        setDeliveryAt('Door Delivery');
-        setDriverName('');
-        setDriverSignature('');
-        setDlNumber('');
-        setLorryOwner('');
-        setBankAccountName('New Balaji Transport');
-        setBankAccountNumber('118715000014102');
-        setBankIfsc('KVBLO001187');
-        setBankName('Karur Vysya Bank');
-        setBankBranch('Salem - 636 002');
-        setAddressLine1('3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,');
-        setAddressLine2('Kandampatty (Po.), Salem - 636 005. (TN)');
-        setPhone1('94433 51789');
-        setPhone2('93622 51789');
-        setPhone3('97892 71721');
-
-        // Refresh archive and switch to it so user sees saved note
-        const savedMonthPrefix = getGcPrefix(gcData.date);
-        if (savedMonthPrefix) {
-          setSelectedMonth(savedMonthPrefix);
+          resetFormFields();
+          const savedMonthPrefix = getGcPrefix(gcData.date);
+          if (savedMonthPrefix) {
+            setSelectedMonth(savedMonthPrefix);
+          }
+          await fetchGcNotes();
+          setActiveTab('ARCHIVE');
+        } else {
+          const err = res.error || 'Failed to update consignment note.';
+          showConfirmDialog('Update Error', err, undefined, 'danger', 'OK');
         }
-        await fetchGcNotes();
-        setActiveTab('ARCHIVE');
       } else {
-        const err = res.error || 'Failed to create consignment note.';
-        showConfirmDialog('Save Error', err, undefined, 'danger', 'OK');
+        const res = await db.createGcNote(gcData);
+        if (res.success && res.gcNote) {
+          const savedGcId = res.gcNote.id || res.gcNote.noteNumber;
+          showConfirmDialog(
+            'GC Saved Successfully!',
+            `Note ${savedGcId} has been archived & saved to database.`,
+            undefined,
+            'success',
+            'Great!'
+          );
+
+          resetFormFields();
+          const savedMonthPrefix = getGcPrefix(gcData.date);
+          if (savedMonthPrefix) {
+            setSelectedMonth(savedMonthPrefix);
+          }
+          await fetchGcNotes();
+          setActiveTab('ARCHIVE');
+        } else {
+          const err = res.error || 'Failed to create consignment note.';
+          showConfirmDialog('Save Error', err, undefined, 'danger', 'OK');
+        }
       }
     } catch (e) {
       showConfirmDialog('Connection Error', 'Connection to backend failed.', undefined, 'danger', 'OK');
@@ -550,17 +582,28 @@ export default function GcScreen() {
     const itemRows = Array.from({ length: 6 }).map((_, idx) => {
       const item = safeItems[idx] || { articlesCount: '', description: '', weight: '', value: '' };
       const valNum = safeNum(item.value);
+      const valStr = item.value !== undefined && item.value !== null && String(item.value).trim() !== '' ? valNum.toFixed(2) : '';
+      const wtStr = item.weight !== undefined && item.weight !== null && String(item.weight).trim() !== '' ? String(item.weight) : '';
+      const countStr = item.articlesCount !== undefined && item.articlesCount !== null && String(item.articlesCount).trim() !== '' ? String(item.articlesCount) : '';
+
       return `
-        <div class="table-row">
-          <div class="table-cell cell-small">${item.articlesCount || ''}</div>
-          <div class="table-cell cell-large">${item.description || ''}</div>
-          <div class="table-cell cell-small">${item.weight || ''}</div>
-          <div class="table-cell cell-small">${item.value !== undefined && item.value !== null && String(item.value) !== '' ? valNum.toFixed(2) : ''}</div>
-        </div>
+        <tr>
+          <td style="width: 16%; text-align: center;">${countStr}</td>
+          <td style="width: 50%; text-align: left; padding-left: 8px;">${item.description || ''}</td>
+          <td style="width: 17%; text-align: right; padding-right: 8px;">${wtStr}</td>
+          <td style="width: 17%; text-align: right; padding-right: 8px;">${valStr}</td>
+        </tr>
       `;
     }).join('');
 
     const totalValue = safeItems.reduce((sum, item) => sum + safeNum(item?.value), 0);
+    const taxPayeeLower = (note.taxPayee || (note as any).gstPayee || '').toLowerCase();
+    const paymentTypeUpper = (note.paymentType || '').toUpperCase();
+
+    const fVal = safeNum(note.freight);
+    const cgstP = fVal > 0 && safeNum(note.cgst) > 0 ? `(${((safeNum(note.cgst) / fVal) * 100).toFixed(1).replace(/\.0$/, '')}%)` : '';
+    const sgstP = fVal > 0 && safeNum(note.sgst) > 0 ? `(${((safeNum(note.sgst) / fVal) * 100).toFixed(1).replace(/\.0$/, '')}%)` : '';
+    const igstP = fVal > 0 && safeNum(note.igst) > 0 ? `(${((safeNum(note.igst) / fVal) * 100).toFixed(1).replace(/\.0$/, '')}%)` : '';
 
     return `
       <!DOCTYPE html>
@@ -568,78 +611,436 @@ export default function GcScreen() {
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>GC Note - ${note.noteNumber || note.id || ''}</title>
         <style>
-          @page { size: A4 landscape; margin: 8mm; }
+          @page {
+            size: A4 landscape;
+            margin: 5mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body {
             margin: 0;
-            font-family: Arial, sans-serif;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
             color: #0f172a;
             background: #ffffff;
-            word-break: break-word;
-            overflow-wrap: anywhere;
+            font-size: 11px;
+            line-height: 1.25;
           }
           .page {
             width: 100%;
-            max-width: 297mm;
-            min-height: 210mm;
-            padding: 12mm;
-            box-sizing: border-box;
+            max-width: 287mm;
+            min-height: 198mm;
             margin: 0 auto;
+            padding: 4mm;
+            background: #ffffff;
           }
-          .frame { border: 3px solid #0f172a; min-height: 100%; padding: 10px; box-sizing: border-box; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-          .header-left { display: flex; align-items: center; gap: 14px; }
-          .logo-mark { width: 100px; height: 100px; border: 3px solid #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 900; letter-spacing: 0.8px; }
-          .header-title { flex: 1.4; text-align: center; }
-          .top-name { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
-          .main-title { font-size: 42px; font-weight: 900; letter-spacing: 2px; margin: 0; }
-          .subtitle { font-size: 12px; font-weight: 700; margin: 8px 0 0; }
-          .badge { display: inline-block; margin-top: 10px; background: #0f172a; color: #ffffff; padding: 8px 18px; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; }
-          .header-right { width: 260px; align-self: flex-start; border: 1px solid #0f172a; border-radius: 10px; padding: 12px; }
-          .header-right p { font-size: 11px; line-height: 1.4; margin: 0; }
-          .phone-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
-          .fields { margin-top: 10px; border: 2px solid #0f172a; border-top: none; }
-          .row { display: flex; }
-          .field-block { flex: 1; border-top: 1px solid #0f172a; border-right: 1px solid #0f172a; padding: 10px; }
-          .field-block:last-child { border-right: none; }
-          .field-label { font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
-          .field-value { font-size: 12px; padding-bottom: 4px; border-bottom: 1px solid #0f172a; min-height: 18px; }
-          .table-container { display: flex; border: 2px solid #0f172a; margin-top: 12px; }
-          .table-left { flex: 1; }
-          .table-header { display: flex; background: #0f172a; color: #ffffff; font-size: 11px; font-weight: 700; }
-          .table-row { display: flex; border-bottom: 1px solid #0f172a; min-height: 34px; }
-          .table-cell { padding: 10px 8px; border-right: 1px solid #0f172a; display: flex; align-items: center; word-break: break-word; overflow-wrap: anywhere; }
-          .table-cell:last-child { border-right: none; }
-          .cell-small { width: 110px; }
-          .cell-large { flex: 1.9; }
-          .field-value, .amount-value, .info-grid, .route-bar { word-break: break-word; overflow-wrap: anywhere; }
-          .value-row { margin-top: 6px; font-size: 11px; font-weight: 700; }
-          .table-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-top: 1px solid #0f172a; background: #f8fafc; }
-          .table-footer span { font-size: 11px; font-weight: 700; }
-          .amount-panel { width: 260px; margin-left: 10px; display: flex; flex-direction: column; gap: 10px; }
-          .amount-box { border: 2px solid #0f172a; }
-          .amount-row { display: flex; align-items: center; border-bottom: 1px solid #0f172a; padding: 8px 10px; font-size: 11px; }
-          .amount-row:last-child { border-bottom: none; }
-          .amount-label { flex: 1.6; font-weight: 700; }
-          .amount-value { flex: 1; text-align: right; }
-          .gst-box { border: 2px solid #0f172a; padding: 10px; }
-          .gst-title { font-size: 11px; font-weight: 700; margin-bottom: 8px; }
-          .gst-item { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 11px; }
-          .gst-data { margin-top: 10px; font-size: 12px; font-weight: 700; line-height: 1.4; }
-          .footer-note { margin-top: 10px; border-top: 1px solid #0f172a; padding-top: 10px; font-size: 10px; line-height: 1.4; }
-          .footer-note-secondary { margin-top: 6px; font-size: 9.8px; line-height: 1.4; }
-          .signature-row { display: flex; gap: 10px; margin-top: 14px; }
-          .signature-box { flex: 1; border: 1px solid #0f172a; border-radius: 6px; padding: 10px; min-height: 60px; }
-          .signature-label { font-size: 10px; font-weight: 700; margin-bottom: 6px; }
-          .signature-line { border-top: 1px dashed #0f172a; margin-top: 12px; }
-          .authorise-row { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-top: 10px; }
-          .authorise-text { font-size: 11px; font-weight: 700; margin-bottom: 6px; }
-          .authorise-signature { width: 110px; height: auto; display: block; margin: 0 auto 6px; }
-          .authorise-label { font-size: 10px; font-weight: 700; }
+          .frame {
+            border: 2.5px solid #0f172a;
+            padding: 8px;
+            background: #ffffff;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #0f172a;
+          }
+          .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100px;
+          }
+          .logo-mark {
+            width: 76px;
+            height: 76px;
+            border: 2.5px solid #0f172a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            color: #0f172a;
+          }
+          .header-title {
+            flex: 1;
+            text-align: center;
+          }
+          .top-name {
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 2px;
+            letter-spacing: 0.5px;
+          }
+          .main-title {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            margin: 0;
+            line-height: 1.1;
+            color: #0f172a;
+          }
+          .subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            margin: 4px 0 0;
+            color: #334155;
+          }
+          .badge {
+            display: inline-block;
+            margin-top: 6px;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 4px 14px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+          }
+          .header-right {
+            width: 255px;
+            align-self: flex-start;
+            border: 1.5px solid #0f172a;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 10px;
+          }
+          .header-right p {
+            margin: 0;
+            line-height: 1.35;
+            font-weight: 600;
+          }
+          .phone-list {
+            margin-top: 5px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.4;
+          }
+          .fields-grid {
+            margin-top: 6px;
+            border: 1.5px solid #0f172a;
+          }
+          .grid-row {
+            display: flex;
+            border-bottom: 1px solid #0f172a;
+          }
+          .grid-row:last-child {
+            border-bottom: none;
+          }
+          .field-block {
+            border-right: 1px solid #0f172a;
+            padding: 4px 6px;
+            min-height: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          .field-block:last-child {
+            border-right: none;
+          }
+          .field-label {
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #475569;
+            margin-bottom: 2px;
+          }
+          .field-value {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #0f172a;
+            word-break: break-word;
+          }
+          .table-container {
+            display: flex;
+            border: 1.5px solid #0f172a;
+            margin-top: 6px;
+            gap: 0;
+          }
+          .table-left {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1.5px solid #0f172a;
+          }
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10.5px;
+          }
+          .items-table th {
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 5px 4px;
+            border-right: 1px solid #334155;
+            text-align: center;
+          }
+          .items-table th:last-child {
+            border-right: none;
+          }
+          .items-table td {
+            border-bottom: 1px solid #0f172a;
+            border-right: 1px solid #0f172a;
+            padding: 4px;
+            height: 22px;
+            font-size: 10.5px;
+            font-weight: 600;
+          }
+          .items-table td:last-child {
+            border-right: none;
+          }
+          .table-footer-label {
+            font-weight: 800;
+            text-align: right;
+            padding-right: 8px !important;
+            background: #f8fafc;
+            border-bottom: none !important;
+          }
+          .table-footer-value {
+            font-weight: 800;
+            text-align: right;
+            padding-right: 8px !important;
+            background: #f8fafc;
+            border-bottom: none !important;
+          }
+          .bank-box {
+            border-top: 1.5px solid #0f172a;
+            padding: 6px 8px;
+            background: #f8fafc;
+            flex: 1;
+          }
+          .bank-box-title {
+            font-size: 9.5px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+          }
+          .bank-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 10px;
+            font-size: 10px;
+            line-height: 1.35;
+          }
+          .bank-row {
+            display: flex;
+            gap: 4px;
+          }
+          .bank-row strong {
+            color: #334155;
+            min-width: 65px;
+          }
+          .amount-panel {
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          .amount-box {
+            border-bottom: 1.5px solid #0f172a;
+          }
+          .amount-header-row {
+            display: flex;
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 5px 8px;
+          }
+          .amount-header-title {
+            flex: 1.3;
+          }
+          .amount-header-rs {
+            flex: 1;
+            text-align: right;
+          }
+          .amount-row {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 3.5px 8px;
+            font-size: 10.5px;
+          }
+          .amount-row:last-child {
+            border-bottom: none;
+          }
+          .amount-label {
+            flex: 1.3;
+            font-weight: 700;
+            color: #1e293b;
+          }
+          .amount-val-col {
+            flex: 1;
+            text-align: right;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .highlight-row {
+            background: #f1f5f9;
+            font-weight: 800;
+            border-top: 1px solid #0f172a;
+            border-bottom: 1px solid #0f172a;
+          }
+          .balance-row {
+            background: #e2e8f0;
+            font-weight: 900;
+            border-top: 1px solid #0f172a;
+          }
+          .payable-row {
+            background: #f8fafc;
+            border-top: 1px solid #0f172a;
+            font-size: 10px;
+          }
+          .gst-box {
+            padding: 6px 8px;
+            font-size: 10px;
+            background: #ffffff;
+          }
+          .gst-title {
+            font-size: 9.5px;
+            font-weight: 800;
+            margin-bottom: 4px;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+          }
+          .gst-checkboxes {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+          }
+          .gst-item {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 9.5px;
+            font-weight: 700;
+          }
+          .box-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 12px;
+            height: 12px;
+            border: 1.5px solid #0f172a;
+            font-size: 10px;
+            font-weight: 900;
+            line-height: 1;
+            background: #ffffff;
+            color: #0f172a;
+          }
+          .gst-meta-row {
+            font-size: 9.5px;
+            line-height: 1.35;
+            margin-top: 2px;
+          }
+          .footer-note {
+            margin-top: 6px;
+            border-top: 1.5px solid #0f172a;
+            padding-top: 5px;
+            font-size: 10px;
+            line-height: 1.35;
+          }
+          .terms-text {
+            margin-top: 3px;
+            font-size: 9px;
+            color: #334155;
+          }
+          .footer-note-secondary {
+            margin-top: 3px;
+            font-size: 8.5px;
+            line-height: 1.25;
+            color: #475569;
+          }
+          .bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 6px;
+            gap: 10px;
+          }
+          .signature-row {
+            flex: 1;
+            display: flex;
+            gap: 6px;
+          }
+          .signature-box {
+            flex: 1;
+            border: 1px solid #0f172a;
+            border-radius: 4px;
+            padding: 4px 6px;
+            min-height: 52px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          .signature-label {
+            font-size: 8.5px;
+            font-weight: 800;
+            color: #475569;
+          }
+          .signature-line {
+            border-top: 1px dashed #94a3b8;
+            margin: 2px 0;
+          }
+          .signature-val {
+            font-size: 10px;
+            font-weight: 700;
+            color: #0f172a;
+            min-height: 14px;
+          }
+          .authorise-row {
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border: 1px solid #0f172a;
+            border-radius: 4px;
+            padding: 4px;
+            background: #f8fafc;
+          }
+          .authorise-text {
+            font-size: 9.5px;
+            font-weight: 800;
+            color: #0f172a;
+          }
+          .authorise-signature {
+            max-height: 38px;
+            width: auto;
+            display: block;
+            margin: 2px auto;
+          }
+          .authorise-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: #475569;
+          }
           @media print {
-            body { background: #ffffff; }
-            .page { width: 100%; max-width: none; margin: 0; padding: 0; }
-            .frame { min-height: 0; }
+            body {
+              background: #ffffff;
+            }
+            .page {
+              width: 100% !important;
+              max-width: none !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            .frame {
+              border-width: 2px;
+              padding: 6px;
+            }
           }
         </style>
       </head>
@@ -657,66 +1058,64 @@ export default function GcScreen() {
                 <div class="badge">GOODS CONSIGNMENT / CONSIGNEE COPY</div>
               </div>
               <div class="header-right">
-                <p>3/131, V.K.V.Complex, 1st Floor,<br />Bangalore Bye Pass Road,<br />Kandampatty (Po.), Salem - 636 005. (TN)</p>
-                <div class="phone-row">☎ 94433 51789</div>
-                <div class="phone-row">☎ 93622 51789</div>
-                <div class="phone-row">☎ 97892 71721</div>
+                <p>${note.addressLine1 || '3/131, V.K.V.Complex, 1st Floor,'}<br />${note.addressLine2 || 'Bangalore Bye Pass Road, Kandampatty (Po.), Salem - 636 005. (TN)'}</p>
+                <div class="phone-list">
+                  <div>☎ ${note.phone1 || '94433 51789'}</div>
+                  <div>☎ ${note.phone2 || '93622 51789'}</div>
+                  <div>☎ ${note.phone3 || '97892 71721'}</div>
+                </div>
               </div>
             </div>
 
-            <div class="fields">
-              <div class="row">
-                <div class="field-block">
+            <div class="fields-grid">
+              <div class="grid-row">
+                <div class="field-block" style="flex: 1.2;">
                   <div class="field-label">From</div>
                   <div class="field-value">${note.from || ''}</div>
                 </div>
-                <div class="field-block">
+                <div class="field-block" style="flex: 1;">
                   <div class="field-label">Truck No.</div>
                   <div class="field-value">${note.truckNumber || ''}</div>
                 </div>
-                <div class="field-block">
+                <div class="field-block" style="flex: 1.1;">
                   <div class="field-label">G.C. Note No.</div>
-                  <div class="field-value">${note.noteNumber || note.id || ''}</div>
+                  <div class="field-value" style="font-weight: 800; color: #b91c1c;">${note.noteNumber || note.id || ''}</div>
                 </div>
               </div>
-              <div class="row">
-                <div class="field-block">
+              <div class="grid-row">
+                <div class="field-block" style="flex: 1.2;">
                   <div class="field-label">To</div>
                   <div class="field-value">${note.to || ''}</div>
                 </div>
-                <div class="field-block">
+                <div class="field-block" style="flex: 1;">
                   <div class="field-label">Date</div>
                   <div class="field-value">${note.date || ''}</div>
                 </div>
-                <div class="field-block">
+                <div class="field-block" style="flex: 1.1;">
                   <div class="field-label">As Per Bill No.</div>
                   <div class="field-value">${note.billNumber || ''}</div>
                 </div>
               </div>
-              <div class="row">
-                <div class="field-block">
+              <div class="grid-row">
+                <div class="field-block" style="flex: 1.5;">
                   <div class="field-label">Consignor M/s.</div>
                   <div class="field-value">${note.consignor || ''}</div>
                 </div>
-                <div class="field-block">
+                <div class="field-block" style="flex: 1.5;">
                   <div class="field-label">Consignee M/s.</div>
                   <div class="field-value">${note.consignee || ''}</div>
                 </div>
-                <div class="field-block">
+              </div>
+              <div class="grid-row">
+                <div class="field-block" style="flex: 1.1;">
                   <div class="field-label">Consignor GSTIN</div>
                   <div class="field-value">${note.consignorGst || ''}</div>
                 </div>
-              </div>
-              <div class="row">
-                <div class="field-block">
+                <div class="field-block" style="flex: 1.1;">
                   <div class="field-label">Consignee GSTIN</div>
                   <div class="field-value">${note.consigneeGst || ''}</div>
                 </div>
-                <div class="field-block">
-                  <div class="field-label">GSTIN</div>
-                  <div class="field-value">${note.gstinNumber || ''}</div>
-                </div>
-                <div class="field-block">
+                <div class="field-block" style="flex: 1;">
                   <div class="field-label">PAN No.</div>
                   <div class="field-value">${note.pan || ''}</div>
                 </div>
@@ -725,65 +1124,132 @@ export default function GcScreen() {
 
             <div class="table-container">
               <div class="table-left">
-                <div class="table-row table-header">
-                  <div class="table-cell cell-small">No. of Articles</div>
-                  <div class="table-cell cell-large">Description of Goods<br />(Said to Contain)</div>
-                  <div class="table-cell cell-small">Weight</div>
-                  <div class="table-cell cell-small">Value (Rs.)</div>
-                </div>
-                ${itemRows}
-                <div class="table-footer">
-                  <span>Value Rs.</span>
-                  <span>${totalValue.toFixed(2)}</span>
-                </div>
-                <div class="field-block" style="margin-top: 10px; border: 1px solid #0f172a;">
-                  <div class="field-label">BANK DETAILS</div>
-                  <div style="font-size:11px; line-height:1.4;">
-                    A/C Name : ${note.bankAccountName || ''}<br />
-                    A/C No. : ${note.bankAccountNumber || ''}<br />
-                    IFSC Code : ${note.bankIfsc || ''}<br />
-                    Bank : ${note.bankName || ''}<br />
-                    Branch : ${note.bankBranch || ''}
+                <table class="items-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 16%;">No. of Articles</th>
+                      <th style="width: 50%;">Description of Goods<br /><span style="font-size:8.5px; font-weight:normal;">(Said to Contain)</span></th>
+                      <th style="width: 17%;">Weight</th>
+                      <th style="width: 17%;">Value (Rs.)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemRows}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="3" class="table-footer-label">Value Rs.</td>
+                      <td class="table-footer-value">${totalValue > 0 ? totalValue.toFixed(2) : '0.00'}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+                
+                <div class="bank-box">
+                  <div class="bank-box-title">BANK DETAILS</div>
+                  <div class="bank-grid">
+                    <div class="bank-row"><strong>A/C Name:</strong> <span>${note.bankAccountName || 'New Balaji Transport'}</span></div>
+                    <div class="bank-row"><strong>A/C No.:</strong> <span>${note.bankAccountNumber || '118715000014102'}</span></div>
+                    <div class="bank-row"><strong>IFSC Code:</strong> <span>${note.bankIfsc || 'KVBLO001187'}</span></div>
+                    <div class="bank-row"><strong>Bank:</strong> <span>${note.bankName || 'Karur Vysya Bank'}</span></div>
+                    <div class="bank-row" style="grid-column: span 2;"><strong>Branch:</strong> <span>${note.bankBranch || 'Salem - 636 002'}</span></div>
                   </div>
                 </div>
               </div>
+
               <div class="amount-panel">
                 <div class="amount-box">
-                  <div class="amount-row"><div class="amount-label">Freight</div><div class="amount-value">${safeNum(note.freight).toFixed(2)}</div></div>
-                  <div class="amount-row"><div class="amount-label">CGST</div><div class="amount-value">${safeNum(note.cgst).toFixed(2)}</div></div>
-                  <div class="amount-row"><div class="amount-label">SGST</div><div class="amount-value">${safeNum(note.sgst).toFixed(2)}</div></div>
-                  <div class="amount-row"><div class="amount-label">IGST</div><div class="amount-value">${safeNum(note.igst).toFixed(2)}</div></div>
-                  <div class="amount-row"><div class="amount-label">TOTAL</div><div class="amount-value">${safeNum(note.total).toFixed(2)}</div></div>
-                  <div class="amount-row"><div class="amount-label">Less Advance</div><div class="amount-value">${safeNum(note.lessAdvance).toFixed(2)}</div></div>
-                  <div class="amount-row"><div class="amount-label">BALANCE</div><div class="amount-value">${safeNum(note.balance).toFixed(2)}</div></div>
+                  <div class="amount-header-row">
+                    <div class="amount-header-title">AMOUNT</div>
+                    <div class="amount-header-rs">Rs. &nbsp;&nbsp;&nbsp; Ps.</div>
+                  </div>
+                  <div class="amount-row">
+                    <div class="amount-label">Freight Amount</div>
+                    <div class="amount-val-col">${safeNum(note.freight) > 0 ? safeNum(note.freight).toFixed(2) : '0.00'}</div>
+                  </div>
+                  <div class="amount-row">
+                    <div class="amount-label">CGST ${cgstP}</div>
+                    <div class="amount-val-col">${safeNum(note.cgst) > 0 ? safeNum(note.cgst).toFixed(2) : '0.00'}</div>
+                  </div>
+                  <div class="amount-row">
+                    <div class="amount-label">SGST ${sgstP}</div>
+                    <div class="amount-val-col">${safeNum(note.sgst) > 0 ? safeNum(note.sgst).toFixed(2) : '0.00'}</div>
+                  </div>
+                  <div class="amount-row">
+                    <div class="amount-label">IGST ${igstP}</div>
+                    <div class="amount-val-col">${safeNum(note.igst) > 0 ? safeNum(note.igst).toFixed(2) : '0.00'}</div>
+                  </div>
+                  <div class="amount-row highlight-row">
+                    <div class="amount-label">TOTAL AMOUNT</div>
+                    <div class="amount-val-col">${safeNum(note.total) > 0 ? safeNum(note.total).toFixed(2) : '0.00'}</div>
+                  </div>
+                  <div class="amount-row">
+                    <div class="amount-label">Less Advance</div>
+                    <div class="amount-val-col">${safeNum(note.lessAdvance) > 0 ? safeNum(note.lessAdvance).toFixed(2) : '0.00'}</div>
+                  </div>
+                  <div class="amount-row balance-row">
+                    <div class="amount-label">BALANCE DUE</div>
+                    <div class="amount-val-col">${safeNum(note.balance).toFixed(2)}</div>
+                  </div>
+                  <div class="amount-row payable-row">
+                    <div class="amount-label">Payable At</div>
+                    <div class="amount-val-col" style="font-weight: 700;">${note.payableAt || ''}</div>
+                  </div>
                 </div>
+
                 <div class="gst-box">
                   <div class="gst-title">GST TAX PAY</div>
-                  <div class="gst-item"><div class="checkbox"></div><div>Transport</div></div>
-                  <div class="gst-item"><div class="checkbox"></div><div>Consignor</div></div>
-                  <div class="gst-item"><div class="checkbox"></div><div>Consignee</div></div>
-                  <div class="gst-data">GSTIN<br />${note.gstinNumber || ''}</div>
-                  <div class="gst-data">PAN No.<br />${note.pan || ''}</div>
-                  <div class="gst-data">Delivery At<br />${note.deliveryAt || ''}</div>
+                  <div class="gst-checkboxes">
+                    <div class="gst-item"><span class="box-check">${taxPayeeLower === 'transport' ? '✓' : ''}</span> Transport</div>
+                    <div class="gst-item"><span class="box-check">${taxPayeeLower === 'consignor' ? '✓' : ''}</span> Consignor</div>
+                    <div class="gst-item"><span class="box-check">${taxPayeeLower === 'consignee' ? '✓' : ''}</span> Consignee</div>
+                  </div>
+                  <div class="gst-meta-row"><strong>GSTIN:</strong> ${note.gstinNumber || '33AMTPR8487P2ZM'}</div>
+                  <div class="gst-meta-row"><strong>PAN No.:</strong> ${note.pan || 'AMTPR8487P'}</div>
+                  <div class="gst-meta-row"><strong>Delivery At:</strong> ${note.deliveryAt || 'Door Delivery'}</div>
                 </div>
               </div>
             </div>
 
-            <div class="footer-note">Payment Type: TBB ☐&nbsp;&nbsp;TO PAY ☐&nbsp;&nbsp;PAID ☐
-              <div style="margin-top: 8px;">These Goods are Booked at Owners risk and Insured by Consignor / Consignee. Subject to Salem Jurisdiction only.</div>
+            <div class="footer-note">
+              <strong>PAYMENT TYPE:</strong>&nbsp;&nbsp;&nbsp;&nbsp;
+              <span class="box-check">${paymentTypeUpper === 'TBB' ? '✓' : ''}</span> TBB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <span class="box-check">${paymentTypeUpper === 'TO_PAY' ? '✓' : ''}</span> TO PAY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <span class="box-check">${paymentTypeUpper === 'PAID' ? '✓' : ''}</span> PAID
+              <div class="terms-text">These Goods are Booked at Owners risk and Insured by Consignor / Consignee. Subject to Salem Jurisdiction only.</div>
             </div>
-            <div class="footer-note-secondary">Certified that the service provided is by a Goods Transport Agency (GTA). GST on this service is payable by the Recipient (Consignee) under Reverse Charge Mechanism (RCM) pursuant to Notification No. 13/2017-Central Tax (Rate), and no tax has been charged by the transporter.</div>
+            <div class="footer-note-secondary">
+              Certified that the service provided is by a Goods Transport Agency (GTA). GST on this service is payable by the Recipient (Consignee) under Reverse Charge Mechanism (RCM) pursuant to Notification No. 13/2017-Central Tax (Rate), and no tax has been charged by the transporter.
+            </div>
 
-            <div class="signature-row">
-              <div class="signature-box"><div class="signature-label">DRIVER'S NAME</div><div class="signature-line"></div><div style="font-size:11px; margin-top:6px;">${note.driverName || ''}</div></div>
-              <div class="signature-box"><div class="signature-label">DRIVER'S SIGNATURE</div><div class="signature-line"></div><div style="font-size:11px; margin-top:6px;">${note.driverSignature || ''}</div></div>
-              <div class="signature-box"><div class="signature-label">DL. No.</div><div class="signature-line"></div><div style="font-size:11px; margin-top:6px;">${note.dlNumber || ''}</div></div>
-              <div class="signature-box"><div class="signature-label">LORRY OWNER</div><div class="signature-line"></div><div style="font-size:11px; margin-top:6px;">${note.lorryOwner || ''}</div></div>
-            </div>
-            <div class="authorise-row">
-              <div class="authorise-text">For NEW BALAJI TRANSPORT</div>
-              <img class="authorise-signature" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
-              <div class="authorise-label">Authorised Signatory</div>
+            <div class="bottom-bar">
+              <div class="signature-row">
+                <div class="signature-box">
+                  <div class="signature-label">DRIVER'S NAME</div>
+                  <div class="signature-line"></div>
+                  <div class="signature-val">${note.driverName || ''}</div>
+                </div>
+                <div class="signature-box">
+                  <div class="signature-label">DRIVER'S SIGNATURE</div>
+                  <div class="signature-line"></div>
+                  <div class="signature-val">${note.driverSignature || ''}</div>
+                </div>
+                <div class="signature-box">
+                  <div class="signature-label">DL. No.</div>
+                  <div class="signature-line"></div>
+                  <div class="signature-val">${note.dlNumber || ''}</div>
+                </div>
+                <div class="signature-box">
+                  <div class="signature-label">LORRY OWNER</div>
+                  <div class="signature-line"></div>
+                  <div class="signature-val">${note.lorryOwner || ''}</div>
+                </div>
+              </div>
+
+              <div class="authorise-row">
+                <div class="authorise-text">For NEW BALAJI TRANSPORT</div>
+                <img class="authorise-signature" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
+                <div class="authorise-label">Authorised Signatory</div>
+              </div>
             </div>
           </div>
         </div>
@@ -847,6 +1313,70 @@ export default function GcScreen() {
       console.error('Download error:', error);
       Alert.alert('Error', 'Unable to generate the PDF.');
     }
+  };
+
+  const handleEditGc = (n: GcNote) => {
+    setEditingGcId(n.id);
+    setNoteNumber(n.noteNumber || n.id);
+    setGcDate(n.date || new Date().toISOString().split('T')[0]);
+    setBillNumber(n.billNumber || '');
+    setFrom(n.from || '');
+    setTo(n.to || '');
+    setTruckNumber(n.truckNumber || '');
+    setConsignor(n.consignor || '');
+    setConsignee(n.consignee || '');
+    setConsignorGst(n.consignorGst || '');
+    setConsigneeGst(n.consigneeGst || '');
+    setGstinNumber(n.gstinNumber || '33AMTPR8487P2ZM');
+    setPanNumber(n.pan || 'AMTPR8487P');
+
+    const rawItems = Array.isArray(n.items) ? n.items : [];
+    const loadedItems = Array.from({ length: Math.max(6, rawItems.length) }, (_, i) => {
+      const item = rawItems[i];
+      return {
+        articlesCount: item && item.articlesCount !== undefined && item.articlesCount !== null ? String(item.articlesCount) : '',
+        description: item ? (item.description || '') : '',
+        weight: item && item.weight !== undefined && item.weight !== null ? String(item.weight) : '',
+        value: item && item.value !== undefined && item.value !== null ? String(item.value) : '',
+      };
+    });
+    setItems(loadedItems);
+
+    setFreight(n.freight ? n.freight.toString() : '');
+    setLessAdvance(n.lessAdvance !== undefined && n.lessAdvance !== null ? n.lessAdvance.toString() : '0');
+    
+    const f = Number(n.freight) || 0;
+    const cgstP = f && n.cgst ? Math.round((n.cgst / f) * 100 * 100) / 100 : 0;
+    const sgstP = f && n.sgst ? Math.round((n.sgst / f) * 100 * 100) / 100 : 0;
+    const igstP = f && n.igst ? Math.round((n.igst / f) * 100 * 100) / 100 : 0;
+
+    setCgstPercent(cgstP);
+    setSgstPercent(sgstP);
+    setIgstPercent(igstP);
+    setTaxOption(n.cgst > 0 || n.sgst > 0 ? 'CGST_SGST' : n.igst > 0 ? 'IGST' : 'NONE');
+
+    setPayableAt(n.payableAt || '');
+    setPaymentType(((n.paymentType as any) || '') as any);
+    setTaxPayee(((n.taxPayee || (n as any).gstPayee || 'Consignor') as any));
+    setDeliveryAt(n.deliveryAt || 'Door Delivery');
+    setDriverName(n.driverName || '');
+    setDriverSignature(n.driverSignature || '');
+    setDlNumber(n.dlNumber || '');
+    setLorryOwner(n.lorryOwner || '');
+    setBankAccountName(n.bankAccountName || 'New Balaji Transport');
+    setBankAccountNumber(n.bankAccountNumber || '118715000014102');
+    setBankIfsc(n.bankIfsc || 'KVBLO001187');
+    setBankName(n.bankName || 'Karur Vysya Bank');
+    setBankBranch(n.bankBranch || 'Salem - 636 002');
+    setAddressLine1(n.addressLine1 || '3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,');
+    setAddressLine2(n.addressLine2 || 'Kandampatty (Po.), Salem - 636 005. (TN)');
+    setPhone1(n.phone1 || '94433 51789');
+    setPhone2(n.phone2 || '93622 51789');
+    setPhone3(n.phone3 || '97892 71721');
+    setBankDetails(n.bankDetails || '');
+    setTerms(n.terms || '');
+
+    setActiveTab('CREATE');
   };
 
   const handleDuplicate = (n: GcNote) => {
@@ -988,6 +1518,21 @@ export default function GcScreen() {
       {activeTab === 'CREATE' ? (
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.gcWrapper}>
+            {editingGcId && (
+              <View style={styles.editingBanner}>
+                <View style={styles.editingBannerLeft}>
+                  <MaterialIcons name="edit" size={20} color="#1e40af" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.editingBannerTitle}>Editing Saved GC Note: {noteNumber || editingGcId}</Text>
+                    <Text style={styles.editingBannerSub}>Modify details below and click UPDATE GC NOTE to save changes.</Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.cancelEditBtn} onPress={resetFormFields}>
+                  <MaterialIcons name="close" size={16} color="#dc2626" />
+                  <Text style={styles.cancelEditBtnText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <View style={[styles.gcPage, !isDesktop && { padding: 10, borderRadius: 8 }]}>
               <View style={[styles.gcHeader, !isDesktop && { flexDirection: 'column', alignItems: 'center', gap: 16 }]}>
                 <View style={[styles.gcHeaderBrand, !isDesktop && { borderRightWidth: 0, paddingRight: 0, alignItems: 'center' }]}>
@@ -1317,7 +1862,7 @@ export default function GcScreen() {
 
             <View style={[styles.formBottomBar, !isDesktop && { flexDirection: 'column', gap: 10, height: 'auto', marginBottom: 32 }]}>
               <TouchableOpacity
-                style={[styles.actionBtnLarge, styles.saveBtnStyle, loading && { opacity: 0.6 }]}
+                style={[styles.actionBtnLarge, editingGcId ? styles.updateBtnStyle : styles.saveBtnStyle, loading && { opacity: 0.6 }]}
                 onPress={handleSaveGC}
                 disabled={loading}
               >
@@ -1325,8 +1870,8 @@ export default function GcScreen() {
                   <ActivityIndicator color="#ffffff" size="small" />
                 ) : (
                   <>
-                    <MaterialIcons name="save" size={18} color="#ffffff" />
-                    <Text style={styles.actionBtnLargeText}>SAVE NOTE</Text>
+                    <MaterialIcons name={editingGcId ? "check-circle" : "save"} size={18} color="#ffffff" />
+                    <Text style={styles.actionBtnLargeText}>{editingGcId ? "UPDATE GC NOTE" : "SAVE NOTE"}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1461,6 +2006,10 @@ export default function GcScreen() {
                     <TouchableOpacity style={styles.actionBtn} onPress={async () => { await db.togglePinGc(item.id); fetchGcNotes(); }}>
                       <MaterialIcons name="push-pin" size={16} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
                       <Text style={[styles.actionBtnText, { color: item.isPinned ? '#d97706' : COLORS.textMuted }]}>{item.isPinned ? 'UNPIN' : 'PIN'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionBtn, { borderColor: '#bfdbfe', backgroundColor: '#eff6ff' }]} onPress={() => handleEditGc(item)}>
+                      <MaterialIcons name="edit" size={16} color="#2563eb" />
+                      <Text style={[styles.actionBtnText, { color: '#2563eb' }]}>EDIT</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => handleDownloadPDF(item.id, item)}>
                       <MaterialIcons name="file-download" size={16} color="#0e7490" />
@@ -2563,11 +3112,59 @@ const styles = StyleSheet.create({
   saveBtnStyle: {
     backgroundColor: '#047857',
   },
+  updateBtnStyle: {
+    backgroundColor: '#2563eb',
+  },
   downloadBtnStyle: {
     backgroundColor: '#0e7490',
   },
   printBtnStyle: {
     backgroundColor: '#6d28d9',
+  },
+  editingBanner: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#93c5fd',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    gap: 10,
+    ...SHADOWS.light,
+  },
+  editingBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  editingBannerTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1e40af',
+  },
+  editingBannerSub: {
+    fontSize: 11,
+    color: '#3b82f6',
+    marginTop: 2,
+  },
+  cancelEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fee2e2',
+    borderColor: '#fca5a5',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  cancelEditBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#dc2626',
   },
   actionBtnLargeText: {
     color: '#ffffff',

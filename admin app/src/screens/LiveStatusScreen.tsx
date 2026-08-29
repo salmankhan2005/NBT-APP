@@ -415,6 +415,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: SPACING.gutter,
     paddingBottom: 96,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
   loader: {
     marginVertical: 48,

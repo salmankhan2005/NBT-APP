@@ -891,7 +891,13 @@ export default function SettingsScreen({ onLogout }: SettingsScreenProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.gutter, paddingBottom: 64 },
+  content: {
+    padding: SPACING.gutter,
+    paddingBottom: 64,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+  },
   screenTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.primary, marginBottom: 16 },
   card: {
     backgroundColor: '#ffffff', borderRadius: 8,

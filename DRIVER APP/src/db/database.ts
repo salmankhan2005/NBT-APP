@@ -71,7 +71,8 @@ export interface Expense {
   reason?: string;
   liters?: number;
   location?: GPSLocation;
-  receiptUri?: string;
+  receiptUri?: string;      // legacy: first/primary photo
+  receiptUris?: string[];   // new: up to 10 expense photos
   timestamp: string;
 }
 
@@ -1137,18 +1138,25 @@ class DatabaseService {
     const trip = this.cache.find(t => t.id === tripId);
     if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return null;
 
-    const rawReceiptUri = expense.receiptUri ? sanitizeInput(expense.receiptUri) : undefined;
-    const initialReceiptUrl = normalizeImageUrl(rawReceiptUri) || rawReceiptUri;
+    // Support up to 10 receipt photos
+    const MAX_RECEIPT_PHOTOS = 10;
+    const rawReceiptUris = [
+      ...(expense.receiptUri ? [sanitizeInput(expense.receiptUri)] : []),
+      ...(expense.receiptUris ? expense.receiptUris.map(u => sanitizeInput(u)).filter(Boolean) : []),
+    ].filter((v, i, arr) => arr.indexOf(v) === i).slice(0, MAX_RECEIPT_PHOTOS) as string[];
+
+    const initialUris = rawReceiptUris.map(u => normalizeImageUrl(u) || u);
 
     const newExpense: Expense = {
-      id:        `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      timestamp: new Date().toLocaleTimeString(),
-      category:  expense.category,
-      amount:    expense.amount,
-      reason:    sanitizeInput(expense.reason),
-      liters:    expense.liters,
-      receiptUri: initialReceiptUrl,
-      location:  expense.location
+      id:          `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp:   new Date().toLocaleTimeString(),
+      category:    expense.category,
+      amount:      expense.amount,
+      reason:      sanitizeInput(expense.reason),
+      liters:      expense.liters,
+      receiptUri:  initialUris[0],
+      receiptUris: initialUris,
+      location:    expense.location
         ? {
             latitude:    expense.location.latitude,
             longitude:   expense.location.longitude,
@@ -1163,17 +1171,24 @@ class DatabaseService {
     trip.expenses.push(newExpense);
     await this.notify();
 
-    // Perform image upload and backend API sync asynchronously in background
+    // Perform image uploads and backend API sync asynchronously in background
     (async () => {
       try {
-        let hostedReceiptUrl: string | undefined = undefined;
-        if (rawReceiptUri) {
-          const uploadedReceiptUrl = await this.uploadLocalImage(rawReceiptUri);
-          if (uploadedReceiptUrl && (uploadedReceiptUrl.startsWith('http') || uploadedReceiptUrl.startsWith('/api') || uploadedReceiptUrl.startsWith('data:image/'))) {
-            hostedReceiptUrl = uploadedReceiptUrl;
-            newExpense.receiptUri = hostedReceiptUrl;
-            await this.notify();
-          }
+        // Upload all receipt photos in parallel
+        const hostedUrls: string[] = [];
+        await Promise.all(
+          rawReceiptUris.map(async (rawUri) => {
+            const uploaded = await this.uploadLocalImage(rawUri);
+            if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
+              hostedUrls.push(uploaded);
+            }
+          })
+        );
+
+        if (hostedUrls.length > 0) {
+          newExpense.receiptUri  = hostedUrls[0];
+          newExpense.receiptUris = hostedUrls;
+          await this.notify();
         }
 
         if (this.currentToken) {
@@ -1184,12 +1199,13 @@ class DatabaseService {
               Authorization: `Bearer ${this.currentToken}`
             },
             body: JSON.stringify({
-              category: expense.category,
-              amount: expense.amount,
-              reason: expense.reason ? sanitizeInput(expense.reason) : undefined,
-              liters: expense.liters,
-              location: expense.location,
-              receiptUrl: hostedReceiptUrl || undefined,
+              category:    expense.category,
+              amount:      expense.amount,
+              reason:      expense.reason ? sanitizeInput(expense.reason) : undefined,
+              liters:      expense.liters,
+              location:    expense.location,
+              receiptUrl:  hostedUrls[0] || undefined,
+              receiptUrls: hostedUrls.length > 0 ? hostedUrls : undefined,
             })
           });
         }

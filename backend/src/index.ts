@@ -127,6 +127,31 @@ async function bootstrap() {
     await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS profit_or_loss NUMERIC DEFAULT 0`;
     // Auto-migrate: trips table receipt url column on expenses
     await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_url TEXT`;
+    // Auto-migrate: expenses multi-photo support (up to 10 per expense)
+    await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_urls JSONB NOT NULL DEFAULT '[]'`;
+    await sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'chk_expenses_receipt_urls_max10'
+          AND conrelid = 'expenses'::regclass
+        ) THEN
+          ALTER TABLE expenses
+            ADD CONSTRAINT chk_expenses_receipt_urls_max10
+            CHECK (jsonb_array_length(receipt_urls) <= 10);
+        END IF;
+      END;
+      $$
+    `;
+    // Backfill: migrate existing single receipt_url into receipt_urls array
+    await sql`
+      UPDATE expenses
+      SET receipt_urls = jsonb_build_array(receipt_url)
+      WHERE receipt_url IS NOT NULL
+        AND receipt_url <> ''
+        AND (receipt_urls = '[]'::jsonb OR receipt_urls IS NULL)
+    `;
     // Auto-migrate: trips table driver pin
     await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS driver_pin TEXT`;
     // Auto-migrate: odometer start url

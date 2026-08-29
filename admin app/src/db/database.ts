@@ -270,18 +270,44 @@ export interface ManagedVehicle {
   rcFrontUrl?: string;
   rcBackUrl?: string;
   insuranceUrl?: string;
+  insuranceIssueDate?: string;
   insuranceExpiryDate?: string;
   pollutionUrl?: string;
+  pollutionIssueDate?: string;
   pollutionExpiryDate?: string;
   permitUrl?: string;
+  permitIssueDate?: string;
   permitExpiryDate?: string;
+  nationalPermitUrl?: string;
+  nationalPermitIssueDate?: string;
+  nationalPermitExpiryDate?: string;
+  fiveYearPermitUrl?: string;
+  fiveYearPermitIssueDate?: string;
+  fiveYearPermitExpiryDate?: string;
+  quarterTaxUrl?: string;
+  quarterTaxIssueDate?: string;
+  quarterTaxExpiryDate?: string;
   fcUrl?: string;
+  fcIssueDate?: string;
   fcExpiryDate?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export type DocType = 'RC' | 'RC_FRONT' | 'RC_BACK' | 'INSURANCE' | 'POLLUTION' | 'ROAD_TAX' | 'FITNESS' | 'PERMIT' | 'FC' | 'OTHER';
+export type DocType =
+  | 'RC'
+  | 'RC_FRONT'
+  | 'RC_BACK'
+  | 'FC'
+  | 'INSURANCE'
+  | 'NATIONAL_PERMIT'
+  | 'FIVE_YEAR_PERMIT'
+  | 'QUARTER_TAX'
+  | 'POLLUTION'
+  | 'ROAD_TAX'
+  | 'FITNESS'
+  | 'PERMIT'
+  | 'OTHER';
 export type DocumentExpiryStatus = 'VALID' | 'EXPIRING_IN_7_DAYS' | 'EXPIRING_SOON' | 'EXPIRED' | 'DATE_NOT_AVAILABLE';
 
 export interface VehicleDocument {
@@ -2003,15 +2029,18 @@ class AdminDatabase {
         });
       }
 
-      const fallbackDocMap: Array<{ field: 'fcExpiryDate' | 'insuranceExpiryDate' | 'pollutionExpiryDate' | 'permitExpiryDate'; docType: DocType; docLabel: string }> = [
+      const fallbackDocMap: Array<{ field: keyof ManagedVehicle; docType: DocType; docLabel: string }> = [
         { field: 'fcExpiryDate', docType: 'FC', docLabel: 'FC Certificate' },
-        { field: 'insuranceExpiryDate', docType: 'INSURANCE', docLabel: 'Insurance' },
+        { field: 'insuranceExpiryDate', docType: 'INSURANCE', docLabel: 'Insurance Policy' },
+        { field: 'nationalPermitExpiryDate', docType: 'NATIONAL_PERMIT', docLabel: 'National Permit' },
+        { field: 'fiveYearPermitExpiryDate', docType: 'FIVE_YEAR_PERMIT', docLabel: '5 Years Permit' },
+        { field: 'quarterTaxExpiryDate', docType: 'QUARTER_TAX', docLabel: 'Quarter Tax' },
         { field: 'pollutionExpiryDate', docType: 'POLLUTION', docLabel: 'Pollution Certificate' },
         { field: 'permitExpiryDate', docType: 'PERMIT', docLabel: 'Permit' },
       ];
 
       for (const fallback of fallbackDocMap) {
-        const fallbackExpiry = vehicle[fallback.field];
+        const fallbackExpiry = vehicle[fallback.field] as string | undefined;
         if (!fallbackExpiry || relevantDocs.some((doc) => doc.docType === fallback.docType)) continue;
         relevantDocs.push({
           docType: fallback.docType,
@@ -2353,6 +2382,46 @@ class AdminDatabase {
 
     this.notify();
     return Promise.resolve({ success: true, gcNote: newNote });
+  }
+
+  async updateGcNote(id: string, gcData: any): Promise<{ success: boolean; gcNote?: GcNote; error?: string }> {
+    const existingIdx = this.mockGcNotes.findIndex(n => n.id === id || n.noteNumber === id);
+    const prefixInfo = this.getGcPrefix(gcData.date);
+    const noteId = id || gcData.noteNumber || gcData.id;
+    const finalNoteNumber = gcData.noteNumber?.trim() || (existingIdx !== -1 ? (this.mockGcNotes[existingIdx].noteNumber || this.mockGcNotes[existingIdx].id) : noteId);
+
+    const updatedNote: GcNote = {
+      ...(existingIdx !== -1 ? this.mockGcNotes[existingIdx] : {}),
+      ...gcData,
+      id: noteId,
+      noteNumber: finalNoteNumber,
+      createdAt: existingIdx !== -1 ? this.mockGcNotes[existingIdx].createdAt : new Date().toISOString(),
+      gcYear: prefixInfo ? prefixInfo.year : undefined,
+      gcMonth: prefixInfo ? prefixInfo.month : undefined,
+    };
+
+    if (existingIdx !== -1) {
+      this.mockGcNotes[existingIdx] = updatedNote;
+    } else {
+      this.mockGcNotes.unshift(updatedNote);
+    }
+
+    await this.persistGcNotes();
+
+    try {
+      await this.authFetch(`${API_HOST}/api/gc`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedNote)
+      });
+    } catch (err) {
+      console.warn('[AdminDB] updateGcNote API error:', err);
+    }
+
+    this.notify();
+    return Promise.resolve({ success: true, gcNote: updatedNote });
   }
 
   async deleteGcNote(id: string): Promise<{ success: boolean }> {

@@ -18,6 +18,8 @@ import { db, API_HOST } from '../db/database';
 type BookingEntry = {
   id: string;
   profit_date: string;
+  name?: string;
+  vehicle_number?: string;
   from_point: string;
   destination_point: string;
   load_freight: number;
@@ -32,6 +34,8 @@ type BookingEntry = {
 };
 
 type BookingFormState = {
+  name: string;
+  vehicleNumber: string;
   fromPoint: string;
   destinationPoint: string;
   loadFreight: string;
@@ -50,6 +54,8 @@ type ProfitSummaryState = {
 
 
 const createEmptyForm = (): BookingFormState => ({
+  name: '',
+  vehicleNumber: '',
   fromPoint: '',
   destinationPoint: '',
   loadFreight: '',
@@ -249,6 +255,8 @@ export default function LorryBookingScreen() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          name: form.name.trim(),
+          vehicleNumber: form.vehicleNumber.trim().toUpperCase(),
           fromPoint: form.fromPoint.trim(),
           destinationPoint: form.destinationPoint.trim(),
           loadFreight: parseAmount(form.loadFreight),
@@ -305,6 +313,29 @@ export default function LorryBookingScreen() {
           <View style={styles.rowBetween}>
             <Text style={styles.label}>Date</Text>
             <Text style={styles.valueText}>{todayLabel}</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={form.name}
+              onChangeText={(value) => updateField('name', value)}
+              placeholder="e.g. Rajan / NBT Transports"
+              placeholderTextColor={COLORS.textMuted}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Vehicle Number</Text>
+            <TextInput
+              style={styles.input}
+              value={form.vehicleNumber}
+              onChangeText={(value) => updateField('vehicleNumber', value.toUpperCase())}
+              placeholder="e.g. TN 38 AB 1234"
+              autoCapitalize="characters"
+              placeholderTextColor={COLORS.textMuted}
+            />
           </View>
 
           <View style={styles.inputGroup}>
@@ -488,6 +519,23 @@ export default function LorryBookingScreen() {
                   </View>
                 </View>
 
+                {(entry.name || entry.vehicle_number) ? (
+                  <View style={styles.entryMetaRow}>
+                    {entry.name ? (
+                      <View style={styles.entryMetaChip}>
+                        <MaterialIcons name="person" size={11} color={COLORS.primary} />
+                        <Text style={styles.entryMetaText}>{entry.name}</Text>
+                      </View>
+                    ) : null}
+                    {entry.vehicle_number ? (
+                      <View style={styles.entryMetaChip}>
+                        <MaterialIcons name="local-shipping" size={11} color={COLORS.primary} />
+                        <Text style={styles.entryMetaText}>{entry.vehicle_number}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 <View style={styles.entryGrid}>
                   <View style={styles.entryGridItem}>
                     <Text style={styles.entryGridLabel}>Load Freight</Text>
@@ -530,7 +578,10 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.gutter,
-    paddingBottom: 32,
+    paddingBottom: 48,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
   },
   pageHeaderCard: {
     flexDirection: 'row',
@@ -807,5 +858,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textDark,
+  },
+  entryMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  entryMetaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  entryMetaText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
 });
