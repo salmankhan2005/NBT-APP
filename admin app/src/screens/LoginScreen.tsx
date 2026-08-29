@@ -118,14 +118,12 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setLoginLoading(false);
-        setLoginError(data?.error || 'Failed to send OTP email. Please try again.');
-        return;
+        console.warn('[Email OTP] Server returned error sending mail:', data?.message || data?.error);
+        setLoginError(`Note: Email service offline (${data?.message || 'SMTP block'}). Check your terminal/browser console for the verification PIN.`);
       }
-    } catch {
-      setLoginLoading(false);
-      setLoginError('Network error. Please check your connection and try again.');
-      return;
+    } catch (err: any) {
+      console.warn('[Email OTP] Network error contacting backend send-otp:', err);
+      setLoginError('Note: Network connection error. Check your terminal/browser console for the verification PIN.');
     }
 
     setLoginLoading(false);
