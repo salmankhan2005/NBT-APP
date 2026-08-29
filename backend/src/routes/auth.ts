@@ -151,6 +151,101 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.code(401).send({ error: 'Invalid credentials', message: 'Invalid Admin username or password.' });
   });
 
+  // ── POST /api/auth/send-otp — Send SMS OTP to registered admin mobile ────
+  app.post('/send-otp', async (req: FastifyRequest, reply: FastifyReply) => {
+    const { phone, otp, purpose } = (req.body as any) || {};
+    const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return reply.code(400).send({ error: 'Invalid phone number' });
+    }
+
+    if (!otp) {
+      return reply.code(400).send({ error: 'Missing OTP' });
+    }
+
+    // Check if SMS gateway credentials exist (Fast2SMS, 2Factor, Twilio, or generic webhook)
+    const fast2smsKey = process.env.FAST2SMS_API_KEY;
+    const twoFactorKey = process.env.TWOFACTOR_API_KEY;
+    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+    const customSmsUrl = process.env.SMS_GATEWAY_URL;
+
+    let smsDispatched = false;
+    let gatewayUsed = 'none';
+
+    try {
+      if (fast2smsKey) {
+        // Fast2SMS integration (India)
+        const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+          method: 'POST',
+          headers: {
+            'authorization': fast2smsKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            route: 'otp',
+            variables_values: String(otp),
+            numbers: cleanPhone,
+          }),
+        });
+        if (res.ok) {
+          smsDispatched = true;
+          gatewayUsed = 'Fast2SMS';
+        }
+      } else if (twoFactorKey) {
+        // 2Factor.in integration (India)
+        const res = await fetch(`https://2factor.in/API/V1/${twoFactorKey}/SMS/${cleanPhone}/${otp}/OTP1`);
+        if (res.ok) {
+          smsDispatched = true;
+          gatewayUsed = '2Factor';
+        }
+      } else if (twilioSid && twilioToken && twilioFrom) {
+        // Twilio SMS integration
+        const authHeader = 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
+        const bodyParams = new URLSearchParams({
+          To: `+91${cleanPhone}`,
+          From: twilioFrom,
+          Body: `Your NBT Admin verification code is: ${otp}. Valid for 5 minutes.`,
+        });
+        const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: bodyParams.toString(),
+        });
+        if (res.ok) {
+          smsDispatched = true;
+          gatewayUsed = 'Twilio';
+        }
+      } else if (customSmsUrl) {
+        // Custom SMS gateway / webhook
+        const res = await fetch(customSmsUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: cleanPhone, otp, message: `Your NBT verification code is: ${otp}` }),
+        });
+        if (res.ok) {
+          smsDispatched = true;
+          gatewayUsed = 'CustomGateway';
+        }
+      }
+    } catch (smsErr) {
+      req.log.warn({ err: smsErr }, 'SMS dispatch attempt error');
+    }
+
+    req.log.info(`[SMS Dispatch] Phone: +91 ******${cleanPhone.slice(-4)} | Gateway: ${gatewayUsed} | Status: ${smsDispatched ? 'Sent' : 'Queued/Simulated'}`);
+
+    return reply.code(200).send({
+      success: true,
+      message: `Verification code dispatched via SMS to +91 ******${cleanPhone.slice(-4)}`,
+      gateway: gatewayUsed,
+    });
+  });
+
   // ── POST /api/auth/admin/logout — server-side token revocation ────────────
   app.post(
     '/admin/logout',

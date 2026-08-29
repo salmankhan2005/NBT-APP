@@ -182,13 +182,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setOtpSent(true);
     setOtpResendTimer(60);
     setScreen('VERIFY_OTP');
-
-    // Display alert with verification OTP for instant access
-    Alert.alert(
-      'Security Verification OTP',
-      `OTP code sent to +91 ${cleanPhone}:\n\n${generatedOtp}\n\nPlease enter this 4-digit code to reset your Admin PIN.`,
-      [{ text: 'ENTER OTP' }]
-    );
   }, [phoneNumber, triggerShake]);
 
   // ── Verify OTP ──
@@ -504,28 +497,19 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               <View style={styles.divider} />
 
               <View style={styles.otpSentBanner}>
-                <MaterialIcons name="check-circle" size={18} color="#16a34a" />
+                <MaterialIcons name="sms" size={20} color="#16a34a" />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.otpSentTitle}>OTP Sent to {maskPhoneNumber(phoneNumber)}</Text>
+                  <Text style={styles.otpSentTitle}>SMS Sent to {maskPhoneNumber(phoneNumber)}</Text>
                   <Text style={styles.otpSentText}>
-                    Please enter the 4-digit code below to proceed with PIN reset.
+                    Please enter the 4-digit verification code sent to your mobile number via SMS.
                   </Text>
                 </View>
               </View>
 
-              {!!otp && (
-                <View style={styles.codeHintBox}>
-                  <MaterialIcons name="vpn-key" size={15} color="#1e40af" />
-                  <Text style={styles.codeHintText}>
-                    Active OTP: <Text style={styles.codeHintValue}>{otp}</Text>
-                  </Text>
-                </View>
-              )}
-
               {renderErrorBox(otpError)}
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>ENTER 4-DIGIT OTP</Text>
+                <Text style={styles.inputLabel}>ENTER 4-DIGIT OTP *</Text>
                 <View style={styles.inputRow}>
                   <View style={styles.inputIconBox}>
                     <MaterialIcons name="pin" size={20} color={COLORS.primary} />
@@ -554,7 +538,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               >
                 <MaterialIcons name="refresh" size={16} color={COLORS.secondary} />
                 <Text style={styles.resendText}>
-                  {otpResendTimer > 0 ? `Request new code in ${otpResendTimer}s` : 'Generate New OTP'}
+                  {otpResendTimer > 0 ? `Resend SMS in ${otpResendTimer}s` : 'Resend SMS OTP'}
                 </Text>
               </TouchableOpacity>
 
