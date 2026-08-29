@@ -1038,30 +1038,7 @@ class AdminDatabase {
     if (this.token && this.token !== 'local-fallback-token') {
       return this.token;
     }
-    // Attempt automatic login to acquire a fresh JWT token
-    try {
-      const response = await fetch(`${API_HOST}/api/auth/admin/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trackingId: this.currentUsername || 'admin', pin: '9999' }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.token) {
-          this.token = data.token;
-          this.currentUsername = data.username || this.currentUsername || 'admin';
-          try {
-            await AsyncStorage.setItem('admin_session_token', this.token!);
-            await AsyncStorage.setItem('admin_username', this.currentUsername!);
-          } catch {
-            await AsyncStorage.setItem('admin_session_token_web', this.token!);
-            await AsyncStorage.setItem('admin_username_web', this.currentUsername!);
-          }
-          return this.token;
-        }
-      }
-    } catch {}
-    return this.token;
+    return null;
   }
 
   private async fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
