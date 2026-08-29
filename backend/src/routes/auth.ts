@@ -19,6 +19,9 @@ function getMailTransporter() {
     if (gmailUser && gmailPass) {
       mailTransporter = nodemailer.createTransport({
         service: 'gmail',
+        connectionTimeout: 4000, // 4 seconds timeout
+        greetingTimeout: 4000,
+        socketTimeout: 8000,
         auth: {
           user: gmailUser,
           pass: gmailPass,

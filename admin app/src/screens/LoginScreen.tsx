@@ -107,6 +107,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     setLoginLoading(true);
     const generatedOtp = generateOtp();
     setOtp(generatedOtp);
+    console.log('🔑 [Admin OTP Debug] Generated Verification PIN:', generatedOtp);
 
     try {
       const url = `${API_HOST}/api/auth/send-otp`;
