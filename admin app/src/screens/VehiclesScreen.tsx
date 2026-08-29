@@ -446,8 +446,9 @@ export default function VehiclesScreen() {
       Alert.alert('Missing Field', 'Please enter the RC / Vehicle Registration Number.');
       return;
     }
-    if (!chassisNumber.trim() || chassisNumber.trim().length < 4) {
-      Alert.alert('Invalid Chassis Number', 'Please enter the last 4 digits of the chassis number.');
+    const trimmedChassis = chassisNumber.trim();
+    if (trimmedChassis && trimmedChassis.length < 4) {
+      Alert.alert('Invalid Chassis Number', 'Please enter the last 4 digits of the chassis number (or leave it blank).');
       return;
     }
 
@@ -1106,7 +1107,7 @@ export default function VehiclesScreen() {
 
               <View style={formCols === 2 ? styles.inputRow : undefined}>
                 <View style={[styles.inputGroup, formCols === 2 && { flex: 1 }]}>
-                  <Text style={styles.label}>CHASSIS NUMBER (LAST 4 DIGITS) *</Text>
+                  <Text style={styles.label}>CHASSIS NUMBER (LAST 4 DIGITS)</Text>
                   <View style={styles.inputWithIcon}>
                     <MaterialIcons name="tag" size={15} color="#94a3b8" style={styles.inputIcon} />
                     <TextInput
@@ -1664,7 +1665,7 @@ export default function VehiclesScreen() {
               </View>
 
               <View style={[styles.inputGroup, !isPhone && { flex: 1 }]}>
-                <Text style={styles.label}>EXPIRE DATE (YYYY-MM-DD) *</Text>
+                <Text style={styles.label}>EXPIRE DATE (YYYY-MM-DD)</Text>
                 <View style={styles.dateInputWrapper}>
                   <MaterialIcons name="event-busy" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
                   <TextInput

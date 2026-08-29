@@ -153,4 +153,130 @@ export async function lorryBookingRoutes(app: FastifyInstance) {
       totalProfit,
     });
   });
+
+  app.put('/:id', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as Record<string, unknown>;
+
+    const fromPoint = String(body.fromPoint || '').trim();
+    const destinationPoint = String(body.destinationPoint || '').trim();
+    const name = String(body.name || '').trim();
+    const vehicleNumber = String(body.vehicleNumber || '').trim().toUpperCase();
+
+    if (!fromPoint || !destinationPoint) {
+      return reply.code(400).send({ success: false, error: 'From Point and Destination Point are required.' });
+    }
+
+    const loadFreight = toCurrencyNumber(body.loadFreight);
+    const lorryFreight = toCurrencyNumber(body.lorryFreight);
+    const coolie = toCurrencyNumber(body.coolie);
+    const commissionFreight = toCurrencyNumber(body.commissionFreight);
+    const expenses = toCurrencyNumber(body.expenses);
+
+    if (loadFreight < 0 || lorryFreight < 0 || coolie < 0 || commissionFreight < 0 || expenses < 0) {
+      return reply.code(400).send({ success: false, error: 'Financial values cannot be negative.' });
+    }
+
+    const grossFreight = loadFreight - lorryFreight;
+    const totalFreight = grossFreight + coolie + commissionFreight;
+    const bookingProfit = totalFreight - expenses;
+
+    try {
+      // 1. Fetch old entry profit details
+      const oldRows = await sql`
+        SELECT profit, profit_date::text as profit_date
+        FROM lorry_booking_entries
+        WHERE id = ${id}
+      `;
+
+      if (oldRows.length === 0) {
+        return reply.code(404).send({ success: false, error: 'Booking not found.' });
+      }
+
+      const oldProfit = Number(oldRows[0].profit || 0);
+      const oldDate = oldRows[0].profit_date;
+
+      // 2. Update entry
+      await sql`
+        UPDATE lorry_booking_entries
+        SET name = ${name},
+            vehicle_number = ${vehicleNumber},
+            from_point = ${fromPoint},
+            destination_point = ${destinationPoint},
+            load_freight = ${loadFreight},
+            lorry_freight = ${lorryFreight},
+            gross_freight = ${grossFreight},
+            coolie = ${coolie},
+            commission_freight = ${commissionFreight},
+            total_freight = ${totalFreight},
+            expenses = ${expenses},
+            profit = ${bookingProfit},
+            updated_at = now()
+        WHERE id = ${id}
+      `;
+
+      // 3. Update daily profit by the difference
+      const diff = bookingProfit - oldProfit;
+      const result = await sql`
+        INSERT INTO lorry_booking_daily_profits (profit_date, total_profit, created_at, updated_at)
+        VALUES (${oldDate}, ${diff}, now(), now())
+        ON CONFLICT (profit_date) DO UPDATE SET
+          total_profit = lorry_booking_daily_profits.total_profit + ${diff},
+          updated_at = now()
+        RETURNING total_profit
+      `;
+
+      return reply.code(200).send({
+        success: true,
+        bookingProfit,
+        dailyProfit: Number(result[0]?.total_profit || 0),
+      });
+    } catch (error) {
+      app.log.error(error);
+      return reply.code(500).send({ success: false, error: 'Unable to update booking. Please try again.' });
+    }
+  });
+
+  app.delete('/:id', authHook, async (req: FastifyRequest, reply: FastifyReply) => {
+    const { id } = req.params as { id: string };
+
+    try {
+      // 1. Fetch old entry profit details
+      const oldRows = await sql`
+        SELECT profit, profit_date::text as profit_date
+        FROM lorry_booking_entries
+        WHERE id = ${id}
+      `;
+
+      if (oldRows.length === 0) {
+        return reply.code(404).send({ success: false, error: 'Booking not found.' });
+      }
+
+      const oldProfit = Number(oldRows[0].profit || 0);
+      const oldDate = oldRows[0].profit_date;
+
+      // 2. Delete entry
+      await sql`
+        DELETE FROM lorry_booking_entries
+        WHERE id = ${id}
+      `;
+
+      // 3. Update daily profit
+      const result = await sql`
+        UPDATE lorry_booking_daily_profits
+        SET total_profit = total_profit - ${oldProfit},
+            updated_at = now()
+        WHERE profit_date = ${oldDate}
+        RETURNING total_profit
+      `;
+
+      return reply.code(200).send({
+        success: true,
+        dailyProfit: Number(result[0]?.total_profit || 0),
+      });
+    } catch (error) {
+      app.log.error(error);
+      return reply.code(500).send({ success: false, error: 'Unable to delete booking. Please try again.' });
+    }
+  });
 }

@@ -9,6 +9,7 @@ import {
   Platform,
   FlatList,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -131,6 +132,7 @@ function getAdminToken(): string {
 
 export default function LorryBookingScreen() {
   const [form, setForm] = useState<BookingFormState>(createEmptyForm);
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [todayProfit, setTodayProfit] = useState<number>(0);
@@ -248,8 +250,14 @@ export default function LorryBookingScreen() {
 
     try {
       const token = getAdminToken();
-      let response = await fetch(`${API_HOST}/api/lorry-booking`, {
-        method: 'POST',
+      const isEditing = editingBookingId !== null;
+      const url = isEditing
+        ? `${API_HOST}/api/lorry-booking/${editingBookingId}`
+        : `${API_HOST}/api/lorry-booking`;
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -269,23 +277,94 @@ export default function LorryBookingScreen() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error || 'Unable to save booking. Please try again.');
+        throw new Error(data?.error || `Unable to ${isEditing ? 'update' : 'save'} booking. Please try again.`);
       }
 
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
-        throw new Error(data?.error || 'Unable to save booking. Please try again.');
+        throw new Error(data?.error || `Unable to ${isEditing ? 'update' : 'save'} booking. Please try again.`);
       }
 
       const bookingProfit = Number(data.bookingProfit ?? 0);
       setTodayProfit(Number(data.dailyProfit ?? 0));
-      setMessage(`Booking Profit: ${formatCurrency(bookingProfit)}`);
+      setMessage(isEditing ? 'Booking updated successfully.' : `Booking Profit: ${formatCurrency(bookingProfit)}`);
       setForm(createEmptyForm());
+      setEditingBookingId(null);
       void loadEntries();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save booking. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleEditBooking = (entry: BookingEntry) => {
+    setEditingBookingId(entry.id);
+    setForm({
+      name: entry.name || '',
+      vehicleNumber: entry.vehicle_number || '',
+      fromPoint: entry.from_point,
+      destinationPoint: entry.destination_point,
+      loadFreight: String(entry.load_freight),
+      lorryFreight: String(entry.lorry_freight),
+      coolie: String(entry.coolie),
+      commissionFreight: String(entry.commission_freight),
+      expenses: String(entry.expenses),
+    });
+    setError(null);
+    setMessage(null);
+  };
+
+  const handleDeleteBooking = async (id: string) => {
+    if (Platform.OS === 'web') {
+      const confirmDelete = window.confirm('Are you sure you want to delete this lorry booking?');
+      if (!confirmDelete) return;
+      await executeDelete(id);
+    } else {
+      Alert.alert(
+        'Delete Booking',
+        'Are you sure you want to delete this lorry booking?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => executeDelete(id),
+          },
+        ]
+      );
+    }
+  };
+
+  const executeDelete = async (id: string) => {
+    try {
+      const token = getAdminToken();
+      const response = await fetch(`${API_HOST}/api/lorry-booking/${id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || 'Unable to delete booking.');
+      }
+
+      const data = await response.json().catch(() => null);
+      if (data?.success) {
+        if (editingBookingId === id) {
+          setEditingBookingId(null);
+          setForm(createEmptyForm());
+        }
+        setMessage('Booking deleted successfully.');
+        void loadEntries();
+        if (data.dailyProfit !== undefined) {
+          setTodayProfit(Number(data.dailyProfit || 0));
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete booking.');
     }
   };
 
@@ -435,9 +514,27 @@ export default function LorryBookingScreen() {
             <Text style={styles.profitHighlightValue}>{formatCurrency(profit)}</Text>
           </View>
 
+          {editingBookingId !== null && (
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: '#64748b', marginBottom: 10 }]}
+              onPress={() => {
+                setEditingBookingId(null);
+                setForm(createEmptyForm());
+                setError(null);
+                setMessage(null);
+              }}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons name="cancel" size={18} color="#ffffff" />
+              <Text style={styles.saveButtonText}>Cancel Edit</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity style={[styles.saveButton, isSaving && styles.disabledButton]} onPress={handleSave} activeOpacity={0.85} disabled={isSaving}>
-            <MaterialIcons name="save-alt" size={18} color="#ffffff" />
-            <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Booking'}</Text>
+            <MaterialIcons name={editingBookingId !== null ? 'check-circle' : 'save-alt'} size={18} color="#ffffff" />
+            <Text style={styles.saveButtonText}>
+              {isSaving ? (editingBookingId !== null ? 'Updating...' : 'Saving...') : (editingBookingId !== null ? 'Update Booking' : 'Save Booking')}
+            </Text>
           </TouchableOpacity>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -561,6 +658,24 @@ export default function LorryBookingScreen() {
                     <Text style={styles.entryGridLabel}>Date</Text>
                     <Text style={styles.entryGridValue}>{formatDisplayDate(entry.profit_date)}</Text>
                   </View>
+                </View>
+
+                <View style={styles.entryActionRow}>
+                  <TouchableOpacity
+                    style={styles.entryActionBtn}
+                    onPress={() => handleEditBooking(entry)}
+                  >
+                    <MaterialIcons name="edit" size={14} color={COLORS.primary} />
+                    <Text style={styles.entryActionBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                  <View style={styles.actionDivider} />
+                  <TouchableOpacity
+                    style={styles.entryActionBtn}
+                    onPress={() => handleDeleteBooking(entry.id)}
+                  >
+                    <MaterialIcons name="delete" size={14} color="#dc2626" />
+                    <Text style={[styles.entryActionBtnText, { color: '#dc2626' }]}>Delete</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ))
@@ -880,5 +995,33 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.primary,
+  },
+  entryActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+    marginTop: 10,
+    paddingTop: 8,
+    gap: 16,
+  },
+  entryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  entryActionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  actionDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: COLORS.outlineVariant,
   },
 });
