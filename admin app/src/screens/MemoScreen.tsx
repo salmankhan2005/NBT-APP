@@ -939,30 +939,30 @@ const MemoScreen = () => {
           {/* Formatting Toolbar */}
           <View style={[styles.toolbarRow, { width: isDesktop ? pageWidth : '100%' }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarScroll}>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('bold')} title="Bold">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('bold')}>
                 <MaterialIcons name="format-bold" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('italic')} title="Italic">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('italic')}>
                 <MaterialIcons name="format-italic" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('underline')} title="Underline">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('underline')}>
                 <MaterialIcons name="format-underlined" size={18} color={COLORS.primary} />
               </TouchableOpacity>
               <View style={styles.toolbarDivider} />
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyLeft')} title="Align Left">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyLeft')}>
                 <MaterialIcons name="format-align-left" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyCenter')} title="Align Center">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyCenter')}>
                 <MaterialIcons name="format-align-center" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyRight')} title="Align Right">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('justifyRight')}>
                 <MaterialIcons name="format-align-right" size={18} color={COLORS.primary} />
               </TouchableOpacity>
               <View style={styles.toolbarDivider} />
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertUnorderedList')} title="Bullet List">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertUnorderedList')}>
                 <MaterialIcons name="format-list-bulleted" size={18} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertOrderedList')} title="Numbered List">
+              <TouchableOpacity style={styles.toolbarButton} onPress={() => executeEditorCommand('insertOrderedList')}>
                 <MaterialIcons name="format-list-numbered" size={18} color={COLORS.primary} />
               </TouchableOpacity>
               <View style={styles.toolbarDivider} />

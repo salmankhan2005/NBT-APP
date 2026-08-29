@@ -932,7 +932,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     {selectedTrip.odometerStartPhotoUri.startsWith('file://') || selectedTrip.odometerStartPhotoUri.startsWith('content://') ? (
                       <View style={{ padding: 14, backgroundColor: '#f1f5f9', borderRadius: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center' }}>
                         <MaterialIcons name="cloud-off" size={28} color={COLORS.primary} />
-                        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
                         <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, textAlign: 'center' }}>Start a new trip to test live Supabase Storage image preview!</Text>
                       </View>
                     ) : (
@@ -986,7 +986,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                     {selectedTrip.odometerEndPhotoUri.startsWith('file://') || selectedTrip.odometerEndPhotoUri.startsWith('content://') ? (
                       <View style={{ padding: 14, backgroundColor: '#f1f5f9', borderRadius: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#cbd5e1', alignItems: 'center' }}>
                         <MaterialIcons name="cloud-off" size={28} color={COLORS.primary} />
-                        <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
+                        <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4, fontWeight: '600', textAlign: 'center' }}>Photo saved locally on driver device before cloud storage sync.</Text>
                       </View>
                     ) : (
                       <>

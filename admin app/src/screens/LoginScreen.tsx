@@ -12,25 +12,18 @@ import {
   useWindowDimensions,
   Image,
   Animated,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, SHADOWS } from '../theme';
-import { db } from '../db/database';
+import { db, API_HOST } from '../db/database';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CORRECT_LOGIN_ID = 'NBT';
-const DEFAULT_PIN = '8520';
-const PIN_STORAGE_KEY = 'nbt_admin_pin';
 const REGISTERED_ADMIN_EMAILS = [
   'krithickpranav906@gmail.com',
   'newbalajitransports1@gmail.com',
 ];
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Screen = 'LOGIN' | 'FORGOT_PIN' | 'VERIFY_OTP' | 'SET_NEW_PIN';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateOtp(): string {
@@ -58,44 +51,15 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   // Animated shake for wrong credentials
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  // ── PIN storage ──
-  const [storedPin, setStoredPin] = useState(DEFAULT_PIN);
-  useEffect(() => {
-    AsyncStorage.getItem(PIN_STORAGE_KEY).then((p) => {
-      if (p && p.length >= 4) setStoredPin(p);
-      else {
-        AsyncStorage.setItem(PIN_STORAGE_KEY, DEFAULT_PIN).catch(() => {});
-      }
-    });
-  }, []);
-
-  // ── Screen state ──
-  const [screen, setScreen] = useState<Screen>('LOGIN');
-
-  // ── Login form ──
+  // ── State ──
   const [loginId, setLoginId] = useState('NBT');
-  const [pin, setPin] = useState('');
-  const [showPin, setShowPin] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpResendTimer, setOtpResendTimer] = useState(0);
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  const pinInputRef = useRef<TextInput>(null);
-
-  // ── Forgot PIN / Email / OTP ──
-  const [emailInput, setEmailInput] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpInput, setOtpInput] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [otpResendTimer, setOtpResendTimer] = useState(0);
-
-  // ── Set new PIN ──
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [showNewPin, setShowNewPin] = useState(false);
-  const [showConfirmPin, setShowConfirmPin] = useState(false);
-  const [newPinError, setNewPinError] = useState('');
-  const [savingPin, setSavingPin] = useState(false);
 
   // ── OTP Resend Countdown ──
   useEffect(() => {
@@ -116,138 +80,89 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     ]).start();
   }, [shakeAnim]);
 
-  // ── Login Handler ──
-  const handleLogin = useCallback(async () => {
+  // ── Send Verification PIN ──
+  const handleSendOtp = useCallback(async () => {
     setLoginError('');
     const trimmedId = loginId.trim().toUpperCase();
-    const trimmedPin = pin.trim();
-
-    if (!trimmedId) {
-      setLoginError('Please enter your Login ID (Default: NBT).');
-      return;
-    }
-    if (!trimmedPin) {
-      setLoginError('Please enter your Security PIN.');
-      return;
-    }
-
-    setLoginLoading(true);
-    await new Promise((r) => setTimeout(r, 300)); // brief UX pause
-
-    const currentPin = (await AsyncStorage.getItem(PIN_STORAGE_KEY)) || DEFAULT_PIN;
-
-    if (trimmedId === CORRECT_LOGIN_ID && trimmedPin === currentPin) {
-      // Set authenticated in local db session so tabs & state stay active
-      await db.login('admin', 'admin123').catch(() => {});
-      onLoginSuccess();
-    } else {
-      triggerShake();
-      if (trimmedId !== CORRECT_LOGIN_ID) {
-        setLoginError('Invalid Login ID. Default Login ID is NBT.');
-      } else {
-        setLoginError('Invalid Security PIN. Please try again or tap "Forgot PIN?".');
-      }
-      setPin('');
-    }
-    setLoginLoading(false);
-  }, [loginId, pin, onLoginSuccess, triggerShake]);
-
-  // ── Forgot PIN: Send OTP with Registered Email Validation ──
-  const handleSendOtp = useCallback(async () => {
-    setOtpError('');
     const cleanEmail = emailInput.trim().toLowerCase();
+
+    if (trimmedId !== CORRECT_LOGIN_ID) {
+      triggerShake();
+      setLoginError('Invalid Login ID. Default Login ID is NBT.');
+      return;
+    }
 
     if (!cleanEmail || !cleanEmail.includes('@')) {
       triggerShake();
-      setOtpError('Please enter a valid registered admin email address.');
+      setLoginError('Please enter a valid registered admin email address.');
       return;
     }
 
     if (!REGISTERED_ADMIN_EMAILS.includes(cleanEmail)) {
       triggerShake();
-      setOtpError('Email not registered. Please use a valid registered Admin email address.');
+      setLoginError('Email not registered. Please use a valid registered Admin email address.');
       return;
     }
 
-    setSendingOtp(true);
+    setLoginLoading(true);
     const generatedOtp = generateOtp();
     setOtp(generatedOtp);
 
     try {
-      const res = await fetch('https://nbt-app.onrender.com/api/auth/send-otp', {
+      const url = `${API_HOST}/api/auth/send-otp`;
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, otp: generatedOtp, purpose: 'admin_pin_reset' }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setSendingOtp(false);
-        setOtpError(data?.error || 'Failed to send OTP email. Please try again.');
+        setLoginLoading(false);
+        setLoginError(data?.error || 'Failed to send OTP email. Please try again.');
         return;
       }
     } catch {
-      setSendingOtp(false);
-      setOtpError('Network error. Please check your connection and try again.');
+      setLoginLoading(false);
+      setLoginError('Network error. Please check your connection and try again.');
       return;
     }
 
-    setSendingOtp(false);
+    setLoginLoading(false);
     setOtpSent(true);
     setOtpResendTimer(60);
-    setScreen('VERIFY_OTP');
-  }, [emailInput, triggerShake]);
+  }, [loginId, emailInput, triggerShake]);
 
-  // ── Verify OTP ──
-  const handleVerifyOtp = useCallback(() => {
-    setOtpError('');
-    if (!otpInput.trim()) {
-      setOtpError('Please enter the 4-digit OTP.');
+  // ── Verify PIN and Login ──
+  const handleVerifyAndLogin = useCallback(async () => {
+    setLoginError('');
+    const trimmedOtpInput = otpInput.trim();
+
+    if (!trimmedOtpInput) {
+      setLoginError('Please enter the 4-digit security PIN.');
       return;
     }
-    if (otpInput.trim() !== otp) {
+
+    if (trimmedOtpInput !== otp) {
       triggerShake();
-      setOtpError('Incorrect OTP entered. Please check the code and try again.');
+      setLoginError('Incorrect Security PIN entered. Please check the code in your email.');
       return;
     }
-    setScreen('SET_NEW_PIN');
-  }, [otpInput, otp, triggerShake]);
 
-  // ── Save New PIN ──
-  const handleSaveNewPin = useCallback(async () => {
-    setNewPinError('');
-    if (!newPin.trim() || newPin.length < 4) {
-      setNewPinError('PIN must be at least 4 digits.');
-      return;
+    setLoginLoading(true);
+    
+    // Login to backend to fetch real JWT token
+    const success = await db.login('admin', '9999').catch(() => false);
+    setLoginLoading(false);
+
+    if (success) {
+      onLoginSuccess();
+    } else {
+      triggerShake();
+      setLoginError('Authentication failed. Server could not authenticate this session.');
     }
-    if (newPin !== confirmPin) {
-      setNewPinError('PINs do not match. Please re-enter.');
-      return;
-    }
-    setSavingPin(true);
-    await AsyncStorage.setItem(PIN_STORAGE_KEY, newPin);
-    setStoredPin(newPin);
-    setSavingPin(false);
+  }, [otpInput, otp, onLoginSuccess, triggerShake]);
 
-    // Reset all forgot-PIN state
-    setEmailInput('');
-    setOtp('');
-    setOtpInput('');
-    setOtpSent(false);
-    setNewPin('');
-    setConfirmPin('');
-    setPin(newPin);
-    setScreen('LOGIN');
-
-    Alert.alert(
-      'Security PIN Updated',
-      'Your new PIN has been configured successfully. Please sign in with your Login ID (NBT) and new PIN.',
-      [{ text: 'SIGN IN' }]
-    );
-  }, [newPin, confirmPin]);
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  UI Card & Header
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Styles Helper ──
   const cardStyle = [
     styles.card,
     isPhone && styles.cardPhone,
@@ -272,307 +187,6 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       </Animated.View>
     ) : null;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  SCREEN 1: LOGIN
-  // ─────────────────────────────────────────────────────────────────────────
-  if (screen === 'LOGIN') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            {renderHeader()}
-
-            <View style={cardStyle}>
-              {/* Card Title */}
-              <View style={styles.cardHeader}>
-                <View style={styles.cardHeaderIconBox}>
-                  <MaterialIcons name="admin-panel-settings" size={24} color={COLORS.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>Administrator Sign In</Text>
-                  <Text style={styles.cardSubtitle}>Enter your Login ID and Security PIN</Text>
-                </View>
-              </View>
-              <View style={styles.divider} />
-
-              {renderErrorBox(loginError)}
-
-              {/* Login ID */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.inputLabel}>LOGIN ID *</Text>
-                  <Text style={styles.labelHint}>Default: NBT</Text>
-                </View>
-                <View style={styles.inputRow}>
-                  <View style={styles.inputIconBox}>
-                    <MaterialIcons name="person" size={20} color={COLORS.primary} />
-                  </View>
-                  <TextInput
-                    style={styles.textInput}
-                    value={loginId}
-                    onChangeText={(v) => { setLoginId(v); setLoginError(''); }}
-                    placeholder="Enter Login ID (e.g. NBT)"
-                    placeholderTextColor="#94a3b8"
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    onSubmitEditing={() => pinInputRef.current?.focus()}
-                  />
-                </View>
-              </View>
-
-              {/* Security PIN */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.inputLabel}>SECURITY PIN *</Text>
-                  <Text style={styles.labelHint}>Default: 8520</Text>
-                </View>
-                <View style={styles.inputRow}>
-                  <View style={styles.inputIconBox}>
-                    <MaterialIcons name="lock" size={20} color={COLORS.primary} />
-                  </View>
-                  <TextInput
-                    ref={pinInputRef}
-                    style={styles.textInput}
-                    value={pin}
-                    onChangeText={(v) => { setPin(v); setLoginError(''); }}
-                    placeholder="Enter Security PIN"
-                    placeholderTextColor="#94a3b8"
-                    secureTextEntry={!showPin}
-                    keyboardType="number-pad"
-                    maxLength={8}
-                    returnKeyType="done"
-                    onSubmitEditing={handleLogin}
-                  />
-                  <TouchableOpacity onPress={() => setShowPin(!showPin)} style={styles.eyeBtn}>
-                    <MaterialIcons name={showPin ? 'visibility' : 'visibility-off'} size={20} color="#64748b" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Forgot PIN Link */}
-              <TouchableOpacity
-                onPress={() => { setScreen('FORGOT_PIN'); setLoginError(''); setEmailInput(''); setOtpSent(false); setOtp(''); setOtpInput(''); }}
-                style={styles.forgotPinBtn}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="lock-reset" size={16} color={COLORS.secondary} />
-                <Text style={styles.forgotPinText}>Forgot PIN?</Text>
-              </TouchableOpacity>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[styles.primaryBtn, loginLoading && { opacity: 0.7 }]}
-                onPress={handleLogin}
-                disabled={loginLoading}
-                activeOpacity={0.88}
-              >
-                {loginLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <>
-                    <MaterialIcons name="login" size={20} color="#fff" />
-                    <Text style={styles.primaryBtnText}>ACCESS CONSOLE</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Security Footer */}
-            <View style={styles.footer}>
-              <MaterialIcons name="security" size={14} color="#64748b" />
-              <Text style={styles.footerText}>Authorized Admin Access Only • Encrypted local credentials</Text>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  SCREEN 2: FORGOT PIN (REQUEST OTP VIA REGISTERED PHONE)
-  // ─────────────────────────────────────────────────────────────────────────
-  if (screen === 'FORGOT_PIN') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            {renderHeader()}
-
-            <View style={cardStyle}>
-              {/* Back to Login */}
-              <TouchableOpacity onPress={() => setScreen('LOGIN')} style={styles.backRow} activeOpacity={0.7}>
-                <MaterialIcons name="arrow-back" size={18} color={COLORS.primary} />
-                <Text style={styles.backText}>Back to Sign In</Text>
-              </TouchableOpacity>
-
-              <View style={styles.cardHeader}>
-                <View style={[styles.cardHeaderIconBox, { backgroundColor: '#fff7ed' }]}>
-                  <MaterialIcons name="lock-reset" size={24} color={COLORS.secondary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>Forgot Security PIN</Text>
-                  <Text style={styles.cardSubtitle}>Administrative PIN Recovery</Text>
-                </View>
-              </View>
-              <View style={styles.divider} />
-
-              {/* Security info banner */}
-              <View style={styles.infoBanner}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <MaterialIcons name="verified-user" size={18} color="#1d4ed8" />
-                  <Text style={styles.infoBannerTitle}>Security Email Verification</Text>
-                </View>
-                <Text style={styles.infoBannerDesc}>
-                  Enter your registered Admin email address to receive a secure 4-digit verification OTP.
-                </Text>
-              </View>
-
-              {renderErrorBox(otpError)}
-
-              {/* Registered Phone Input */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.inputLabel}>REGISTERED EMAIL ADDRESS *</Text>
-                </View>
-                <View style={styles.inputRow}>
-                  <View style={styles.inputIconBox}>
-                    <MaterialIcons name="email" size={20} color={COLORS.primary} />
-                  </View>
-                  <TextInput
-                    style={styles.textInput}
-                    value={emailInput}
-                    onChangeText={(v) => { setEmailInput(v.trim()); setOtpError(''); }}
-                    placeholder="Enter registered admin email"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="done"
-                    onSubmitEditing={handleSendOtp}
-                    autoFocus
-                  />
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.primaryBtn, sendingOtp && { opacity: 0.7 }, { backgroundColor: COLORS.secondary }]}
-                onPress={handleSendOtp}
-                disabled={sendingOtp}
-                activeOpacity={0.88}
-              >
-                {sendingOtp ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <>
-                    <MaterialIcons name="email" size={18} color="#fff" />
-                    <Text style={styles.primaryBtnText}>SEND OTP TO EMAIL</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.footer}>
-              <MaterialIcons name="lock" size={14} color="#64748b" />
-              <Text style={styles.footerText}>OTP is strictly valid for registered administrative numbers</Text>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  SCREEN 3: VERIFY OTP
-  // ─────────────────────────────────────────────────────────────────────────
-  if (screen === 'VERIFY_OTP') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            {renderHeader()}
-
-            <View style={cardStyle}>
-              <TouchableOpacity onPress={() => setScreen('FORGOT_PIN')} style={styles.backRow} activeOpacity={0.7}>
-                <MaterialIcons name="arrow-back" size={18} color={COLORS.primary} />
-                <Text style={styles.backText}>Change Mobile Number</Text>
-              </TouchableOpacity>
-
-              <View style={styles.cardHeader}>
-                <View style={[styles.cardHeaderIconBox, { backgroundColor: '#f0fdf4' }]}>
-                  <MaterialIcons name="sms" size={24} color="#16a34a" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>Verify Security Code</Text>
-                  <Text style={styles.cardSubtitle}>Enter 4-digit code sent to your registered number</Text>
-                </View>
-              </View>
-              <View style={styles.divider} />
-
-              <View style={styles.otpSentBanner}>
-                <MaterialIcons name="email" size={20} color="#16a34a" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.otpSentTitle}>Email Sent to {maskEmail(emailInput)}</Text>
-                  <Text style={styles.otpSentText}>
-                    Please check your inbox and enter the 4-digit verification code.
-                  </Text>
-                </View>
-              </View>
-
-              {renderErrorBox(otpError)}
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>ENTER 4-DIGIT OTP *</Text>
-                <View style={styles.inputRow}>
-                  <View style={styles.inputIconBox}>
-                    <MaterialIcons name="pin" size={20} color={COLORS.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.textInput, { flex: 1, letterSpacing: 8, fontSize: 20, fontWeight: '900', color: COLORS.primary }]}
-                    value={otpInput}
-                    onChangeText={(v) => { setOtpInput(v.replace(/\D/g, '').slice(0, 4)); setOtpError(''); }}
-                    placeholder="• • • •"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="number-pad"
-                    maxLength={4}
-                    returnKeyType="done"
-                    onSubmitEditing={handleVerifyOtp}
-                    autoFocus
-                  />
-                </View>
-              </View>
-
-              {/* Resend button */}
-              <TouchableOpacity
-                style={[styles.resendBtn, otpResendTimer > 0 && { opacity: 0.5 }]}
-                onPress={otpResendTimer <= 0 ? handleSendOtp : undefined}
-                disabled={otpResendTimer > 0 || sendingOtp}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="refresh" size={16} color={COLORS.secondary} />
-                <Text style={styles.resendText}>
-                  {otpResendTimer > 0 ? `Resend Email in ${otpResendTimer}s` : 'Resend Email OTP'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: '#16a34a' }]}
-                onPress={handleVerifyOtp}
-                activeOpacity={0.88}
-              >
-                <MaterialIcons name="verified" size={20} color="#fff" />
-                <Text style={styles.primaryBtnText}>VERIFY & PROCEED</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  SCREEN 4: SET NEW PIN
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -580,92 +194,171 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           {renderHeader()}
 
           <View style={cardStyle}>
+            {/* Card Header */}
             <View style={styles.cardHeader}>
-              <View style={[styles.cardHeaderIconBox, { backgroundColor: '#f5f3ff' }]}>
-                <MaterialIcons name="lock-open" size={24} color="#7c3aed" />
+              <View style={styles.cardHeaderIconBox}>
+                <MaterialIcons name="admin-panel-settings" size={24} color={COLORS.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>Set New Security PIN</Text>
-                <Text style={styles.cardSubtitle}>Create your new administrative PIN code</Text>
+                <Text style={styles.cardTitle}>Administrator Sign In</Text>
+                <Text style={styles.cardSubtitle}>
+                  {otpSent ? 'Enter the security code sent to email' : 'Sign in using NBT ID and registered email'}
+                </Text>
               </View>
             </View>
             <View style={styles.divider} />
 
-            {renderErrorBox(newPinError)}
+            {renderErrorBox(loginError)}
 
-            {/* New PIN */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>NEW PIN (MIN. 4 DIGITS) *</Text>
-              <View style={styles.inputRow}>
-                <View style={styles.inputIconBox}>
-                  <MaterialIcons name="lock" size={20} color={COLORS.primary} />
+            {!otpSent ? (
+              // ─── STAGE 1: Admin ID & Email ───
+              <View>
+                {/* Login ID */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.inputLabel}>LOGIN ID *</Text>
+                    <Text style={styles.labelHint}>Default: NBT</Text>
+                  </View>
+                  <View style={styles.inputRow}>
+                    <View style={styles.inputIconBox}>
+                      <MaterialIcons name="person" size={20} color={COLORS.primary} />
+                    </View>
+                    <TextInput
+                      style={styles.textInput}
+                      value={loginId}
+                      onChangeText={(v) => { setLoginId(v); setLoginError(''); }}
+                      placeholder="Enter Login ID (e.g. NBT)"
+                      placeholderTextColor="#94a3b8"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      returnKeyType="next"
+                    />
+                  </View>
                 </View>
-                <TextInput
-                  style={[styles.textInput, { flex: 1 }]}
-                  value={newPin}
-                  onChangeText={(v) => { setNewPin(v.replace(/\D/g, '')); setNewPinError(''); }}
-                  placeholder="Enter new 4-digit PIN"
-                  placeholderTextColor="#94a3b8"
-                  secureTextEntry={!showNewPin}
-                  keyboardType="number-pad"
-                  maxLength={8}
-                />
-                <TouchableOpacity onPress={() => setShowNewPin(!showNewPin)} style={styles.eyeBtn}>
-                  <MaterialIcons name={showNewPin ? 'visibility' : 'visibility-off'} size={20} color="#64748b" />
+
+                {/* Email Address */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.inputLabel}>REGISTERED EMAIL ADDRESS *</Text>
+                  </View>
+                  <View style={styles.inputRow}>
+                    <View style={styles.inputIconBox}>
+                      <MaterialIcons name="email" size={20} color={COLORS.primary} />
+                    </View>
+                    <TextInput
+                      style={styles.textInput}
+                      value={emailInput}
+                      onChangeText={(v) => { setEmailInput(v.trim()); setLoginError(''); }}
+                      placeholder="Enter registered admin email"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={handleSendOtp}
+                    />
+                  </View>
+                </View>
+
+                {/* Submit Action */}
+                <TouchableOpacity
+                  style={[styles.primaryBtn, loginLoading && { opacity: 0.7 }]}
+                  onPress={handleSendOtp}
+                  disabled={loginLoading}
+                  activeOpacity={0.88}
+                >
+                  {loginLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <MaterialIcons name="send" size={20} color="#fff" />
+                      <Text style={styles.primaryBtnText}>GET SECURITY PIN</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Confirm PIN */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>CONFIRM NEW PIN *</Text>
-              <View style={styles.inputRow}>
-                <View style={styles.inputIconBox}>
-                  <MaterialIcons name="lock-outline" size={20} color={COLORS.primary} />
+            ) : (
+              // ─── STAGE 2: OTP Verification ───
+              <View>
+                <View style={styles.otpSentBanner}>
+                  <MaterialIcons name="email" size={20} color="#16a34a" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.otpSentTitle}>Email Sent to {maskEmail(emailInput)}</Text>
+                    <Text style={styles.otpSentText}>
+                      Please check your inbox and enter the 4-digit verification code.
+                    </Text>
+                  </View>
                 </View>
-                <TextInput
-                  style={[styles.textInput, { flex: 1 }]}
-                  value={confirmPin}
-                  onChangeText={(v) => { setConfirmPin(v.replace(/\D/g, '')); setNewPinError(''); }}
-                  placeholder="Re-enter new PIN"
-                  placeholderTextColor="#94a3b8"
-                  secureTextEntry={!showConfirmPin}
-                  keyboardType="number-pad"
-                  maxLength={8}
-                  returnKeyType="done"
-                  onSubmitEditing={handleSaveNewPin}
-                />
-                <TouchableOpacity onPress={() => setShowConfirmPin(!showConfirmPin)} style={styles.eyeBtn}>
-                  <MaterialIcons name={showConfirmPin ? 'visibility' : 'visibility-off'} size={20} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-            </View>
 
-            {/* PIN match indicator */}
-            {newPin.length >= 4 && confirmPin.length >= 4 && (
-              <View style={[styles.matchBadge, { backgroundColor: newPin === confirmPin ? '#f0fdf4' : '#fef2f2', borderColor: newPin === confirmPin ? '#86efac' : '#fca5a5' }]}>
-                <MaterialIcons name={newPin === confirmPin ? 'check-circle' : 'cancel'} size={14} color={newPin === confirmPin ? '#16a34a' : '#dc2626'} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: newPin === confirmPin ? '#16a34a' : '#dc2626' }}>
-                  {newPin === confirmPin ? 'PINs match perfectly' : 'PINs do not match'}
-                </Text>
+                {/* OTP Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>ENTER 4-DIGIT SECURITY PIN *</Text>
+                  <View style={styles.inputRow}>
+                    <View style={styles.inputIconBox}>
+                      <MaterialIcons name="vpn-key" size={20} color={COLORS.primary} />
+                    </View>
+                    <TextInput
+                      style={[styles.textInput, { flex: 1, letterSpacing: 8, fontSize: 20, fontWeight: '900', color: COLORS.primary }]}
+                      value={otpInput}
+                      onChangeText={(v) => { setOtpInput(v.replace(/\D/g, '').slice(0, 4)); setLoginError(''); }}
+                      placeholder="• • • •"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="number-pad"
+                      maxLength={4}
+                      returnKeyType="done"
+                      onSubmitEditing={handleVerifyAndLogin}
+                      autoFocus
+                    />
+                  </View>
+                </View>
+
+                {/* Resend button */}
+                <TouchableOpacity
+                  style={[styles.resendBtn, otpResendTimer > 0 && { opacity: 0.5 }]}
+                  onPress={otpResendTimer <= 0 ? handleSendOtp : undefined}
+                  disabled={otpResendTimer > 0 || loginLoading}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="refresh" size={16} color={COLORS.secondary} />
+                  <Text style={styles.resendText}>
+                    {otpResendTimer > 0 ? `Resend Email in ${otpResendTimer}s` : 'Resend Security PIN'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Submit Action */}
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: '#16a34a' }, loginLoading && { opacity: 0.7 }]}
+                  onPress={handleVerifyAndLogin}
+                  disabled={loginLoading}
+                  activeOpacity={0.88}
+                >
+                  {loginLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <MaterialIcons name="verified" size={20} color="#fff" />
+                      <Text style={styles.primaryBtnText}>VERIFY & SIGN IN</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Go Back / Change Email */}
+                <TouchableOpacity
+                  onPress={() => { setOtpSent(false); setOtpInput(''); setLoginError(''); }}
+                  style={[styles.forgotPinBtn, { alignSelf: 'center', marginTop: 16 }]}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="arrow-back" size={16} color={COLORS.secondary} />
+                  <Text style={styles.forgotPinText}>Change Email / Go Back</Text>
+                </TouchableOpacity>
               </View>
             )}
+          </View>
 
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: '#7c3aed' }, savingPin && { opacity: 0.7 }]}
-              onPress={handleSaveNewPin}
-              disabled={savingPin}
-              activeOpacity={0.88}
-            >
-              {savingPin ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <MaterialIcons name="save" size={20} color="#fff" />
-                  <Text style={styles.primaryBtnText}>SAVE & UPDATE PIN</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          {/* Security Footer */}
+          <View style={styles.footer}>
+            <MaterialIcons name="security" size={14} color="#64748b" />
+            <Text style={styles.footerText}>Authorized Admin Access Only • Verification PIN required</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
