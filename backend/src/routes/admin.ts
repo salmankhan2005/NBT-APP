@@ -290,7 +290,68 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // ── Managed Vehicles Routes ───────────────────────────────────────────────
   app.get('/vehicles', adminHook, async (_req: FastifyRequest, reply: FastifyReply) => {
-    const rows = await sql`SELECT * FROM managed_vehicles ORDER BY created_at DESC`;
+    const rows = await sql`
+      SELECT 
+        v.*,
+        -- Expiry dates
+        COALESCE(
+          (SELECT expiry_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'FC' ORDER BY uploaded_at DESC LIMIT 1),
+          v.fc_expiry_date
+        ) AS fc_expiry_date,
+        (SELECT issue_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'FC' ORDER BY uploaded_at DESC LIMIT 1) AS fc_issue_date,
+        
+        COALESCE(
+          (SELECT expiry_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'INSURANCE' ORDER BY uploaded_at DESC LIMIT 1),
+          v.insurance_expiry_date
+        ) AS insurance_expiry_date,
+        (SELECT issue_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'INSURANCE' ORDER BY uploaded_at DESC LIMIT 1) AS insurance_issue_date,
+        
+        COALESCE(
+          (SELECT expiry_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'POLLUTION' ORDER BY uploaded_at DESC LIMIT 1),
+          v.pollution_expiry_date
+        ) AS pollution_expiry_date,
+        (SELECT issue_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'POLLUTION' ORDER BY uploaded_at DESC LIMIT 1) AS pollution_issue_date,
+        
+        COALESCE(
+          (SELECT expiry_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'NATIONAL_PERMIT' ORDER BY uploaded_at DESC LIMIT 1),
+          v.permit_expiry_date
+        ) AS national_permit_expiry_date,
+        (SELECT issue_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'NATIONAL_PERMIT' ORDER BY uploaded_at DESC LIMIT 1) AS national_permit_issue_date,
+        
+        (SELECT expiry_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'FIVE_YEAR_PERMIT' ORDER BY uploaded_at DESC LIMIT 1) AS five_year_permit_expiry_date,
+        (SELECT issue_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'FIVE_YEAR_PERMIT' ORDER BY uploaded_at DESC LIMIT 1) AS five_year_permit_issue_date,
+        
+        (SELECT expiry_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'QUARTER_TAX' ORDER BY uploaded_at DESC LIMIT 1) AS quarter_tax_expiry_date,
+        (SELECT issue_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'QUARTER_TAX' ORDER BY uploaded_at DESC LIMIT 1) AS quarter_tax_issue_date,
+        
+        COALESCE(
+          v.permit_expiry_date,
+          (SELECT expiry_date FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND (doc_type = 'NATIONAL_PERMIT' OR doc_type = 'FIVE_YEAR_PERMIT') ORDER BY uploaded_at DESC LIMIT 1)
+        ) AS permit_expiry_date,
+
+        -- URLs
+        COALESCE(
+          v.fc_url,
+          (SELECT file_uri FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'FC' ORDER BY uploaded_at DESC LIMIT 1)
+        ) AS fc_url,
+        COALESCE(
+          v.insurance_url,
+          (SELECT file_uri FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'INSURANCE' ORDER BY uploaded_at DESC LIMIT 1)
+        ) AS insurance_url,
+        COALESCE(
+          v.pollution_url,
+          (SELECT file_uri FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'POLLUTION' ORDER BY uploaded_at DESC LIMIT 1)
+        ) AS pollution_url,
+        COALESCE(
+          v.permit_url,
+          (SELECT file_uri FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND (doc_type = 'NATIONAL_PERMIT' OR doc_type = 'FIVE_YEAR_PERMIT') ORDER BY uploaded_at DESC LIMIT 1)
+        ) AS permit_url,
+        (SELECT file_uri FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'NATIONAL_PERMIT' ORDER BY uploaded_at DESC LIMIT 1) AS national_permit_url,
+        (SELECT file_uri FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'FIVE_YEAR_PERMIT' ORDER BY uploaded_at DESC LIMIT 1) AS five_year_permit_url,
+        (SELECT file_uri FROM vehicle_documents WHERE vehicle_id = v.vehicle_id AND doc_type = 'QUARTER_TAX' ORDER BY uploaded_at DESC LIMIT 1) AS quarter_tax_url
+      FROM managed_vehicles v
+      ORDER BY v.created_at DESC
+    `;
     return reply.code(200).send(rows);
   });
 
@@ -365,6 +426,14 @@ export async function adminRoutes(app: FastifyInstance) {
       const dateVal = parseToIsoString(body.permitExpiryDate) ?? null;
       await sql`UPDATE managed_vehicles SET permit_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
+    if (body.nationalPermitExpiryDate !== undefined) {
+      const dateVal = parseToIsoString(body.nationalPermitExpiryDate) ?? null;
+      await sql`UPDATE managed_vehicles SET permit_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+    }
+    if (body.fiveYearPermitExpiryDate !== undefined) {
+      const dateVal = parseToIsoString(body.fiveYearPermitExpiryDate) ?? null;
+      await sql`UPDATE managed_vehicles SET permit_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+    }
     if (body.fcExpiryDate !== undefined) {
       const dateVal = parseToIsoString(body.fcExpiryDate) ?? null;
       await sql`UPDATE managed_vehicles SET fc_expiry_date = ${dateVal}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
@@ -377,6 +446,12 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     if (body.permitUrl !== undefined) {
       await sql`UPDATE managed_vehicles SET permit_url = ${body.permitUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+    }
+    if (body.nationalPermitUrl !== undefined) {
+      await sql`UPDATE managed_vehicles SET permit_url = ${body.nationalPermitUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
+    }
+    if (body.fiveYearPermitUrl !== undefined) {
+      await sql`UPDATE managed_vehicles SET permit_url = ${body.fiveYearPermitUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;
     }
     if (body.fcUrl !== undefined) {
       await sql`UPDATE managed_vehicles SET fc_url = ${body.fcUrl || null}, updated_at = now() WHERE vehicle_id = ${vehicleId}`;

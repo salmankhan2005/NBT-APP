@@ -794,7 +794,7 @@ export default function VehiclesScreen() {
             </View>
             <View style={styles.expiryGrid}>
               {COMPLIANCE_DOCS.map((docSpec) => {
-                const expiryVal = (item[docSpec.expiryField] as string) || (docSpec.key === 'NATIONAL_PERMIT' ? item.permitExpiryDate : '');
+                const expiryVal = (item[docSpec.expiryField] as string) || '';
                 const badge = getExpiryBadgeInfo(expiryVal);
                 return (
                   <View
@@ -1441,7 +1441,7 @@ export default function VehiclesScreen() {
                   </View>
 
                   {COMPLIANCE_DOCS.map((docSpec) => {
-                    const expiryDateVal = (selectedVehicle[docSpec.expiryField] as string) || (docSpec.key === 'NATIONAL_PERMIT' ? selectedVehicle.permitExpiryDate : '');
+                    const expiryDateVal = (selectedVehicle[docSpec.expiryField] as string) || '';
                     const issueDateVal = selectedVehicle[docSpec.issueField] as string;
                     const attachedDocs = vehicleDocuments.filter((d) => d.docType === docSpec.key);
                     const latestDoc = attachedDocs[0];
