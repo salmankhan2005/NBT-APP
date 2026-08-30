@@ -22,6 +22,7 @@ import * as Sharing from 'expo-sharing';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import nbtAuthorisedSignatureBase64 from '../nbtSignatureBase64';
 import nbtLogoBase64 from '../nbtLogoBase64';
+import nbtBalajiBase64 from '../nbtBalajiBase64';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { db, GcNote, GcItem } from '../db/database';
 
@@ -657,7 +658,7 @@ export default function GcScreen() {
             display: flex;
             align-items: center;
             gap: 10px;
-            width: 100px;
+            width: 175px;
           }
           .logo-mark {
             width: 76px;
@@ -1051,6 +1052,7 @@ export default function GcScreen() {
             <div class="header">
               <div class="header-left">
                 ${nbtLogoBase64 ? `<img src="${nbtLogoBase64}" style="width: 76px; height: 76px; object-fit: contain;" />` : `<div class="logo-mark">NBT</div>`}
+                <img src="${nbtBalajiBase64}" style="width: 76px; height: 76px; object-fit: contain; filter: grayscale(1) contrast(1.4) brightness(0.9);" />
               </div>
               <div class="header-title">
                 <div class="top-name">Sri Ramajayam</div>
