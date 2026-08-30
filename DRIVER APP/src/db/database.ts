@@ -1040,7 +1040,7 @@ class DatabaseService {
           console.log(`[DriverDB] Upload attempt ${attempt}/3...`);
           const uploadResult = await FileSystem.uploadAsync(`${API_HOST}/api/upload`, finalUriToUpload, {
             httpMethod: 'POST',
-            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            uploadType: FileSystem.UploadType.MULTIPART as any,
             fieldName: 'file',
             mimeType: 'image/jpeg',
             headers: {

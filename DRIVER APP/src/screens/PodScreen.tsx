@@ -302,10 +302,8 @@ export default function PodScreen({
           }
         }
 
-        // Upload POD detail — use already-hosted URL if available, else local URI
-        if (!podHostedUrl && !podPhoto) throw new Error('POD photo is not uploaded');
-        const uploaded = await db.uploadPOD(trip.id, (podHostedUrl || podPhoto)!, isSigned ? 'Receiver Signature Captured' : 'Signed', notes, gps);
-        if (!uploaded) throw new Error('POD photo upload failed');
+        const success = await db.markArrived(trip.id);
+        if (!success) throw new Error('Failed to update status to reached destination');
       } catch (err) {
         Alert.alert('Error', 'Failed to update destination status.');
         setLoading(false);

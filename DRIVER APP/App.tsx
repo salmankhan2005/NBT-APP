@@ -224,7 +224,15 @@ export default function App() {
               onAddExpensePress={() => setDriverTab('EXPENSE')}
               onUploadPodPress={() => setDriverTab('DELIVERY')}
               onArrivedPress={async () => {
-                if (activeTrip) await db.markArrived(activeTrip.id);
+                if (activeTrip) {
+                  const success = await db.markArrived(activeTrip.id);
+                  if (success) {
+                    Alert.alert('Arrived', 'Status updated to Reached Destination. Please upload POD and complete the trip.');
+                    setDriverTab('DELIVERY');
+                  } else {
+                    Alert.alert('Error', 'Unable to confirm depot arrival.');
+                  }
+                }
               }}
               onSwitchToMap={() => setDriverTab('MAP')}
               onLogout={handleLogout}
