@@ -21,6 +21,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { COLORS, SPACING, SHADOWS } from '../theme';
 import nbtAuthorisedSignatureBase64 from '../nbtSignatureBase64';
+import nbtLogoBase64 from '../nbtLogoBase64';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { db, GcNote, GcItem } from '../db/database';
 
@@ -1049,7 +1050,7 @@ export default function GcScreen() {
           <div class="frame">
             <div class="header">
               <div class="header-left">
-                <div class="logo-mark">NBT</div>
+                ${nbtLogoBase64 ? `<img src="${nbtLogoBase64}" style="width: 76px; height: 76px; object-fit: contain;" />` : `<div class="logo-mark">NBT</div>`}
               </div>
               <div class="header-title">
                 <div class="top-name">Sri Ramajayam</div>

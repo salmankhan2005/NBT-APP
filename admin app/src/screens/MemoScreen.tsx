@@ -22,6 +22,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { COLORS, SHADOWS, SPACING } from '../theme';
 import nbtAuthorisedSignatureBase64 from '../nbtSignatureBase64';
+import nbtLogoBase64 from '../nbtLogoBase64';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { db, MemoDocument } from '../db/database';
 
@@ -321,10 +322,12 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
     <div>
       <div class="header-top">
         <div class="logo-area">
-          <div class="logo-circle">
-            <div class="logo-mark">NBT</div>
-            <div class="logo-text">NEW BALAJI TRANSPORT</div>
-          </div>
+          ${nbtLogoBase64 ? `<img src="${nbtLogoBase64}" style="width: 82px; height: 82px; object-fit: contain;" />` : `
+            <div class="logo-circle">
+              <div class="logo-mark">NBT</div>
+              <div class="logo-text">NEW BALAJI TRANSPORT</div>
+            </div>
+          `}
         </div>
         <div class="header-center">
           <div class="signed-by">Sri Ramajayam</div>
