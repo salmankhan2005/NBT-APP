@@ -644,33 +644,53 @@ export default function SettingsScreen({ onLogout }: SettingsScreenProps) {
 
         {/* Danger Zone */}
         <View style={[styles.card, styles.dangerCard]}>
-          <Text style={[styles.sectionTitle, { color: COLORS.error }]}>DANGER ZONE</Text>
+          <Text style={[styles.sectionTitle, { color: '#dc2626' }]}>DANGER ZONE</Text>
+          
+          <View style={styles.dangerCardContent}>
+            <Text style={styles.dangerSectionDesc}>
+              These operations are destructive and permanently affect the shared cloud infrastructure. Proceed with caution.
+            </Text>
 
-          <TouchableOpacity
-            style={[styles.actionRow, resetting && { opacity: 0.6 }]}
-            onPress={handleResetPress}
-            disabled={resetting}
-          >
-            <View style={styles.dangerActionLabel}>
-              <MaterialIcons name="settings-backup-restore" size={20} color={COLORS.error} />
-              <View>
-                <Text style={styles.dangerTitle}>Reset Shared Database</Text>
-                <Text style={styles.dangerDesc}>
-                  Permanently delete all trips, vehicles, drivers, expenses, GC notes, memos & logs
+            <View style={styles.dangerDivider} />
+
+            <View style={styles.dangerItemRow}>
+              <View style={styles.dangerItemTextContent}>
+                <Text style={styles.dangerItemTitle}>Wipe Database System</Text>
+                <Text style={styles.dangerItemDesc}>
+                  Resets the shared PostgreSQL database. Permanently deletes all recorded trips, expenses, vehicles, drivers, GC notes, memos, and telemetry logs.
                 </Text>
               </View>
+              <TouchableOpacity
+                style={[styles.resetButtonOutlined, resetting && { opacity: 0.6 }]}
+                onPress={handleResetPress}
+                disabled={resetting}
+              >
+                {resetting ? (
+                  <ActivityIndicator size="small" color="#dc2626" />
+                ) : (
+                  <>
+                    <MaterialIcons name="delete-forever" size={16} color="#dc2626" />
+                    <Text style={styles.resetButtonOutlinedText}>WIPE DATABASE SYSTEM</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-            {resetting ? (
-              <ActivityIndicator size="small" color={COLORS.error} />
-            ) : (
-              <MaterialIcons name="chevron-right" size={20} color={COLORS.error} />
-            )}
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogoutPress}>
-            <MaterialIcons name="logout" size={20} color="#ffffff" />
-            <Text style={styles.logoutBtnText}>LOGOUT SESSION</Text>
-          </TouchableOpacity>
+            <View style={styles.dangerDivider} />
+
+            <View style={styles.dangerItemRow}>
+              <View style={styles.dangerItemTextContent}>
+                <Text style={styles.dangerItemTitle}>Terminate Account Session</Text>
+                <Text style={styles.dangerItemDesc}>
+                  Logs you out of the Admin Command Portal on this device. Securely wipes local session caching and tokens.
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.logoutButtonOutlined} onPress={handleLogoutPress}>
+                <MaterialIcons name="logout" size={16} color="#475569" />
+                <Text style={styles.logoutButtonOutlinedText}>LOGOUT SESSION</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -923,19 +943,80 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 13, fontWeight: 'bold', color: COLORS.textDark },
   itemDesc: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
   itemStatus: { fontSize: 11, fontWeight: 'bold', color: COLORS.textMuted },
-  dangerCard: { borderColor: COLORS.error + '30' },
-  actionRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingVertical: 12,
+  dangerCard: {
+    borderColor: '#fee2e2',
+    borderWidth: 1.5,
+    backgroundColor: '#fffdfd',
   },
-  dangerActionLabel: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  dangerTitle: { fontSize: 13, fontWeight: 'bold', color: COLORS.error },
-  dangerDesc: { fontSize: 11, color: COLORS.textMuted, marginTop: 2, paddingRight: 16 },
-  logoutBtn: {
-    flexDirection: 'row', backgroundColor: COLORS.primary, height: 48,
-    borderRadius: 6, alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20,
+  dangerCardContent: {
+    marginTop: 8,
+    gap: 12,
   },
-  logoutBtnText: { color: '#ffffff', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 },
+  dangerSectionDesc: {
+    fontSize: 11.5,
+    color: '#6b7280',
+    lineHeight: 16,
+  },
+  dangerDivider: {
+    height: 1,
+    backgroundColor: '#fee2e2',
+    marginVertical: 4,
+  },
+  dangerItemRow: {
+    flexDirection: 'column',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  dangerItemTextContent: {
+    flex: 1,
+    gap: 3,
+  },
+  dangerItemTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  dangerItemDesc: {
+    fontSize: 11,
+    color: '#6b7280',
+    lineHeight: 15,
+  },
+  resetButtonOutlined: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#dc2626',
+    borderRadius: 8,
+    paddingVertical: 10,
+    backgroundColor: '#fff5f5',
+    width: '100%',
+  },
+  resetButtonOutlinedText: {
+    color: '#dc2626',
+    fontSize: 11.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  logoutButtonOutlined: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingVertical: 10,
+    backgroundColor: '#f8fafc',
+    width: '100%',
+  },
+  logoutButtonOutlinedText: {
+    color: '#475569',
+    fontSize: 11.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
 
   // Data Extraction Card
   backupCard: {

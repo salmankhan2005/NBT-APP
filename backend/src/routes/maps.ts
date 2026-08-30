@@ -679,11 +679,10 @@ export async function staticMapHandler(req: FastifyRequest, reply: FastifyReply)
     }
   }
 
-  // 2. OpenStreetMap / CartoDB Voyager Tile Engine
+  // 2. OpenStreetMap Tile Engine
   const { x, y } = getTileCoords(lat, lng, zoom);
 
   const tileUrls = [
-    `https://basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${x}/${y}.png`,
     `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png`
   ];
 
