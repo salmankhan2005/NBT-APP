@@ -339,10 +339,10 @@ export interface VehicleDocumentHistory {
 }
 
 export interface GcItem {
-  articlesCount: number;
+  articlesCount: number | string;
   description: string;
-  weight: number;
-  value: number;
+  weight: number | string;
+  value: number | string;
 }
 
 export interface GcNote {

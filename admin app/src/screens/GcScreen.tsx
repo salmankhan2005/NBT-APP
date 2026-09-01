@@ -266,7 +266,14 @@ export default function GcScreen() {
   const totalTax = cgstAmount + sgstAmount + igstAmount;
   const grandTotal = fValue + totalTax;
   const balanceDue = grandTotal - advValue;
-  const itemsTotalValue = items.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  const itemsTotalNumericValue = items.reduce((sum, item) => {
+    const num = Number(item.value);
+    return sum + (!isNaN(num) && item.value.trim() !== '' ? num : 0);
+  }, 0);
+  const itemsNonNumericValues = items.map(item => item.value.trim()).filter(v => v !== '' && isNaN(Number(v)));
+  const itemsTotalValueDisplay = itemsTotalNumericValue > 0
+    ? itemsTotalNumericValue.toFixed(2)
+    : (itemsNonNumericValues.length > 0 ? itemsNonNumericValues.join(', ') : '');
 
   const formatRupeeValue = (value: number | string) => {
     const amount = typeof value === 'string' ? Number(value) || 0 : value;
@@ -278,10 +285,10 @@ export default function GcScreen() {
     const filledItems: GcItem[] = items
       .filter(item => item.description.trim() || item.articlesCount.trim() || item.weight.trim() || item.value.trim())
       .map(item => ({
-        articlesCount: Number(item.articlesCount) || 0,
+        articlesCount: item.articlesCount.trim(),
         description: item.description.trim(),
-        weight: Number(item.weight) || 0,
-        value: Number(item.value) || 0,
+        weight: item.weight.trim(),
+        value: item.value.trim(),
       }));
 
     return {
@@ -387,10 +394,10 @@ export default function GcScreen() {
     const filledItems: GcItem[] = items
       .filter(item => item.description.trim() || item.articlesCount.trim() || item.weight.trim() || item.value.trim())
       .map(item => ({
-        articlesCount: Number(item.articlesCount) || 0,
+        articlesCount: item.articlesCount.trim(),
         description: item.description.trim(),
-        weight: Number(item.weight) || 0,
-        value: Number(item.value) || 0,
+        weight: item.weight.trim(),
+        value: item.value.trim(),
       }));
 
     const missing: string[] = [];
@@ -583,8 +590,10 @@ export default function GcScreen() {
 
     const itemRows = Array.from({ length: 6 }).map((_, idx) => {
       const item = safeItems[idx] || { articlesCount: '', description: '', weight: '', value: '' };
-      const valNum = safeNum(item.value);
-      const valStr = item.value !== undefined && item.value !== null && String(item.value).trim() !== '' ? valNum.toFixed(2) : '';
+      const rawVal = item.value !== undefined && item.value !== null ? String(item.value).trim() : '';
+      const numVal = Number(rawVal);
+      const isNum = !isNaN(numVal) && rawVal !== '';
+      const valStr = isNum ? (numVal % 1 === 0 ? numVal.toString() : numVal.toFixed(2)) : rawVal;
       const wtStr = item.weight !== undefined && item.weight !== null && String(item.weight).trim() !== '' ? String(item.weight) : '';
       const countStr = item.articlesCount !== undefined && item.articlesCount !== null && String(item.articlesCount).trim() !== '' ? String(item.articlesCount) : '';
 
@@ -593,12 +602,17 @@ export default function GcScreen() {
           <td style="width: 16%; text-align: center;">${countStr}</td>
           <td style="width: 50%; text-align: left; padding-left: 8px;">${item.description || ''}</td>
           <td style="width: 17%; text-align: right; padding-right: 8px;">${wtStr}</td>
-          <td style="width: 17%; text-align: right; padding-right: 8px;">${valStr}</td>
+          <td style="width: 17%; text-align: ${isNum ? 'right' : 'center'}; padding-right: 8px;">${valStr}</td>
         </tr>
       `;
     }).join('');
 
-    const totalValue = safeItems.reduce((sum, item) => sum + safeNum(item?.value), 0);
+    const numericValues = safeItems.map(item => Number(item?.value)).filter(n => !isNaN(n) && n > 0);
+    const sumNumericValue = numericValues.reduce((sum, n) => sum + n, 0);
+    const nonNumericValues = safeItems.map(item => String(item?.value || '').trim()).filter(s => s !== '' && isNaN(Number(s)));
+    const totalValueDisplay = sumNumericValue > 0 
+      ? sumNumericValue.toFixed(2) 
+      : (nonNumericValues.length > 0 ? nonNumericValues.join(', ') : '');
     const taxPayeeLower = (note.taxPayee || (note as any).gstPayee || '').toLowerCase();
     const paymentTypeUpper = (note.paymentType || '').toUpperCase();
 
@@ -1142,7 +1156,7 @@ export default function GcScreen() {
                   <tfoot>
                     <tr>
                       <td colspan="3" class="table-footer-label">Value Rs.</td>
-                      <td class="table-footer-value">${totalValue > 0 ? totalValue.toFixed(2) : '0.00'}</td>
+                      <td class="table-footer-value">${totalValueDisplay}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1493,7 +1507,7 @@ export default function GcScreen() {
   const totalFreight = filteredNotes.reduce((sum, n) => sum + n.freight, 0);
   const totalGst = filteredNotes.reduce((sum, n) => sum + n.cgst + n.sgst + n.igst, 0);
   const totalWeight = filteredNotes.reduce((sum, n) => {
-    const itemWeight = n.items?.reduce((s, i) => s + i.weight, 0) || 0;
+    const itemWeight = n.items?.reduce((s, i) => s + (Number(i.weight) || 0), 0) || 0;
     return sum + itemWeight;
   }, 0);
   const totalAmount = filteredNotes.reduce((sum, n) => sum + n.total, 0);
@@ -1700,7 +1714,6 @@ export default function GcScreen() {
                           <TextInput
                             style={[styles.tableCell, styles.tableCellInput, styles.tableCellSmall]}
                             value={item.value}
-                            keyboardType="numeric"
                             onChangeText={(value) => updateItemField(index, 'value', value)}
                             placeholder=""
                           />
@@ -1708,7 +1721,7 @@ export default function GcScreen() {
                       ))}
                       <View style={styles.tableFooterRow}>
                         <Text style={styles.tableFooterLabel}>Value Rs.</Text>
-                        <TextInput style={styles.tableFooterInput} value={totalAmount.toFixed(2)} editable={false} />
+                        <TextInput style={styles.tableFooterInput} value={itemsTotalValueDisplay} editable={false} />
                       </View>
                       <View style={styles.bankInfoBox}>
                         <Text style={styles.bankInfoTitle}>BANK DETAILS</Text>
