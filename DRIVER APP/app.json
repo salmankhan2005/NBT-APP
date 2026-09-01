@@ -27,6 +27,15 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.vahith_app1234.tempexpo",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "RECORD_AUDIO"
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCRQ3QPWMeXqYFOBtayGkScl7lXynWqNus"
@@ -43,6 +52,13 @@
     },
     "plugins": [
       "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access photo library to attach Proof of Delivery and receipts.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access camera to capture Proof of Delivery and receipts."
+        }
+      ],
       [
         "expo-speech-recognition",
         {

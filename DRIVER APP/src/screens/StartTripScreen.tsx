@@ -52,28 +52,60 @@ export default function StartTripScreen({
   
   const [loading, setLoading] = useState(false);
 
+  // Recover any pending photo from Android camera activity if OS killed activity in background
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const recoverPendingPhoto = async () => {
+      try {
+        const pending = await ImagePicker.getPendingResultAsync();
+        if (pending && !('canceled' in pending && pending.canceled) && 'assets' in pending && pending.assets && pending.assets.length > 0) {
+          const uri = pending.assets[0].uri;
+          if (uri) {
+            setOdometerPhotoUri(uri);
+          }
+        }
+      } catch (err) {
+        console.log('Pending photo recovery error in StartTripScreen:', err);
+      }
+    };
+    recoverPendingPhoto();
+  }, []);
+
   const handleCapturePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera access is required to take photo.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setOdometerPhotoUri(result.assets[0].uri);
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Camera access is required to take photo.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setOdometerPhotoUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      Alert.alert('Camera Error', 'Could not open camera. Please try again or select from gallery.');
     }
   };
 
   const handleChooseOdometerPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setOdometerPhotoUri(result.assets[0].uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setOdometerPhotoUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Gallery picker error:', err);
     }
   };
 

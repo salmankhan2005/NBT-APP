@@ -189,24 +189,52 @@ export default function AddExpenseScreen({
     }
   };
 
+  // Recover any pending photo from Android camera activity if OS killed activity in background
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const recoverPendingPhoto = async () => {
+      try {
+        const pending = await ImagePicker.getPendingResultAsync();
+        if (pending && !('canceled' in pending && pending.canceled) && 'assets' in pending && pending.assets && pending.assets.length > 0) {
+          const uri = pending.assets[0].uri;
+          if (uri) {
+            setReceiptImages(prev => {
+              if (prev.includes(uri)) return prev;
+              return [...prev, uri].slice(0, MAX_RECEIPT_PHOTOS);
+            });
+          }
+        }
+      } catch (err) {
+        console.log('Pending photo recovery error in AddExpenseScreen:', err);
+      }
+    };
+    recoverPendingPhoto();
+  }, []);
+
   const handlePickImage = async () => {
     if (receiptImages.length >= MAX_RECEIPT_PHOTOS) {
       Alert.alert('Limit Reached', `You can attach a maximum of ${MAX_RECEIPT_PHOTOS} photos per expense.`);
       return;
     }
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (permission.status !== 'granted') {
-      Alert.alert('Permission Denied', 'Camera permission is required.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: 'images',
-      allowsEditing: true,
-      quality: 0.5,
-    });
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera permission is required.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setReceiptImages(prev => [...prev, result.assets[0].uri].slice(0, MAX_RECEIPT_PHOTOS));
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setReceiptImages(prev => [...prev, result.assets[0].uri].slice(0, MAX_RECEIPT_PHOTOS));
+      }
+    } catch (err) {
+      console.error('Camera capture error:', err);
+      Alert.alert('Camera Error', 'Could not open camera. Please try again or select from gallery.');
     }
   };
 
@@ -215,13 +243,18 @@ export default function AddExpenseScreen({
       Alert.alert('Limit Reached', `You can attach a maximum of ${MAX_RECEIPT_PHOTOS} photos per expense.`);
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setReceiptImages(prev => [...prev, result.assets[0].uri].slice(0, MAX_RECEIPT_PHOTOS));
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setReceiptImages(prev => [...prev, result.assets[0].uri].slice(0, MAX_RECEIPT_PHOTOS));
+      }
+    } catch (err) {
+      console.error('Gallery picker error:', err);
     }
   };
 

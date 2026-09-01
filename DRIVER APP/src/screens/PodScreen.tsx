@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -198,65 +198,111 @@ export default function PodScreen({
     })
   ).current;
 
+  // Recover any pending photo from Android camera activity if OS killed activity in background
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const recoverPendingPhoto = async () => {
+      try {
+        const pending = await ImagePicker.getPendingResultAsync();
+        if (pending && !('canceled' in pending && pending.canceled) && 'assets' in pending && pending.assets && pending.assets.length > 0) {
+          const uri = pending.assets[0].uri;
+          if (uri) {
+            setPodPhoto(uri);
+            setPodPhotoPreview(uri);
+            setPodUploadStatus('idle');
+            setPodHostedUrl(null);
+          }
+        }
+      } catch (err) {
+        console.log('Pending photo recovery error in PodScreen:', err);
+      }
+    };
+    recoverPendingPhoto();
+  }, []);
+
   const handleCaptureEndOdometerPhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera access is required to take photo.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setOdometerEndPhotoUri(result.assets[0].uri);
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Camera access is required to take photo.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setOdometerEndPhotoUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      Alert.alert('Camera Error', 'Could not open camera. Please try again or select from gallery.');
     }
   };
 
   const handleChooseEndOdometerPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setOdometerEndPhotoUri(result.assets[0].uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setOdometerEndPhotoUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('Gallery picker error:', err);
     }
   };
 
   const handlePickPodPhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Camera permission is required.');
-      return;
-    }
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera permission is required.');
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: 'images',
-      allowsEditing: true,
-      quality: 0.5,
-    });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const localUri = result.assets[0].uri;
-      setPodPhoto(localUri);
-      setPodPhotoPreview(localUri);
-      setPodUploadStatus('idle');
-      setPodHostedUrl(null);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const localUri = result.assets[0].uri;
+        setPodPhoto(localUri);
+        setPodPhotoPreview(localUri);
+        setPodUploadStatus('idle');
+        setPodHostedUrl(null);
+      }
+    } catch (err) {
+      console.error('Camera capture error:', err);
+      Alert.alert('Camera Error', 'Could not open camera. Please try again or select from gallery.');
     }
   };
 
   const handleChoosePodPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const localUri = result.assets[0].uri;
-      setPodPhoto(localUri);
-      setPodPhotoPreview(localUri);
-      setPodUploadStatus('idle');
-      setPodHostedUrl(null);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.6,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const localUri = result.assets[0].uri;
+        setPodPhoto(localUri);
+        setPodPhotoPreview(localUri);
+        setPodUploadStatus('idle');
+        setPodHostedUrl(null);
+      }
+    } catch (err) {
+      console.error('Gallery picker error:', err);
     }
   };
 
