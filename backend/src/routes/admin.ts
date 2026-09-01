@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import argon2 from 'argon2';
 import { sql } from '../db/client';
 import { CreateTripSchema } from '../middleware/validate';
+import { deleteUploadedFile } from './upload';
 
 function parseToIsoString(value: unknown): string | null | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -241,7 +242,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return reply.code(200).send({ deleted: true, id });
   });
 
-  // PATCH /api/admin/trips/:id/payment — persist driver payment & profit/loss to Neon DB
+  // PATCH /api/admin/trips/:id/payment — persist driver payment & profit/loss to Neon DB and wipe receipt photos
   app.patch('/trips/:id/payment', adminHook, async (req: FastifyRequest, reply: FastifyReply) => {
     const { id } = req.params as { id: string };
     const { driverPayment } = req.body as { driverPayment: number };
@@ -256,9 +257,13 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const agreedFreight = Number(rows[0].agreed_freight || 0);
 
-    // Fetch total expenses for this trip
-    const expenseRows = await sql`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE trip_id = ${id}`;
-    const totalExpenses = Number(expenseRows[0].total || 0);
+    // Fetch expenses for this trip to compute totals and collect receipt URLs for wiping
+    const expenseRows = await sql`
+      SELECT id, amount, receipt_url, receipt_urls
+      FROM expenses
+      WHERE trip_id = ${id}
+    `;
+    const totalExpenses = expenseRows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
     // Profit/Loss = Agreed Freight - Driver Payment - Total Expenses
     const profitOrLoss = agreedFreight - driverPayment - totalExpenses;
@@ -271,9 +276,38 @@ export async function adminRoutes(app: FastifyInstance) {
       WHERE id = ${id}
     `;
 
+    // ── STORAGE RECLAMATION ──
+    // Once admin saves payment, wipe all receipt photos from DB binary storage, Supabase, and disk
+    if (driverPayment > 0) {
+      const receiptUrlsToWipe: string[] = [];
+      for (const exp of expenseRows) {
+        if (exp.receipt_url) receiptUrlsToWipe.push(exp.receipt_url);
+        if (Array.isArray(exp.receipt_urls)) {
+          for (const u of exp.receipt_urls) {
+            if (u && typeof u === 'string') receiptUrlsToWipe.push(u);
+          }
+        }
+      }
+
+      // 1. Wipe file binary content and metadata from storage & uploaded_files table
+      for (const url of receiptUrlsToWipe) {
+        await deleteUploadedFile(url);
+      }
+
+      // 2. Clear receipt_url and receipt_urls on the expenses records in DB
+      await sql`
+        UPDATE expenses
+        SET receipt_url = NULL,
+            receipt_urls = '[]'::jsonb
+        WHERE trip_id = ${id}
+      `;
+
+      app.log.info(`[Admin] Wiped ${receiptUrlsToWipe.length} expense receipt photos for trip ${id} to reclaim storage space.`);
+    }
+
     app.log.info(`[Admin] Payment updated for trip ${id}: payment=${driverPayment}, P&L=${profitOrLoss}`);
 
-    return reply.code(200).send({ updated: true, driverPayment, profitOrLoss });
+    return reply.code(200).send({ updated: true, driverPayment, profitOrLoss, photosWiped: driverPayment > 0 });
   });
 
   // GET /api/admin/gps/:tripId — full GPS history for a trip

@@ -285,3 +285,76 @@ export async function legacyUploadsFallbackRoutes(app: FastifyInstance) {
   });
 }
 
+/**
+ * Helper to delete an uploaded file by URL or file ID from:
+ * 1. Neon Postgres uploaded_files table (wipes heavy binary content to free DB storage space)
+ * 2. Supabase Storage bucket (removes file from cloud storage)
+ * 3. Local disk cache uploads/ folder
+ */
+export async function deleteUploadedFile(urlOrId?: string | null): Promise<void> {
+  if (!urlOrId || typeof urlOrId !== 'string') return;
+  const trimmed = urlOrId.trim();
+  if (!trimmed) return;
+
+  // Extract file_id, file_name, or storage_path
+  let fileIdentifier = trimmed;
+  if (trimmed.includes('/api/files/')) {
+    fileIdentifier = trimmed.split('/api/files/').pop()?.split('?')[0] || trimmed;
+  } else if (trimmed.includes('/uploads/')) {
+    fileIdentifier = trimmed.split('/uploads/').pop()?.split('?')[0] || trimmed;
+  } else if (trimmed.includes('/nbt-uploads/')) {
+    fileIdentifier = trimmed.split('/nbt-uploads/').pop()?.split('?')[0] || trimmed;
+  }
+
+  try {
+    // 1. Fetch file record to get storage_path and file_name
+    const rows = await sql`
+      SELECT file_id, file_name, storage_path
+      FROM uploaded_files
+      WHERE file_id = ${fileIdentifier} 
+         OR file_name = ${fileIdentifier}
+         OR storage_path = ${fileIdentifier}
+         OR file_id = ${trimmed}
+    `;
+
+    // 2. Delete from Supabase Storage
+    if (supabase && rows.length > 0) {
+      const pathsToDelete: string[] = [];
+      for (const r of rows) {
+        if (r.storage_path) pathsToDelete.push(r.storage_path);
+      }
+      if (pathsToDelete.length > 0) {
+        try {
+          await supabase.storage.from(supabaseBucket).remove(pathsToDelete);
+        } catch (spErr) {
+          // ignore error
+        }
+      }
+    }
+
+    // 3. Delete from Neon Postgres uploaded_files table (frees storage space in DB)
+    await sql`
+      DELETE FROM uploaded_files
+      WHERE file_id = ${fileIdentifier} 
+         OR file_name = ${fileIdentifier}
+         OR storage_path = ${fileIdentifier}
+         OR file_id = ${trimmed}
+    `;
+
+    // 4. Delete from local disk cache if exists
+    for (const r of rows) {
+      if (r.file_name) {
+        try {
+          const filePath = path.join(process.cwd(), 'uploads', r.file_name);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn(`[DeleteFile] Warning deleting file ${fileIdentifier}:`, err);
+  }
+}
+
+

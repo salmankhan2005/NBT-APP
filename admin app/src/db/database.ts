@@ -1403,6 +1403,13 @@ class AdminDatabase {
     const trip = this.mockTrips.find(t => t.id === tripId);
     if (trip) {
       trip.driverPayment = driverPayment;
+      if (driverPayment > 0 && trip.expenses && trip.expenses.length > 0) {
+        // Wipe receipt photos from local cache to immediately reclaim memory/storage
+        trip.expenses = trip.expenses.map(e => ({
+          ...e,
+          receiptUri: undefined,
+        }));
+      }
     }
 
     // Persist to Neon Postgres via backend — survives app refresh/reload
