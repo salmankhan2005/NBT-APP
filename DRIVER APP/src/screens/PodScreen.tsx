@@ -72,6 +72,17 @@ export default function PodScreen({
               <Text style={styles.docketSub}>DIGITAL TRANSIT & DELIVERY DOCKET</Text>
             </View>
 
+            {/* Admin Delivery Confirmation Banner */}
+            <View style={styles.adminSuccessBanner}>
+              <MaterialIcons name="verified" size={28} color="#15803d" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.adminSuccessTitle}>POD SENT SUCCESSFULLY TO ADMIN</Text>
+                <Text style={styles.adminSuccessDesc}>
+                  Proof of Delivery photo, receiver signature, and transit logs have been verified and sent to Admin.
+                </Text>
+              </View>
+            </View>
+
             {/* Status Pill */}
             <View style={styles.docketStatusBadge}>
               <MaterialIcons name="check-circle" size={16} color={COLORS.success} />
@@ -382,13 +393,19 @@ export default function PodScreen({
       
       // Voice guidance announcement
       try {
-        Speech.speak("Trip completed successfully. Your digital delivery docket has been generated. Please review and share.", {
+        Speech.speak("POD sent successfully to Admin. Trip completed successfully.", {
           language: 'en',
           rate: 0.9,
         });
       } catch (err) {
         console.log('Speech error:', err);
       }
+
+      Alert.alert(
+        'POD Sent Successfully',
+        'POD sent successfully to admin!\n\nDelivery proof, odometer reading, and transit logs have been delivered.',
+        [{ text: 'View Docket', onPress: () => setShowSummaryDocket(true) }]
+      );
       
       setShowSummaryDocket(true);
     } catch (e) {
@@ -958,6 +975,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
     letterSpacing: 1.5,
+  },
+  adminSuccessBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#dcfce7',
+    borderWidth: 1.5,
+    borderColor: '#16a34a',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    boxShadow: '0px 2px 6px rgba(22, 163, 74, 0.15)',
+    elevation: 3,
+  },
+  adminSuccessTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#15803d',
+    letterSpacing: 0.5,
+  },
+  adminSuccessDesc: {
+    fontSize: 11,
+    color: '#166534',
+    marginTop: 2,
+    lineHeight: 15,
   },
   docketStatusBadge: {
     flexDirection: 'row',
