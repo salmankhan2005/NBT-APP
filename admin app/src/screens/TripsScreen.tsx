@@ -53,6 +53,7 @@ export default function TripsScreen() {
   const getTripDocuments = (): TripDocument[] => {
     if (!selectedTrip) return [];
     const docs: TripDocument[] = [];
+    const hasDriverPaymentSaved = selectedTrip.driverPayment !== undefined && selectedTrip.driverPayment !== null && Number(selectedTrip.driverPayment) > 0;
     
     if (selectedTrip.odometerStartPhotoUri) {
       docs.push({ id: 'odo-start', type: 'ODOMETER', title: 'Odometer Start Photo', subtitle: `Reading: ${selectedTrip.odometerStart || 'N/A'} km`, uri: selectedTrip.odometerStartPhotoUri });
@@ -63,7 +64,7 @@ export default function TripsScreen() {
     if (selectedTrip.podPhotoUri) {
       docs.push({ id: 'pod-photo', type: 'POD', title: 'Proof of Delivery (POD)', subtitle: selectedTrip.endDate ? `Delivered: ${selectedTrip.endDate}` : 'Delivery Photo', uri: selectedTrip.podPhotoUri });
     }
-    if (selectedTrip.expenses && selectedTrip.expenses.length > 0) {
+    if (!hasDriverPaymentSaved && selectedTrip.expenses && selectedTrip.expenses.length > 0) {
       selectedTrip.expenses.forEach(exp => {
         if (exp.receiptUri) {
           docs.push({ id: `exp-${exp.id}`, type: 'EXPENSE', title: `${exp.category} Receipt`, subtitle: `Amount: ₹${exp.amount}`, uri: exp.receiptUri });
@@ -202,7 +203,8 @@ export default function TripsScreen() {
     try {
       const success = await db.updateTripPayment(selectedTrip.id, payment);
       if (success) {
-        Alert.alert('Payment Saved', 'Driver payment and Profit/Loss updated successfully.');
+        Alert.alert('Payment Saved', 'Driver payment saved successfully. Expense amounts are recorded and receipt photos are archived.');
+        setSelectedTrip(prev => prev ? ({ ...prev, driverPayment: payment }) : null);
         await fetchTrips(false);
       } else {
         Alert.alert('Error', 'Failed to save payment details.');
@@ -1154,12 +1156,21 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
 
               {/* Individual Expense entries list */}
               <View style={styles.detailsCard}>
-                <Text style={styles.cardSectionTitle}>Individual Expense Log</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                  <Text style={styles.cardSectionTitle}>Individual Expense Log</Text>
+                  {(selectedTrip.driverPayment !== undefined && selectedTrip.driverPayment !== null && Number(selectedTrip.driverPayment) > 0) ? (
+                    <View style={styles.settledBadge}>
+                      <MaterialIcons name="verified" size={14} color="#15803d" />
+                      <Text style={styles.settledBadgeText}>Payment Saved • Expense Amounts Only</Text>
+                    </View>
+                  ) : null}
+                </View>
                 {(!selectedTrip.expenses || selectedTrip.expenses.length === 0) ? (
                   <Text style={styles.emptyExpensesText}>No expenses logged yet.</Text>
                 ) : (
                   selectedTrip.expenses.map((exp, index) => {
                     const isExpanded = expandedExpenses.has(exp.id);
+                    const hasDriverPaymentSaved = selectedTrip.driverPayment !== undefined && selectedTrip.driverPayment !== null && Number(selectedTrip.driverPayment) > 0;
                     return (
                       <View key={exp.id} style={styles.individualExpenseCard}>
                         {/* Tappable header row */}
@@ -1240,7 +1251,8 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                               ) : null}
                             </View>
 
-                            {exp.receiptUri ? (
+                            {/* Receipt photo is only visible BEFORE driver payment is saved */}
+                            {!hasDriverPaymentSaved && exp.receiptUri ? (
                               <View style={styles.receiptContainer}>
                                 <Text style={styles.receiptLabel}>📄 Receipt Photo</Text>
                                 <Image
@@ -1258,6 +1270,11 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
                                   <MaterialIcons name="open-in-new" size={14} color={COLORS.primary} />
                                   <Text style={styles.viewReceiptText}>View Full Size</Text>
                                 </TouchableOpacity>
+                              </View>
+                            ) : hasDriverPaymentSaved ? (
+                              <View style={styles.receiptSettledRow}>
+                                <MaterialIcons name="check-circle" size={13} color="#15803d" />
+                                <Text style={styles.receiptSettledText}>Driver payment saved • Receipt photo archived</Text>
                               </View>
                             ) : (
                               <Text style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 8, fontStyle: 'italic' }}>No receipt photo attached.</Text>
@@ -1781,6 +1798,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.primary,
     fontWeight: 'bold',
+  },
+  settledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  settledBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#15803d',
+  },
+  receiptSettledRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.outlineVariant,
+  },
+  receiptSettledText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#15803d',
+    fontStyle: 'italic',
   },
   emptyExpensesText: {
     fontSize: 12,

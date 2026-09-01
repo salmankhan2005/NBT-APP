@@ -226,7 +226,7 @@ export default function LiveStatusScreen() {
                       {exp.reason ? <Text style={styles.expenseReason}>{exp.reason}</Text> : null}
                       {exp.liters ? <Text style={styles.expenseReason}>{exp.liters} Liters</Text> : null}
                       <Text style={styles.expenseTime}>{exp.timestamp}</Text>
-                      {exp.receiptUri ? (
+                      {(!(driverTrip.driverPayment && Number(driverTrip.driverPayment) > 0) && exp.receiptUri) ? (
                         <View style={{ marginTop: 6, gap: 4 }}>
                           <Image source={{ uri: normalizeImageUrl(exp.receiptUri) || exp.receiptUri }} style={{ width: 80, height: 60, borderRadius: 6 }} resizeMode="cover" />
                           <TouchableOpacity
