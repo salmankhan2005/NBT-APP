@@ -45,9 +45,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "experiments": {
-      "baseUrl": "/driver"
-    },
     "extra": {
       "eas": {
         "projectId": "6f15f73a-77a4-4e3d-ad3a-ba377c2f4e2e"
