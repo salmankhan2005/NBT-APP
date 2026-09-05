@@ -1,7 +1,12 @@
 {
+  "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "cleanUrls": false,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/_expo/:match*", "destination": "/_expo/:match*" },
+    { "source": "/assets/:match*", "destination": "/assets/:match*" },
+    { "source": "/favicon.ico", "destination": "/favicon.ico" },
+    { "source": "/:path*", "destination": "/index.html" }
   ]
 }
