@@ -1,0 +1,66 @@
+﻿name: 🚀 Build & Deploy NBT Demo Suite
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    name: Build Admin + Driver → Deploy to Netlify
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install Admin App Dependencies
+        working-directory: 'admin app'
+        run: npm ci
+
+      - name: 📦 Install Driver App Dependencies
+        working-directory: 'DRIVER APP'
+        run: npm ci
+
+      - name: 🔨 Build Admin App (Expo Web → /admin)
+        working-directory: 'admin app'
+        env:
+          EXPO_PUBLIC_API_URL: https://nbt-app.onrender.com
+        run: npx expo export --platform web
+
+      - name: 🔨 Build Driver App (Expo Web → /driver)
+        working-directory: 'DRIVER APP'
+        env:
+          EXPO_PUBLIC_API_URL: https://nbt-app.onrender.com
+        run: npx expo export --platform web
+
+      - name: 📁 Assemble Unified dist/
+        run: |
+          mkdir -p dist/admin dist/driver
+          cp -r "admin app/dist/." dist/admin/
+          cp -r "DRIVER APP/dist/." dist/driver/
+          sed -e 's|src="http://localhost:8081"|src="/admin/"|g' -e 's|value="http://localhost:8081"|value="/admin"|g' -e 's|src="http://localhost:8082"|src="/driver/"|g' demo-suite.html > dist/index.html
+          echo '/admin/*  /admin/index.html  200' >  dist/_redirects
+          echo '/driver/* /driver/index.html 200' >> dist/_redirects
+          echo "✅ dist/ assembled:" && ls -la dist/
+
+      - name: 🌐 Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: dist
+          production-branch: main
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "🚀 Auto-deploy from commit ${{ github.sha }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 10
