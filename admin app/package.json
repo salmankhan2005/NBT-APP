@@ -42,7 +42,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build": "expo export --platform web"
+    "build": "expo export --platform web && node -e \"require('fs').writeFileSync('dist/.nojekyll','')\" && node -e \"require('fs').writeFileSync('dist/_redirects','/* /index.html 200\\n')\""
   },
   "private": true
 }

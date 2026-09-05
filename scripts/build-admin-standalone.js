@@ -36,9 +36,12 @@ execSync('npx expo export --platform web --clear', {
 // 4. Copy dist directly to root dist-admin/
 if (fs.existsSync(path.join(ADMIN_DIR, 'dist'))) {
   fs.cpSync(path.join(ADMIN_DIR, 'dist'), OUTPUT_DIR, { recursive: true });
+  fs.writeFileSync(path.join(ADMIN_DIR, 'dist', '.nojekyll'), '', 'utf8');
+  fs.writeFileSync(path.join(ADMIN_DIR, 'dist', '_redirects'), '/*  /index.html  200\n', 'utf8');
 }
 
-// 5. Add SPA redirect rules
+// 5. Add SPA redirect rules and .nojekyll for Netlify static processing
 fs.writeFileSync(path.join(OUTPUT_DIR, '_redirects'), '/*  /index.html  200\n', 'utf8');
+fs.writeFileSync(path.join(OUTPUT_DIR, '.nojekyll'), '', 'utf8');
 
 console.log('\n✅ [Build Admin App] Standalone Admin App compiled directly to dist-admin/ !');
