@@ -335,15 +335,6 @@ function AppContent() {
                 />
               </View>
 
-              {sidebarCollapsed && (
-                <View style={{ position: 'absolute', left: 0, top: 0, width: 72, height: 72, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image
-                    source={require('./assets/logo.png')}
-                    style={{ width: 32, height: 32 }}
-                    resizeMode="contain"
-                  />
-                </View>
-              )}
               {!sidebarCollapsed && (
                 <View style={styles.sidebarBrandTextCol}>
                   <Text style={styles.sidebarBrandTitle}>New Balaji Transport</Text>
@@ -480,9 +471,18 @@ function AppContent() {
                 <MaterialIcons name="menu" size={24} color="#ffffff" />
               </TouchableOpacity>
 
-              <View style={styles.mobileBrandInfo}>
-                <Text style={styles.mobileBrandName}>New Balaji Transport</Text>
-                <Text style={styles.mobileBrandTagline}>ADMIN COMMAND PORTAL</Text>
+              <View style={styles.mobileBrandRow}>
+                <View style={styles.mobileLogoCircle}>
+                  <Image
+                    source={require('./assets/logo.png')}
+                    style={styles.mobileLogoImg}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={styles.mobileBrandInfo}>
+                  <Text style={styles.mobileBrandName}>New Balaji Transport</Text>
+                  <Text style={styles.mobileBrandTagline}>ADMIN COMMAND PORTAL</Text>
+                </View>
               </View>
 
               <View style={styles.mobileAdminBadge}>
@@ -628,7 +628,14 @@ function AppContent() {
             <View style={[styles.drawerContentCard, { paddingTop: Math.max(insets.top + 12, 16) }]}>
               {/* Drawer Header */}
               <View style={styles.drawerHeaderRow}>
-                <View style={{ flex: 1 }}>
+                <View style={styles.drawerLogoCircle}>
+                  <Image
+                    source={require('./assets/logo.png')}
+                    style={styles.drawerLogoImg}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={styles.drawerTitle}>New Balaji Transport</Text>
                   <Text style={styles.drawerSubtitle}>Logistics Admin Command Menu</Text>
                 </View>
@@ -732,32 +739,33 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   sidebarBrandIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sidebarBrandLogo: {
     width: 38,
     height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    padding: 2,
+  },
+  sidebarBrandLogo: {
+    width: '100%',
+    height: '100%',
   },
   sidebarBrandTextCol: {
     flex: 1,
     marginLeft: 10,
-    display: 'none',
   },
   sidebarBrandTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: 0.5,
-    display: 'none',
   },
   sidebarBrandSubtitle: {
     fontSize: 8,
-    display: 'none',
     fontWeight: 'bold',
     color: COLORS.secondary,
     letterSpacing: 1,
@@ -942,6 +950,26 @@ const styles = StyleSheet.create({
     padding: 4,
     marginRight: 8,
   },
+  mobileBrandRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mobileLogoCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mobileLogoImg: {
+    width: '100%',
+    height: '100%',
+  },
   mobileBrandInfo: {
     flex: 1,
   },
@@ -1029,11 +1057,27 @@ const styles = StyleSheet.create({
   drawerHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
     marginBottom: 16,
+  },
+  drawerLogoCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  drawerLogoImg: {
+    width: '100%',
+    height: '100%',
   },
   drawerTitle: {
     fontSize: 16,

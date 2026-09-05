@@ -148,7 +148,11 @@ export default function ProfileScreen({
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarLarge}>
-            <MaterialIcons name="person" size={56} color={COLORS.primary} />
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.profileLogoImg}
+              resizeMode="contain"
+            />
           </View>
           <Text style={styles.profileName}>{driverName}</Text>
           <View style={styles.badge}>
@@ -396,12 +400,22 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.outlineVariant,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
     marginBottom: SPACING.gutter,
+    overflow: 'hidden',
+    padding: 3,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+  },
+  profileLogoImg: {
+    width: '100%',
+    height: '100%',
   },
   profileName: {
     fontSize: 22,

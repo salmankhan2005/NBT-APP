@@ -995,8 +995,11 @@ const MemoScreen = () => {
                 <View style={[styles.headerTop, !isDesktop && { flexDirection: 'column', alignItems: 'center', gap: 10, paddingBottom: 10 }]}>
                   <View style={styles.logoArea}>
                     <View style={styles.logoCircle}>
-                      <Text style={styles.logoMark}>NBT</Text>
-                      <Text style={styles.logoText}>NEW BALAJI TRANSPORT</Text>
+                      <Image
+                        source={require('../../assets/logo.png')}
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                      />
                     </View>
                   </View>
                   <View style={styles.headerCenter}>
@@ -1502,9 +1505,8 @@ const styles = StyleSheet.create({
   memoPage: { flex: 1, width: '100%', backgroundColor: '#ffffff', borderRadius: 8, padding: 18, borderWidth: 2.5, borderColor: '#0f172a', overflow: 'hidden' },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 10 },
   logoArea: { width: 86, minWidth: 86, alignItems: 'center', justifyContent: 'center' },
-  logoCircle: { width: 82, height: 82, borderWidth: 2.5, borderColor: '#0f172a', borderRadius: 41, alignItems: 'center', justifyContent: 'center', padding: 4 },
-  logoMark: { fontSize: 24, fontWeight: '900', letterSpacing: 1, color: '#0f172a' },
-  logoText: { fontSize: 6.5, lineHeight: 8, fontWeight: '800', letterSpacing: 0.5, marginTop: 2, textAlign: 'center', color: '#0f172a' },
+  logoCircle: { width: 82, height: 82, borderWidth: 2, borderColor: '#0f172a', borderRadius: 41, alignItems: 'center', justifyContent: 'center', padding: 2, overflow: 'hidden', backgroundColor: '#ffffff' },
+  logoImage: { width: '100%', height: '100%' },
   headerCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   signedBy: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2, color: '#0f172a' },
   companyName: { fontSize: 24, fontWeight: '900', letterSpacing: 1.5, lineHeight: 28, textAlign: 'center', color: '#0f172a' },

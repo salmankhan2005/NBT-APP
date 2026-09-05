@@ -132,8 +132,17 @@ export default function LandingPage({ onEnterDashboard }: LandingPageProps) {
               onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
               style={styles.brandContainer}
             >
-              <Text style={styles.brandTitleLine1}>Logistics</Text>
-              <Text style={styles.brandTitleLine2}>Command</Text>
+              <View style={styles.brandLogoCircle}>
+                <Image
+                  source={require('../../assets/logo.png')}
+                  style={styles.brandLogoImg}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.brandTextWrap}>
+                <Text style={styles.brandTitleLine1}>NEW BALAJI TRANSPORT</Text>
+                <Text style={styles.brandTitleLine2}>LOGISTICS COMMAND</Text>
+              </View>
             </TouchableOpacity>
 
             {/* Nav Menu Links */}
@@ -357,8 +366,20 @@ export default function LandingPage({ onEnterDashboard }: LandingPageProps) {
           <View style={styles.footerInner}>
             {/* Left Brand Column */}
             <View style={styles.footerBrandCol}>
-              <Text style={styles.footerBrandName}>Logistics Command</Text>
-              <Text style={styles.footerCopyright}>© 2026 Logistics Command.</Text>
+              <View style={styles.footerBrandHeader}>
+                <View style={styles.footerLogoCircle}>
+                  <Image
+                    source={require('../../assets/logo.png')}
+                    style={styles.footerLogoImg}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View>
+                  <Text style={styles.footerBrandName}>NEW BALAJI TRANSPORT</Text>
+                  <Text style={styles.footerBrandSubtitle}>LOGISTICS COMMAND</Text>
+                </View>
+              </View>
+              <Text style={styles.footerCopyright}>© 2026 New Balaji Transport & Logistics Command.</Text>
               <Text style={styles.footerCopyright}>All rights reserved.</Text>
             </View>
 
@@ -588,22 +609,44 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   brandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  brandLogoCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#FC7728',
+    overflow: 'hidden',
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  brandLogoImg: {
+    width: '100%',
+    height: '100%',
+  },
+  brandTextWrap: {
     flexDirection: 'column',
     justifyContent: 'center',
   },
   brandTitleLine1: {
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: '900',
     color: '#FC7728',
-    letterSpacing: 0.5,
-    lineHeight: 22,
+    letterSpacing: 0.6,
+    lineHeight: 18,
   },
   brandTitleLine2: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#FC7728',
-    letterSpacing: 0.5,
-    lineHeight: 22,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#00F2FF',
+    letterSpacing: 1.5,
+    lineHeight: 14,
+    marginTop: 1,
   },
   navRightGroup: {
     flexDirection: 'row',
@@ -989,14 +1032,41 @@ const styles = StyleSheet.create({
     gap: 28,
   },
   footerBrandCol: {
-    gap: 4,
+    gap: 6,
+  },
+  footerBrandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 4,
+  },
+  footerLogoCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#FC7728',
+    overflow: 'hidden',
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footerLogoImg: {
+    width: '100%',
+    height: '100%',
   },
   footerBrandName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
     color: '#FC7728',
     letterSpacing: 0.5,
-    marginBottom: 6,
+  },
+  footerBrandSubtitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#00F2FF',
+    letterSpacing: 1.2,
   },
   footerCopyright: {
     fontSize: 13,

@@ -72,13 +72,20 @@ export default function HomeScreen({
       {/* Header bar */}
       <View style={styles.headerBar}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatarContainer}>
-            <MaterialIcons name="account-circle" size={32} color={COLORS.outline} />
+          <View style={styles.headerLogoBadge}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.headerLogoImg}
+              resizeMode="contain"
+            />
           </View>
-          <Text style={styles.headerTitle}>Driver Console</Text>
+          <View>
+            <Text style={styles.headerBrandTitle}>New Balaji Transport</Text>
+            <Text style={styles.headerSubtitle}>DRIVER CONSOLE</Text>
+          </View>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-          <MaterialIcons name="logout" size={24} color={COLORS.error} />
+          <MaterialIcons name="logout" size={22} color={COLORS.error} />
         </TouchableOpacity>
       </View>
 
@@ -326,20 +333,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  avatarContainer: {
+  headerLogoBadge: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.surfaceContainerLow,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    padding: 2,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  headerLogoImg: {
+    width: '100%',
+    height: '100%',
+  },
+  headerBrandTitle: {
+    fontSize: 15,
+    fontWeight: '900',
     color: COLORS.primary,
+    letterSpacing: 0.3,
+  },
+  headerSubtitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: COLORS.secondary,
+    letterSpacing: 0.8,
+    marginTop: 1,
   },
   logoutBtn: {
     padding: 8,

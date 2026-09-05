@@ -171,7 +171,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const renderHeader = () => (
     <View style={styles.pageHeader}>
       <View style={styles.logoWrap}>
-        <Image source={require('../../assets/icon.png')} style={styles.logoImg} resizeMode="contain" />
+        <Image source={require('../../assets/logo.png')} style={styles.logoImg} resizeMode="contain" />
       </View>
       <Text style={styles.brandName}>New Balaji Transport</Text>
       <Text style={styles.brandTagline}>ADMIN COMMAND CONSOLE</Text>
@@ -382,19 +382,20 @@ const styles = StyleSheet.create({
   // ── Header ──
   pageHeader: { alignItems: 'center', marginBottom: 24 },
   logoWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#e2e8f0',
+    padding: 3,
     ...SHADOWS.medium,
   },
-  logoImg: { width: 88, height: 88 },
+  logoImg: { width: '100%', height: '100%' },
   brandName: {
     fontSize: 22,
     fontWeight: '900',

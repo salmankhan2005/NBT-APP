@@ -6,6 +6,7 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS } from '../theme';
@@ -111,7 +112,11 @@ export default function SplashScreen({ onAnimationEnd }: SplashScreenProps) {
             },
           ]}
         >
-          <MaterialIcons name="local-shipping" size={64} color={COLORS.secondary} />
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </Animated.View>
 
         {/* Animated Text Titles */}
@@ -174,17 +179,24 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 120,
     height: 120,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 60,
+    backgroundColor: '#ffffff',
+    borderWidth: 2.5,
+    borderColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: 36,
+    overflow: 'hidden',
+    padding: 3,
     shadowColor: COLORS.secondary,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 22,
