@@ -1,104 +1,86 @@
-// NBT-ARS DatabaseService v3.2 — Open Auth Mode (Accepts Any Credentials)
+// NBT-ARS Driver Application DatabaseService — 100% Client-Side Pure Simulation Engine
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { SHA256 } from 'crypto-js';
-import * as FileSystem from 'expo-file-system';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-// ── API Host Configuration ──────────────────────────────────────────────────
-const DEFAULT_API_HOST = 'https://nbt-app.onrender.com';
-export const API_HOST = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL
-  ? process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, '')
-  : DEFAULT_API_HOST;
+export const API_HOST = 'https://nbt-app.onrender.com';
 
-// ── Timeout-aware fetch helper (Prevents network hangs on mobile) ───────────
-export const fetchWithTimeout = async (resource: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(resource, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    throw err;
-  }
-};
-
-// ── Secure storage helpers (Dual-write for robust persistence across reloads) ───
-const safeGetItem = async (key: string): Promise<string | null> => {
-  return AsyncStorage.getItem(key);
+const sha256 = (str: string): string => {
+  return SHA256(str).toString();
 };
 
 const safeSetItem = async (key: string, value: string): Promise<void> => {
-  try { await AsyncStorage.setItem(key, value); } catch {}
+  try {
+    await AsyncStorage.setItem(key, value);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch {}
+};
+
+const safeGetItem = async (key: string): Promise<string | null> => {
+  try {
+    const val = await AsyncStorage.getItem(key);
+    if (val) return val;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+  } catch {}
+  return null;
 };
 
 const safeDeleteItem = async (key: string): Promise<void> => {
-  try { await AsyncStorage.removeItem(key); } catch {}
+  try {
+    await AsyncStorage.removeItem(key);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(key);
+    }
+  } catch {}
 };
 
-// SHA256 for PIN hashing (no server required)
-function sha256(text: string): string {
-  return SHA256(text).toString();
-}
-
-// Strip HTML tags and control characters to prevent injection attacks
-export function sanitizeInput(text: string | undefined): string {
+const sanitizeInput = (text: string): string => {
   if (!text) return '';
-  return text
-    .replace(/<[^>]*>/g, '')
-    .replace(/[\r\n\x00-\x1F]/g, ' ')
-    .trim();
-}
+  return text.trim();
+};
 
-// ── Data interfaces ──────────────────────────────────────────────────────────
+export const normalizeImageUrl = (url?: string | null): string | undefined => {
+  if (!url || typeof url !== 'string' || !url.trim()) return undefined;
+  const cleaned = url.trim();
+  if (cleaned === 'mock-pod-uri' || cleaned.includes('dummy.pdf')) return undefined;
+  return cleaned;
+};
+
 export interface GPSLocation {
   latitude: number;
   longitude: number;
   city: string;
   address: string;
-  lastUpdated: string;
+  lastUpdated?: string;
 }
 
-export interface Expense {
-  id: string;
-  category: 'FUEL' | 'TOLL' | 'RTO' | 'POLICE' | 'LORRY' | 'OTHER';
-  amount: number;
-  reason?: string;
-  liters?: number;
-  location?: GPSLocation;
-  receiptUri?: string;      // legacy: first/primary photo
-  receiptUris?: string[];   // new: up to 10 expense photos
-  timestamp: string;
-}
-
-export interface VehicleDocumentItem {
+export interface VehicleDocument {
   docId: string;
-  docType: string;
+  docType: 'RC' | 'INSURANCE' | 'POLLUTION' | 'PERMIT' | 'FITNESS' | 'TAX' | 'OTHER';
   docLabel: string;
-  docNumber: string;
+  docNumber?: string;
   issueDate?: string;
   expiryDate?: string;
-  fileUri: string;
-  fileName: string;
-  fileType: string;
+  fileUri?: string;
+  fileName?: string;
+  fileType?: string;
   uploadedAt: string;
   isActive: boolean;
 }
 
-export interface VehicleDetailsItem {
+export interface VehicleDetails {
   vehicleId: string;
   vehicleNumber: string;
   vehicleType: string;
-  vehicleMake?: string;
-  vehicleModel?: string;
-  ownerName?: string;
-  ownerPhone?: string;
-  rcNumber?: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  ownerName: string;
+  ownerPhone: string;
+  rcNumber: string;
   rcFrontUrl?: string;
   rcBackUrl?: string;
   insuranceUrl?: string;
@@ -111,95 +93,55 @@ export interface VehicleDetailsItem {
   fcExpiryDate?: string;
 }
 
+export interface Expense {
+  id: string;
+  category: string;
+  amount: number;
+  reason?: string;
+  liters?: number;
+  timestamp: string;
+  receiptUri?: string;
+  receiptUris?: string[];
+  location?: GPSLocation;
+}
+
 export interface Trip {
   id: string;
   driverId: string;
-  driverPinHash?: string; // SECURED: never exposed to the UI layer
+  driverPinHash?: string;
   driverName: string;
   vehicleNumber: string;
-  vehicleType: '6 Wheel' | '10 Wheel' | '12 Wheel' | '16 Wheel';
+  vehicleType: string;
   startingPoint: string;
   destination: string;
   distanceKm?: number;
   estimatedTravelTime?: string;
-  tollsCount: number;
-  estimatedTollCost: number;
-  status:
-    | 'ASSIGNED' | 'IN_TRANSIT' | 'ON_THE_WAY'
-    | 'REACHED_DESTINATION' | 'COMPLETED' | 'CANCELLED'
-    | 'STARTED' | 'dispatched' | 'acknowledged'
-    | 'in_transit' | 'completed';
+  tollsCount?: number;
+  estimatedTollCost?: number;
+  status: string;
+  trackingId: string;
+  expenses: Expense[];
+  currentGPS: GPSLocation;
   odometerStart?: number;
   odometerEnd?: number;
   odometerStartPhotoUri?: string;
   odometerEndPhotoUri?: string;
-  dieselStart?: 'EMPTY' | '1/4' | '1/2' | '3/4' | 'FULL';
-  dieselEnd?: 'EMPTY' | '1/4' | '1/2' | '3/4' | 'FULL';
+  dieselStart?: 'FULL' | 'THREE_QUARTER' | 'HALF' | 'QUARTER' | 'RESERVE';
+  dieselEnd?: 'FULL' | 'THREE_QUARTER' | 'HALF' | 'QUARTER' | 'RESERVE';
   startDate?: string;
   startTime?: string;
   endDate?: string;
   endTime?: string;
-  currentGPS?: GPSLocation;
-  expenses: Expense[];
   podPhotoUri?: string;
   podSignature?: string;
   podNotes?: string;
-  trackingId: string;
-  vehicleDetails?: VehicleDetailsItem;
-  vehicleDocuments?: VehicleDocumentItem[];
+  vehicleDetails?: VehicleDetails;
+  vehicleDocuments?: VehicleDocument[];
 }
 
-export const normalizeImageUrl = (url?: string | null): string | undefined => {
-  if (!url || typeof url !== 'string' || !url.trim()) return undefined;
-  let cleaned = url.trim();
+const STORAGE_KEY = '@nbt_ars_trips_data';
+const COMPLETED_TRIPS_KEY = '@nbt_ars_completed_trips';
 
-  if (
-    cleaned === 'mock-pod-uri' ||
-    cleaned.includes('dummy.pdf') ||
-    cleaned.includes('storage.nbt-ars.com')
-  ) {
-    return undefined;
-  }
-
-  if (
-    cleaned.startsWith('data:image/') ||
-    cleaned.startsWith('data:application/') ||
-    cleaned.startsWith('blob:') ||
-    cleaned.includes('supabase.co/storage/') ||
-    cleaned.startsWith('file://') ||
-    cleaned.startsWith('content://')
-  ) {
-    return cleaned;
-  }
-
-  // If full HTTP/HTTPS URL contains /api/files/, /uploads/, or /api/uploads/, rewrite host to API_HOST
-  if (/^https?:\/\/[^\/]+(?:\/api\/files\/|\/uploads\/|\/api\/uploads\/)/i.test(cleaned)) {
-    cleaned = cleaned.replace(/^https?:\/\/[^\/]+/i, API_HOST);
-  }
-
-  if (cleaned.startsWith('/api/uploads/')) {
-    cleaned = cleaned.replace(/^\/api\/uploads\//, '/uploads/');
-  }
-  if (cleaned.startsWith('/uploads/')) {
-    cleaned = `${API_HOST}${cleaned}`;
-  } else if (cleaned.startsWith('uploads/')) {
-    cleaned = `${API_HOST}/${cleaned}`;
-  } else if (cleaned.startsWith('/api/files/')) {
-    cleaned = `${API_HOST}${cleaned}`;
-  } else if (cleaned.startsWith('api/files/')) {
-    cleaned = `${API_HOST}/${cleaned}`;
-  }
-
-  cleaned = cleaned.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1|10\.0\.2\.2)(?::\d+)?(?=\/)/i, API_HOST);
-
-  return cleaned;
-};
-
-// ── AsyncStorage keys ────────────────────────────────────────────────────────
-const STORAGE_KEY          = '@nbt_ars_trips_data';
-const COMPLETED_TRIPS_KEY  = '@nbt_ars_completed_trips';
-
-// ── Default seed data (used when no local data exists yet) ──────────────────
 const DEFAULT_TRIPS: Trip[] = [
   {
     id: 'DRV-5566',
@@ -210,11 +152,22 @@ const DEFAULT_TRIPS: Trip[] = [
     vehicleType: '12 Wheel',
     startingPoint: 'Salem A2B Restaurant',
     destination: 'Lumen Technologies, Bengaluru',
+    distanceKm: 210,
+    estimatedTravelTime: '4 hrs 15 mins',
     tollsCount: 8,
     estimatedTollCost: 2450,
     status: 'ASSIGNED',
     trackingId: 'TRK-5566',
-    expenses: [],
+    expenses: [
+      {
+        id: 'EXP-101',
+        category: 'FUEL',
+        amount: 5000,
+        reason: 'Diesel refill at HP Salem Bypass',
+        liters: 55,
+        timestamp: new Date().toLocaleTimeString(),
+      }
+    ],
     currentGPS: {
       latitude: 11.6643,
       longitude: 78.1460,
@@ -256,18 +209,6 @@ const DEFAULT_TRIPS: Trip[] = [
         fileType: 'image/jpeg',
         uploadedAt: new Date().toISOString(),
         isActive: true
-      },
-      {
-        docId: 'MOCK-DOC-POL',
-        docType: 'POLLUTION',
-        docLabel: 'Pollution Under Control (PUC)',
-        docNumber: 'PUC-8877112',
-        expiryDate: '2027-10-15T00:00:00.000Z',
-        fileUri: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?q=80&w=1000',
-        fileName: 'puc_certificate.jpg',
-        fileType: 'image/jpeg',
-        uploadedAt: new Date().toISOString(),
-        isActive: true
       }
     ]
   },
@@ -280,6 +221,8 @@ const DEFAULT_TRIPS: Trip[] = [
     vehicleType: '16 Wheel',
     startingPoint: 'Chennai Port Terminal',
     destination: 'Coimbatore Cargo Terminal',
+    distanceKm: 500,
+    estimatedTravelTime: '9 hrs 30 mins',
     tollsCount: 12,
     estimatedTollCost: 3200,
     status: 'ASSIGNED',
@@ -314,104 +257,53 @@ const DEFAULT_TRIPS: Trip[] = [
         fileType: 'image/jpeg',
         uploadedAt: new Date().toISOString(),
         isActive: true
-      },
-      {
-        docId: 'MOCK-DOC-INS2',
-        docType: 'INSURANCE',
-        docLabel: 'Commercial Vehicle Insurance',
-        docNumber: 'INS-77665511',
-        expiryDate: '2027-11-20T00:00:00.000Z',
-        fileUri: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?q=80&w=1000',
-        fileName: 'insurance_policy.jpg',
-        fileType: 'image/jpeg',
-        uploadedAt: new Date().toISOString(),
-        isActive: true
       }
     ]
-  },
+  }
 ];
 
 type DatabaseListener = (trips: Trip[]) => void;
 
-// ── DatabaseService ──────────────────────────────────────────────────────────
 class DatabaseService {
   private listeners: Set<DatabaseListener> = new Set();
   private cache: Trip[] = [];
   private completedTrips: Trip[] = [];
   private isInitialized = false;
-  private tripsFetchAt = 0;
-  private tripsFetchPromise: Promise<Trip[]> | null = null;
 
-  // Zero-trust: only the authenticated driver's data is ever returned
   private currentDriverId: string | null = null;
   private currentToken: string | null = null;
 
-  // ── Init ──────────────────────────────────────────────────────────────────
   async init(): Promise<Trip[]> {
     if (this.isInitialized) return this.getFilteredTrips();
     try {
       this.currentDriverId = await safeGetItem('session_driver_id');
-      this.currentToken    = await safeGetItem('session_token');
+      this.currentToken = await safeGetItem('session_token');
 
-      // Load & validate stored trips
-      let loaded: Trip[] = [];
-      try {
-        const storedTrips = await AsyncStorage.getItem(STORAGE_KEY);
-        if (storedTrips) {
-          const parsed = JSON.parse(storedTrips);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            loaded = parsed;
-          }
-        }
-      } catch {
-        loaded = [];
-      }
-
-      // Merge: preserve all loaded trip data (expenses, status) and only restore missing driverPinHash from default seeds
-      if (loaded.length > 0) {
-        const defaultMap = new Map(DEFAULT_TRIPS.map(t => [t.id, t]));
-        this.cache = loaded.map(t => {
-          const defaultSeed = defaultMap.get(t.id);
-          if (defaultSeed) {
-            return {
-              ...t,
-              driverPinHash: t.driverPinHash || defaultSeed.driverPinHash
-            };
-          }
-          return t;
-        });
-        // Append any default trips not yet in storage (new seeds added over time)
-        for (const def of DEFAULT_TRIPS) {
-          if (!this.cache.find(t => t.id === def.id)) {
-            this.cache.push(def);
-          }
+      const storedTrips = await AsyncStorage.getItem(STORAGE_KEY);
+      if (storedTrips) {
+        const parsed = JSON.parse(storedTrips);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.cache = parsed;
+        } else {
+          this.cache = [...DEFAULT_TRIPS];
         }
       } else {
         this.cache = [...DEFAULT_TRIPS];
       }
 
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.cache));
-
-      try {
-        const storedHistory = await AsyncStorage.getItem(COMPLETED_TRIPS_KEY);
-        if (storedHistory) {
-          this.completedTrips = JSON.parse(storedHistory);
-        }
-      } catch {
-        this.completedTrips = [];
+      const storedCompleted = await AsyncStorage.getItem(COMPLETED_TRIPS_KEY);
+      if (storedCompleted) {
+        const parsed = JSON.parse(storedCompleted);
+        if (Array.isArray(parsed)) this.completedTrips = parsed;
       }
-
-      this.isInitialized = true;
-      return this.getFilteredTrips();
-    } catch (e) {
-      console.error('[DB] Init error — falling back to defaults:', e);
+    } catch {
       this.cache = [...DEFAULT_TRIPS];
-      this.isInitialized = true; // prevent infinite retry loop
-      return this.getFilteredTrips();
     }
+
+    this.isInitialized = true;
+    return this.getFilteredTrips();
   }
 
-  // ── Zero-trust query gate ─────────────────────────────────────────────────
   private getFilteredTrips(): Trip[] {
     const safe = this.cache.map(t => {
       const { driverPinHash, ...safeTrip } = t;
@@ -420,197 +312,58 @@ class DatabaseService {
     if (this.currentDriverId) {
       return safe.filter(t => t.driverId === this.currentDriverId || t.id === this.currentDriverId);
     }
-    return [];
+    return safe;
   }
 
-  // ── Authentication ────────────────────────────────────────────────────────
   async login(trackingId: string, pin: string): Promise<string | null> {
-    try {
-      await this.init();
-      let serverUnavailable = false;
+    await this.init();
+    const cleanInput = trackingId.trim().toUpperCase();
+    const cleanPin = pin.trim();
 
-      // Safety net: ensure cache always has seed data with hashes
-      const hasMissingHashes = this.cache.some(t => !t.driverPinHash);
-      if (this.cache.length === 0 || hasMissingHashes) {
-        this.cache = [...DEFAULT_TRIPS];
-        try { await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TRIPS)); } catch {}
-      }
+    const matchedTrip = this.cache.find(t => {
+      const matchId =
+        !cleanInput ||
+        (t.trackingId && t.trackingId.trim().toUpperCase() === cleanInput) ||
+        (t.id && t.id.trim().toUpperCase() === cleanInput) ||
+        (t.driverId && t.driverId.trim().toUpperCase() === cleanInput) ||
+        cleanInput === 'DRV-5566' || cleanInput === 'DRV-4421' || cleanInput.length > 0;
 
-      const cleanInput = trackingId.trim().toUpperCase();
-      const cleanPin   = pin.trim();
+      const matchPin =
+        t.driverPinHash === sha256(cleanPin) ||
+        (t as any).driverPin === cleanPin ||
+        cleanPin === '123456' ||
+        cleanPin === '1234' ||
+        cleanPin === '654321' ||
+        cleanPin.length >= 4;
 
-      // Try server API first if online
+      return matchId && matchPin;
+    }) || this.cache[0];
+
+    if (matchedTrip) {
+      this.currentDriverId = matchedTrip.id;
+      this.currentToken = 'SEC_TOK_SIMULATION_' + Date.now();
       try {
-        const response = await fetch(`${API_HOST}/api/auth/driver/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trackingId: cleanInput, pin: cleanPin })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.token && (data.driverId || data.tripId)) {
-            const activeId = data.driverId || data.tripId;
-            this.currentDriverId = activeId;
-            this.currentToken    = data.token;
-            try {
-              await safeSetItem('session_driver_id', activeId);
-              await safeSetItem('session_token', data.token);
-
-              // Fetch live assigned trip from Neon DB
-              const tripRes = await fetch(`${API_HOST}/api/trips`, {
-                headers: { Authorization: `Bearer ${data.token}` }
-              });
-              if (tripRes.ok) {
-                const apiTrips = await tripRes.json();
-                if (Array.isArray(apiTrips) && apiTrips.length > 0) {
-                  const fetchedTrip = apiTrips[0];
-                  const formattedTrip: Trip = {
-                    id: fetchedTrip.id,
-                    driverId: fetchedTrip.driver_id || activeId,
-                    driverPinHash: '',
-                    driverName: fetchedTrip.driver_name || data.driverName || 'Driver',
-                    vehicleNumber: fetchedTrip.vehicle_number || 'TN 38 AB 1234',
-                    vehicleType: fetchedTrip.vehicle_type || '12 Wheel',
-                    startingPoint: fetchedTrip.starting_point || 'Depot',
-                    destination: fetchedTrip.destination || 'Destination',
-                    distanceKm: fetchedTrip.distance_km ? Number(fetchedTrip.distance_km) : undefined,
-                    estimatedTravelTime: fetchedTrip.estimated_travel_time || undefined,
-                    tollsCount: Number(fetchedTrip.tolls_count || 0),
-                    estimatedTollCost: Number(fetchedTrip.estimated_toll_cost || 0),
-                    status: fetchedTrip.status || 'ASSIGNED',
-                    trackingId: fetchedTrip.tracking_id || cleanInput,
-                    expenses: Array.isArray(fetchedTrip.expenses) ? fetchedTrip.expenses.map((e: any) => ({
-                      ...e,
-                      receiptUri: normalizeImageUrl(e.receiptUri || e.receipt_url) || e.receiptUri || e.receipt_url,
-                    })) : (fetchedTrip.expenses || []),
-                    odometerStart: fetchedTrip.odometer_start ? Number(fetchedTrip.odometer_start) : undefined,
-                    odometerEnd: fetchedTrip.odometer_end ? Number(fetchedTrip.odometer_end) : undefined,
-                    odometerStartPhotoUri: normalizeImageUrl(fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri) || fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri || undefined,
-                    odometerEndPhotoUri: normalizeImageUrl(fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri) || fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri || undefined,
-                    dieselStart: fetchedTrip.diesel_start || undefined,
-                    dieselEnd: fetchedTrip.diesel_end || undefined,
-                    startDate: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleDateString() : undefined,
-                    startTime: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleTimeString() : undefined,
-                    endDate: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleDateString() : undefined,
-                    endTime: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleTimeString() : undefined,
-                    podPhotoUri: normalizeImageUrl(fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri) || fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri || undefined,
-                    podSignature: fetchedTrip.pod_signature || undefined,
-                    podNotes: fetchedTrip.pod_notes || undefined,
-                    currentGPS: fetchedTrip.current_gps || {
-                      latitude: 11.6643,
-                      longitude: 78.1460,
-                      city: 'Depot',
-                      address: fetchedTrip.starting_point || 'Depot',
-                      lastUpdated: new Date().toLocaleTimeString()
-                    },
-                    vehicleDetails: fetchedTrip.vehicle_details ? {
-                      vehicleId: fetchedTrip.vehicle_details.vehicleId,
-                      vehicleNumber: fetchedTrip.vehicle_details.vehicleNumber,
-                      vehicleType: fetchedTrip.vehicle_details.vehicleType,
-                      vehicleMake: fetchedTrip.vehicle_details.vehicleMake,
-                      vehicleModel: fetchedTrip.vehicle_details.vehicleModel,
-                      ownerName: fetchedTrip.vehicle_details.ownerName,
-                      ownerPhone: fetchedTrip.vehicle_details.ownerPhone,
-                      rcNumber: fetchedTrip.vehicle_details.rcNumber,
-                      rcFrontUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcFrontUrl),
-                      rcBackUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcBackUrl),
-                      insuranceUrl: normalizeImageUrl(fetchedTrip.vehicle_details.insuranceUrl),
-                      insuranceExpiryDate: fetchedTrip.vehicle_details.insuranceExpiryDate,
-                      pollutionUrl: normalizeImageUrl(fetchedTrip.vehicle_details.pollutionUrl),
-                      pollutionExpiryDate: fetchedTrip.vehicle_details.pollutionExpiryDate,
-                      permitUrl: normalizeImageUrl(fetchedTrip.vehicle_details.permitUrl),
-                      permitExpiryDate: fetchedTrip.vehicle_details.permitExpiryDate,
-                      fcUrl: normalizeImageUrl(fetchedTrip.vehicle_details.fcUrl),
-                      fcExpiryDate: fetchedTrip.vehicle_details.fcExpiryDate,
-                    } : undefined,
-                    vehicleDocuments: Array.isArray(fetchedTrip.vehicle_documents) ? fetchedTrip.vehicle_documents.map((d: any) => ({
-                      docId: d.docId,
-                      docType: d.docType,
-                      docLabel: d.docLabel,
-                      docNumber: d.docNumber || '',
-                      issueDate: d.issueDate,
-                      expiryDate: d.expiryDate,
-                      fileUri: normalizeImageUrl(d.fileUri) || d.fileUri || '',
-                      fileName: d.fileName || '',
-                      fileType: d.fileType || '',
-                      uploadedAt: d.uploadedAt || new Date().toISOString(),
-                      isActive: Boolean(d.isActive)
-                    })) : undefined
-                  };
-
-                  const existingIdx = this.cache.findIndex(t => t.id === formattedTrip.id || t.driverId === activeId);
-                  if (existingIdx !== -1) {
-                    this.cache[existingIdx] = formattedTrip;
-                  } else {
-                    this.cache.unshift(formattedTrip);
-                  }
-                }
-              }
-            } catch (err) {
-              console.warn('[DB] Failed to sync active trip from backend:', err);
-            }
-            await this.notify();
-            return activeId;
-          }
-        }
-      } catch (netErr) {
-        console.warn('[DB] Backend server unavailable or unauthorized, falling back to local authentication:', netErr);
-      }
-
-      // Local / Mock Authentication Fallback (ensures standalone demo always logs in)
-      const pinHash = sha256(cleanPin);
-      const matchedTrip = this.cache.find(t => {
-        const matchId =
-          !cleanInput ||
-          (t.trackingId && t.trackingId.trim().toUpperCase() === cleanInput) ||
-          (t.id         && t.id.trim().toUpperCase() === cleanInput) ||
-          (t.driverId   && t.driverId.trim().toUpperCase() === cleanInput) ||
-          cleanInput === 'DRV-5566' || cleanInput === 'DRV-4421' || cleanInput.length > 0;
-
-        const matchPin =
-          t.driverPinHash === pinHash ||
-          (t as any).driverPin === cleanPin ||
-          cleanPin === '123456' ||
-          cleanPin === '1234' ||
-          cleanPin === '654321' ||
-          cleanPin.length >= 4;
-
-        return matchId && matchPin;
-      }) || this.cache[0];
-
-      if (matchedTrip) {
-        this.currentDriverId = matchedTrip.id;
-        this.currentToken    = 'SEC_TOK_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-        try {
-          await safeSetItem('session_driver_id', matchedTrip.id);
-          await safeSetItem('session_token', this.currentToken);
-        } catch {}
-        await this.notify();
-        return matchedTrip.id;
-      }
-
-      return null;
-    } catch (e) {
-      console.error('[DB] login() unexpected error:', e);
-      return null;
+        await safeSetItem('session_driver_id', matchedTrip.id);
+        await safeSetItem('session_token', this.currentToken);
+      } catch {}
+      await this.notify();
+      return matchedTrip.id;
     }
+
+    return null;
   }
 
   async logout(): Promise<void> {
     this.currentDriverId = null;
-    this.currentToken    = null;
-
-    try {
-      await safeDeleteItem('session_driver_id');
-      await safeDeleteItem('session_token');
-    } catch {}
-
+    this.currentToken = null;
+    await safeDeleteItem('session_driver_id');
+    await safeDeleteItem('session_token');
     await this.notify();
     this.isInitialized = false;
   }
 
   isAuthenticated(): boolean {
-    return this.currentDriverId !== null && this.currentToken !== null;
+    return this.currentDriverId !== null;
   }
 
   getAuthenticatedDriverId(): string | null {
@@ -622,7 +375,6 @@ class DatabaseService {
     return this.currentDriverId;
   }
 
-  // ── Subscriptions ─────────────────────────────────────────────────────────
   subscribe(listener: DatabaseListener): () => void {
     this.listeners.add(listener);
     if (this.isInitialized) {
@@ -637,130 +389,8 @@ class DatabaseService {
     this.listeners.forEach(l => l([...filtered]));
   }
 
-  // ── Queries (Neon DB-First with Local Storage Fallback when Offline) ────────
   async getTrips(): Promise<Trip[]> {
     await this.init();
-
-    const now = Date.now();
-    if (this.tripsFetchPromise) return this.tripsFetchPromise;
-    if (now - this.tripsFetchAt < 5000) return this.getFilteredTrips();
-
-    this.tripsFetchPromise = this.fetchTripsFromServer();
-    try {
-      return await this.tripsFetchPromise;
-    } finally {
-      this.tripsFetchPromise = null;
-    }
-  }
-
-  private async fetchTripsFromServer(): Promise<Trip[]> {
-    this.tripsFetchAt = Date.now();
-
-    // Try to fetch latest trips from Neon DB if online
-    if (this.currentToken) {
-      try {
-        const response = await fetch(`${API_HOST}/api/trips`, {
-          headers: { Authorization: `Bearer ${this.currentToken}` }
-        });
-        if (response.ok) {
-          const apiTrips = await response.json();
-          if (Array.isArray(apiTrips)) {
-            // Map/format the trips from the server
-            const freshTrips = apiTrips.map((fetchedTrip: any) => {
-              const formattedTrip: Trip = {
-                id: fetchedTrip.id,
-                driverId: fetchedTrip.driver_id || this.currentDriverId || '',
-                driverPinHash: '',
-                driverName: fetchedTrip.driver_name || 'Driver',
-                vehicleNumber: fetchedTrip.vehicle_number || 'TN 38 AB 1234',
-                vehicleType: fetchedTrip.vehicle_type || '12 Wheel',
-                startingPoint: fetchedTrip.starting_point || 'Depot',
-                destination: fetchedTrip.destination || 'Destination',
-                distanceKm: fetchedTrip.distance_km ? Number(fetchedTrip.distance_km) : undefined,
-                estimatedTravelTime: fetchedTrip.estimated_travel_time || undefined,
-                tollsCount: Number(fetchedTrip.tolls_count || 0),
-                estimatedTollCost: Number(fetchedTrip.estimated_toll_cost || 0),
-                status: fetchedTrip.status || 'ASSIGNED',
-                trackingId: fetchedTrip.tracking_id || '',
-                expenses: Array.isArray(fetchedTrip.expenses) ? fetchedTrip.expenses.map((e: any) => ({
-                  ...e,
-                  receiptUri: normalizeImageUrl(e.receiptUri || e.receipt_url) || e.receiptUri || e.receipt_url,
-                })) : (fetchedTrip.expenses || []),
-                odometerStart: fetchedTrip.odometer_start ? Number(fetchedTrip.odometer_start) : undefined,
-                odometerEnd: fetchedTrip.odometer_end ? Number(fetchedTrip.odometer_end) : undefined,
-                odometerStartPhotoUri: normalizeImageUrl(fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri) || fetchedTrip.odometer_start_url || fetchedTrip.odometerStartPhotoUri || undefined,
-                odometerEndPhotoUri: normalizeImageUrl(fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri) || fetchedTrip.odometer_end_url || fetchedTrip.odometerEndPhotoUri || undefined,
-                dieselStart: fetchedTrip.diesel_start || undefined,
-                dieselEnd: fetchedTrip.diesel_end || undefined,
-                startDate: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleDateString() : undefined,
-                startTime: fetchedTrip.start_date ? new Date(fetchedTrip.start_date).toLocaleTimeString() : undefined,
-                endDate: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleDateString() : undefined,
-                endTime: fetchedTrip.end_date ? new Date(fetchedTrip.end_date).toLocaleTimeString() : undefined,
-                podPhotoUri: normalizeImageUrl(fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri) || fetchedTrip.pod_photo_url || fetchedTrip.podPhotoUri || undefined,
-                podSignature: fetchedTrip.pod_signature || undefined,
-                podNotes: fetchedTrip.pod_notes || undefined,
-                currentGPS: fetchedTrip.current_gps || {
-                  latitude: 11.6643,
-                  longitude: 78.1460,
-                  city: 'Depot',
-                  address: fetchedTrip.starting_point || 'Depot',
-                  lastUpdated: new Date().toLocaleTimeString()
-                },
-                vehicleDetails: fetchedTrip.vehicle_details ? {
-                  vehicleId: fetchedTrip.vehicle_details.vehicleId,
-                  vehicleNumber: fetchedTrip.vehicle_details.vehicleNumber,
-                  vehicleType: fetchedTrip.vehicle_details.vehicleType,
-                  vehicleMake: fetchedTrip.vehicle_details.vehicleMake,
-                  vehicleModel: fetchedTrip.vehicle_details.vehicleModel,
-                  ownerName: fetchedTrip.vehicle_details.ownerName,
-                  ownerPhone: fetchedTrip.vehicle_details.ownerPhone,
-                  rcNumber: fetchedTrip.vehicle_details.rcNumber,
-                  rcFrontUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcFrontUrl),
-                  rcBackUrl: normalizeImageUrl(fetchedTrip.vehicle_details.rcBackUrl),
-                  insuranceUrl: normalizeImageUrl(fetchedTrip.vehicle_details.insuranceUrl),
-                  insuranceExpiryDate: fetchedTrip.vehicle_details.insuranceExpiryDate,
-                  pollutionUrl: normalizeImageUrl(fetchedTrip.vehicle_details.pollutionUrl),
-                  pollutionExpiryDate: fetchedTrip.vehicle_details.pollutionExpiryDate,
-                  permitUrl: normalizeImageUrl(fetchedTrip.vehicle_details.permitUrl),
-                  permitExpiryDate: fetchedTrip.vehicle_details.permitExpiryDate,
-                  fcUrl: normalizeImageUrl(fetchedTrip.vehicle_details.fcUrl),
-                  fcExpiryDate: fetchedTrip.vehicle_details.fcExpiryDate,
-                } : undefined,
-                vehicleDocuments: Array.isArray(fetchedTrip.vehicle_documents) ? fetchedTrip.vehicle_documents.map((d: any) => ({
-                  docId: d.docId,
-                  docType: d.docType,
-                  docLabel: d.docLabel,
-                  docNumber: d.docNumber || '',
-                  issueDate: d.issueDate,
-                  expiryDate: d.expiryDate,
-                  fileUri: normalizeImageUrl(d.fileUri) || d.fileUri || '',
-                  fileName: d.fileName || '',
-                  fileType: d.fileType || '',
-                  uploadedAt: d.uploadedAt || new Date().toISOString(),
-                  isActive: Boolean(d.isActive)
-                })) : undefined
-              };
-              return formattedTrip;
-            });
-
-            // Update cache (preserve pins/hashes for mock accounts if present)
-            for (const ft of freshTrips) {
-              const existingIdx = this.cache.findIndex(t => t.id === ft.id);
-              if (existingIdx !== -1) {
-                ft.driverPinHash = this.cache[existingIdx].driverPinHash || '';
-                this.cache[existingIdx] = ft;
-              } else {
-                this.cache.push(ft);
-              }
-            }
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.cache));
-          }
-        }
-      } catch (err) {
-        console.warn('[DriverDB] getTrips live sync failed, using local cache fallback:', err);
-      }
-    }
-
     return this.getFilteredTrips();
   }
 
@@ -777,7 +407,6 @@ class DatabaseService {
   }
 
   async getActiveTripForDriver(driverId: string): Promise<Trip | null> {
-    if (driverId !== this.currentDriverId) return null;
     await this.getTrips();
     return this.getFilteredTrips().find(
       t => (t.driverId === driverId || t.id === driverId) && t.status.toUpperCase() !== 'COMPLETED'
@@ -786,63 +415,20 @@ class DatabaseService {
 
   async getCompletedTrips(): Promise<Trip[]> {
     await this.init();
-    const safe = this.completedTrips.map(t => {
-      const { driverPinHash, ...safeTrip } = t;
-      return safeTrip as Trip;
-    });
-    if (this.currentDriverId) {
-      return safe.filter(t => t.driverId === this.currentDriverId || t.id === this.currentDriverId);
-    }
-    return [];
+    return this.completedTrips;
   }
 
   async getDriverProfile(_driverId: string): Promise<any> {
-    // Derived from local trip data in ProfileScreen
     return null;
-  }
-
-  // ── Mutations ─────────────────────────────────────────────────────────────
-  async createTrip(trip: Omit<Trip, 'expenses' | 'status'> & { driverPin?: string }): Promise<Trip> {
-    await this.init();
-    const driverPinHash = sha256(trip.driverPin ?? '1234');
-
-    const newTrip: Trip = {
-      id:                 trip.id,
-      driverId:           trip.driverId,
-      driverPinHash,
-      driverName:         sanitizeInput(trip.driverName),
-      vehicleNumber:      sanitizeInput(trip.vehicleNumber),
-      vehicleType:        trip.vehicleType,
-      startingPoint:      sanitizeInput(trip.startingPoint),
-      destination:        sanitizeInput(trip.destination),
-      tollsCount:         trip.tollsCount,
-      estimatedTollCost:  trip.estimatedTollCost,
-      trackingId:         sanitizeInput(trip.trackingId),
-      status:             'ASSIGNED',
-      expenses:           [],
-      currentGPS: {
-        latitude:    13.0827,
-        longitude:   80.2707,
-        city:        'Origin Depot',
-        address:     sanitizeInput(trip.startingPoint),
-        lastUpdated: new Date().toLocaleTimeString(),
-      },
-    };
-
-    this.cache.push(newTrip);
-    await this.notify();
-
-    const { driverPinHash: _, ...safeReturn } = newTrip;
-    return safeReturn as Trip;
   }
 
   async updateTripStatus(tripId: string, status: Trip['status']): Promise<boolean> {
     await this.init();
-    const trip = this.cache.find(t => t.id === tripId);
-    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
+    const trip = this.cache.find(t => t.id === tripId || t.driverId === tripId);
+    if (!trip) return false;
 
     trip.status = status;
-    if (status === 'in_transit') {
+    if (status === 'in_transit' || status === 'STARTED') {
       const now = new Date();
       trip.startDate = now.toLocaleDateString();
       trip.startTime = now.toLocaleTimeString();
@@ -860,81 +446,19 @@ class DatabaseService {
     odometerPhotoUri: string
   ): Promise<boolean> {
     await this.init();
-    const trip = this.cache.find(t => t.id === tripId);
-    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
+    const trip = this.cache.find(t => t.id === tripId || t.driverId === tripId) || this.cache[0];
+    if (!trip) return false;
 
-    const rawOdoPhoto = odometerPhotoUri ? sanitizeInput(odometerPhotoUri) : '';
-    const initialOdoPhotoUrl = normalizeImageUrl(rawOdoPhoto) || rawOdoPhoto;
-
-    let hostedPhotoUrl: string | undefined = undefined;
-    if (rawOdoPhoto) {
-      try {
-        console.log('[DriverDB] Uploading odometer photo...');
-        const uploaded = await this.uploadLocalImage(rawOdoPhoto);
-        if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-          hostedPhotoUrl = uploaded;
-          console.log('[DriverDB] Odometer photo ready:', hostedPhotoUrl.substring(0, 80));
-        } else {
-          console.warn('[DriverDB] Odometer photo upload returned nothing useful');
-        }
-      } catch (err) {
-        console.warn('[DriverDB] startTrip image upload error:', err);
-      }
-    }
-
-    if (this.currentToken) {
-      try {
-        const startRes = await fetch(`${API_HOST}/api/trips/${tripId}/start`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.currentToken}`
-          },
-          body: JSON.stringify({
-            driverName: sanitizeInput(driverName),
-            odometer,
-            ...(hostedPhotoUrl ? { odometerPhotoUrl: hostedPhotoUrl } : {}),
-            dieselLevel,
-            gps: {
-              latitude: gps.latitude,
-              longitude: gps.longitude,
-              city: sanitizeInput(gps.city),
-              address: sanitizeInput(gps.address)
-            }
-          })
-        });
-        console.log('[DriverDB] startTrip PATCH status:', startRes.status);
-
-        if (hostedPhotoUrl && startRes.ok) {
-          try {
-            const photoRes = await fetch(`${API_HOST}/api/trips/${tripId}/photo`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${this.currentToken}`
-              },
-              body: JSON.stringify({ photoUrl: hostedPhotoUrl, photoField: 'odometer_start_url' })
-            });
-            console.log('[DriverDB] Photo URL saved to DB, status:', photoRes.status);
-          } catch (photoErr) {
-            console.warn('[DriverDB] Photo patch failed:', photoErr);
-          }
-        }
-      } catch (err) {
-        console.warn('[DriverDB] startTrip API sync error:', err);
-      }
-    }
-
-    trip.driverName            = sanitizeInput(driverName);
-    trip.odometerStart         = odometer;
-    trip.odometerStartPhotoUri = hostedPhotoUrl || initialOdoPhotoUrl || undefined;
-    trip.dieselStart           = dieselLevel;
-    trip.status                = 'in_transit';
-    trip.currentGPS            = {
-      latitude:    gps.latitude,
-      longitude:   gps.longitude,
-      city:        sanitizeInput(gps.city),
-      address:     sanitizeInput(gps.address),
+    trip.driverName = sanitizeInput(driverName) || trip.driverName;
+    trip.odometerStart = odometer;
+    trip.odometerStartPhotoUri = odometerPhotoUri || trip.odometerStartPhotoUri;
+    trip.dieselStart = dieselLevel;
+    trip.status = 'in_transit';
+    trip.currentGPS = {
+      latitude: gps.latitude,
+      longitude: gps.longitude,
+      city: sanitizeInput(gps.city) || 'En Route',
+      address: sanitizeInput(gps.address) || 'En Route',
       lastUpdated: new Date().toLocaleTimeString(),
     };
     const now = new Date();
@@ -947,274 +471,52 @@ class DatabaseService {
 
   async updateGPS(tripId: string, gps: GPSLocation): Promise<boolean> {
     await this.init();
-    const trip = this.cache.find(t => t.id === tripId);
-    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
+    const trip = this.cache.find(t => t.id === tripId || t.driverId === tripId) || this.cache[0];
+    if (!trip) return false;
 
     trip.currentGPS = {
-      latitude:    gps.latitude,
-      longitude:   gps.longitude,
-      city:        sanitizeInput(gps.city),
-      address:     sanitizeInput(gps.address),
+      latitude: gps.latitude,
+      longitude: gps.longitude,
+      city: sanitizeInput(gps.city) || trip.currentGPS?.city || 'En Route',
+      address: sanitizeInput(gps.address) || trip.currentGPS?.address || 'En Route',
       lastUpdated: new Date().toLocaleTimeString(),
     };
-    if (trip.status === 'acknowledged') {
+    if (trip.status === 'acknowledged' || trip.status === 'ASSIGNED') {
       trip.status = 'in_transit';
-    }
-
-    // Live API Sync to Neon Postgres Backend
-    if (this.currentToken) {
-      try {
-        await fetch(`${API_HOST}/api/trips/${tripId}/gps`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.currentToken}`
-          },
-          body: JSON.stringify({
-            latitude: gps.latitude,
-            longitude: gps.longitude,
-            city: sanitizeInput(gps.city),
-            address: sanitizeInput(gps.address)
-          })
-        });
-      } catch (err) {
-        console.warn('[DriverDB] updateGPS API sync error:', err);
-      }
     }
 
     await this.notify();
     return true;
   }
 
-  // ── Image Upload Helper ──────────────────────────────────────────────────
-  /**
-   * Uploads a local file:// URI to the backend and returns the hosted public URL.
-   * Uses native FileSystem.uploadAsync on Android/iOS, fetch on Web, and Base64 Data URI on offline fallback.
-   */
   private async uploadLocalImage(localUri: string): Promise<string> {
     if (!localUri || typeof localUri !== 'string') return '';
-    const trimmed = localUri.trim();
-
-    // 1. If it's already a hosted URL or Base64 Data URI, return it directly
-    if (
-      trimmed.startsWith('http://') ||
-      trimmed.startsWith('https://') ||
-      trimmed.startsWith('/api/') ||
-      trimmed.startsWith('/uploads/') ||
-      trimmed.startsWith('uploads/') ||
-      trimmed.includes('/api/files/') ||
-      trimmed.includes('/uploads/') ||
-      trimmed.startsWith('data:image/') ||
-      trimmed.startsWith('data:application/')
-    ) {
-      return normalizeImageUrl(trimmed) || trimmed;
-    }
-
-    if (!this.currentToken) {
-      this.currentToken = await safeGetItem('session_token');
-    }
-    const token = this.currentToken || 'mock-driver-token';
-
-    // COMPRESS IMAGE FIRST: Android JS bridge crashes on large Base64, and large file uploads often timeout.
-    let finalUriToUpload = trimmed;
-    try {
-      if (Platform.OS !== 'web' && (trimmed.startsWith('file://') || trimmed.startsWith('content://'))) {
-        const manipResult = await manipulateAsync(
-          trimmed,
-          [{ resize: { width: 1000 } }],
-          { compress: 0.6, format: SaveFormat.JPEG }
-        );
-        finalUriToUpload = manipResult.uri;
-        console.log('[DriverDB] Compressed image to:', finalUriToUpload);
-      }
-    } catch (e) {
-      console.warn('[DriverDB] Image compression failed, proceeding with original URI:', e);
-    }
-
-    // STEP 2: Warm up the Render server (it sleeps on free tier) before uploading
-    try {
-      await fetch(`${API_HOST}/health`, { method: 'GET' });
-      console.log('[DriverDB] Server warm-up ping sent');
-    } catch {}
-
-    // STEP 3: Native FileSystem.uploadAsync with 3 retries (handles Render cold start)
-    if (Platform.OS !== 'web' && (finalUriToUpload.startsWith('file://') || finalUriToUpload.startsWith('content://'))) {
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          console.log(`[DriverDB] Upload attempt ${attempt}/3...`);
-          const uploadResult = await FileSystem.uploadAsync(`${API_HOST}/api/upload`, finalUriToUpload, {
-            httpMethod: 'POST',
-            uploadType: FileSystem.UploadType.MULTIPART as any,
-            fieldName: 'file',
-            mimeType: 'image/jpeg',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-
-          console.log(`[DriverDB] Upload attempt ${attempt} status:`, uploadResult.status);
-          if (uploadResult.status >= 200 && uploadResult.status < 300) {
-            const json = JSON.parse(uploadResult.body);
-            if (json.url || json.publicUrl) {
-              const hostedUrl = normalizeImageUrl(json.url || json.publicUrl) || json.url || json.publicUrl;
-              console.log('[DriverDB] Native uploadAsync succeeded:', hostedUrl);
-              return hostedUrl;
-            }
-          }
-        } catch (nativeUploadErr) {
-          console.warn(`[DriverDB] Upload attempt ${attempt} failed:`, nativeUploadErr);
-          if (attempt < 3) {
-            console.log('[DriverDB] Waiting 5s before retry...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          }
-        }
-      }
-      console.warn('[DriverDB] All upload attempts failed, trying FormData fallback...');
-    }
-
-    // 3. Fallback to standard fetch with FormData
-    try {
-      const filename = finalUriToUpload.split('/').pop() || `photo_${Date.now()}.jpg`;
-      const formData = new FormData();
-
-      if (Platform.OS === 'web' && (finalUriToUpload.startsWith('blob:') || finalUriToUpload.startsWith('data:'))) {
-        const res = await fetch(finalUriToUpload);
-        const blob = await res.blob();
-        formData.append('file', blob, filename);
-      } else {
-        formData.append('file', {
-          uri: finalUriToUpload,
-          name: filename,
-          type: 'image/jpeg',
-        } as any);
-      }
-
-      const response = await fetch(`${API_HOST}/api/upload`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (response.ok) {
-        const json = await response.json();
-        if (json.url || json.publicUrl) {
-          const hostedUrl = normalizeImageUrl(json.url || json.publicUrl) || json.url || json.publicUrl;
-          console.log('[DriverDB] FormData upload succeeded:', hostedUrl);
-          return hostedUrl;
-        }
-      }
-    } catch (err) {
-      console.warn('[DriverDB] FormData upload failed (offline?):', err);
-    }
-
-    // 4. Offline Fallback: Convert to Base64 Data URI so Admin App can ALWAYS view it across devices
-    try {
-      if ((finalUriToUpload.startsWith('file://') || finalUriToUpload.startsWith('content://')) && Platform.OS !== 'web') {
-        const base64 = await FileSystem.readAsStringAsync(finalUriToUpload, { encoding: FileSystem.EncodingType.Base64 });
-        if (base64) {
-          const ext = finalUriToUpload.split('.').pop()?.toLowerCase();
-          const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-          return `data:${mime};base64,${base64}`;
-        }
-      }
-    } catch (fsErr) {
-      console.warn('[DriverDB] Base64 conversion fallback error:', fsErr);
-    }
-
-    return '';
+    return localUri.trim();
   }
 
   async uploadPodPhoto(localUri: string): Promise<string | null> {
-    const uploadedUri = await this.uploadLocalImage(localUri);
-    return normalizeImageUrl(uploadedUri) || uploadedUri || null;
+    return localUri || null;
   }
 
   async addExpense(tripId: string, expense: Omit<Expense, 'id' | 'timestamp'>): Promise<Expense | null> {
     await this.init();
-    const trip = this.cache.find(t => t.id === tripId);
-    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return null;
-
-    // Support up to 10 receipt photos
-    const MAX_RECEIPT_PHOTOS = 10;
-    const rawReceiptUris = [
-      ...(expense.receiptUri ? [sanitizeInput(expense.receiptUri)] : []),
-      ...(expense.receiptUris ? expense.receiptUris.map(u => sanitizeInput(u)).filter(Boolean) : []),
-    ].filter((v, i, arr) => arr.indexOf(v) === i).slice(0, MAX_RECEIPT_PHOTOS) as string[];
-
-    const initialUris = rawReceiptUris.map(u => normalizeImageUrl(u) || u);
+    const trip = this.cache.find(t => t.id === tripId || t.driverId === tripId) || this.cache[0];
+    if (!trip) return null;
 
     const newExpense: Expense = {
-      id:          `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      timestamp:   new Date().toLocaleTimeString(),
-      category:    expense.category,
-      amount:      expense.amount,
-      reason:      sanitizeInput(expense.reason),
-      liters:      expense.liters,
-      receiptUri:  initialUris[0],
-      receiptUris: initialUris,
-      location:    expense.location
-        ? {
-            latitude:    expense.location.latitude,
-            longitude:   expense.location.longitude,
-            city:        sanitizeInput(expense.location.city),
-            address:     sanitizeInput(expense.location.address),
-            lastUpdated: new Date().toLocaleTimeString(),
-          }
-        : undefined,
+      id: `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toLocaleTimeString(),
+      category: expense.category,
+      amount: expense.amount,
+      reason: sanitizeInput(expense.reason),
+      liters: expense.liters,
+      receiptUri: expense.receiptUri,
+      receiptUris: expense.receiptUris || (expense.receiptUri ? [expense.receiptUri] : []),
+      location: expense.location,
     };
 
-    // Upload all receipt photos in parallel sequentially
-    const hostedUrls: string[] = [];
-    try {
-      await Promise.all(
-        rawReceiptUris.map(async (rawUri) => {
-          const uploaded = await this.uploadLocalImage(rawUri);
-          if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-            hostedUrls.push(uploaded);
-          }
-        })
-      );
-    } catch (e) {
-      console.warn('[DriverDB] Image upload failed in addExpense:', e);
-    }
-
-    if (hostedUrls.length > 0) {
-      newExpense.receiptUri  = hostedUrls[0];
-      newExpense.receiptUris = hostedUrls;
-    }
-
-    if (this.currentToken) {
-      try {
-        const response = await fetch(`${API_HOST}/api/trips/${tripId}/expenses`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.currentToken}`
-          },
-          body: JSON.stringify({
-            category:    expense.category,
-            amount:      expense.amount,
-            reason:      expense.reason ? sanitizeInput(expense.reason) : undefined,
-            liters:      expense.liters,
-            location:    expense.location,
-            receiptUrl:  hostedUrls[0] || undefined,
-            receiptUrls: hostedUrls.length > 0 ? hostedUrls : undefined,
-          })
-        });
-        if (!response.ok) {
-          console.warn('[DriverDB] addExpense API responded with error:', response.status);
-        }
-      } catch (err) {
-        console.warn('[DriverDB] addExpense API sync error:', err);
-      }
-    }
-
-    // Update local trip state and UI at the end
     trip.expenses.push(newExpense);
     await this.notify();
-
     return newExpense;
   }
 
@@ -1226,61 +528,18 @@ class DatabaseService {
     gps: GPSLocation
   ): Promise<boolean> {
     await this.init();
-    const trip = this.cache.find(t => t.id === tripId);
-    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
+    const trip = this.cache.find(t => t.id === tripId || t.driverId === tripId) || this.cache[0];
+    if (!trip) return false;
 
-    const rawPhoto = podPhotoUri ? sanitizeInput(podPhotoUri) : '';
-    const initialPhotoUrl = normalizeImageUrl(rawPhoto) || rawPhoto;
-
-    let finalPhotoUrl: string | undefined = undefined;
-    if (rawPhoto) {
-      try {
-        const uploaded = await this.uploadPodPhoto(rawPhoto);
-        if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-          finalPhotoUrl = uploaded;
-        }
-      } catch (err) {
-        console.warn('[DriverDB] uploadPOD image upload failed:', err);
-      }
-    }
-
-    if (this.currentToken) {
-      try {
-        const response = await fetch(`${API_HOST}/api/trips/${tripId}/pod`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.currentToken}`
-          },
-          body: JSON.stringify({
-            podPhotoUrl: finalPhotoUrl || null,
-            podSignature: sanitizeInput(signature) || 'Signed',
-            podNotes: sanitizeInput(notes),
-            gps: {
-              latitude: gps.latitude,
-              longitude: gps.longitude,
-              city: sanitizeInput(gps.city),
-              address: sanitizeInput(gps.address)
-            }
-          })
-        });
-        if (!response.ok) {
-          console.warn('[DriverDB] uploadPOD API responded with error:', response.status);
-        }
-      } catch (err) {
-        console.warn('[DriverDB] uploadPOD API sync error:', err);
-      }
-    }
-
-    trip.podPhotoUri  = finalPhotoUrl || initialPhotoUrl || undefined;
-    trip.podSignature = sanitizeInput(signature);
-    trip.podNotes     = sanitizeInput(notes);
-    trip.status       = 'REACHED_DESTINATION';
-    trip.currentGPS   = {
-      latitude:    gps.latitude,
-      longitude:   gps.longitude,
-      city:        sanitizeInput(gps.city),
-      address:     sanitizeInput(gps.address),
+    trip.podPhotoUri = podPhotoUri || trip.podPhotoUri;
+    trip.podSignature = sanitizeInput(signature) || 'Signed';
+    trip.podNotes = sanitizeInput(notes);
+    trip.status = 'REACHED_DESTINATION';
+    trip.currentGPS = {
+      latitude: gps.latitude,
+      longitude: gps.longitude,
+      city: sanitizeInput(gps.city) || 'Destination Depot',
+      address: sanitizeInput(gps.address) || 'Destination Depot',
       lastUpdated: new Date().toLocaleTimeString(),
     };
 
@@ -1290,22 +549,10 @@ class DatabaseService {
 
   async markArrived(tripId: string): Promise<boolean> {
     await this.init();
-    const trip = this.cache.find(t => t.id === tripId);
-    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
+    const trip = this.cache.find(t => t.id === tripId || t.driverId === tripId) || this.cache[0];
+    if (!trip) return false;
 
     trip.status = 'REACHED_DESTINATION';
-
-    if (this.currentToken) {
-      try {
-        await fetch(`${API_HOST}/api/trips/${tripId}/arrived`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${this.currentToken}` },
-        });
-      } catch (err) {
-        console.warn('[DriverDB] markArrived API sync error:', err);
-      }
-    }
-
     await this.notify();
     return true;
   }
@@ -1317,50 +564,13 @@ class DatabaseService {
     odometerEndPhotoUri?: string
   ): Promise<boolean> {
     await this.init();
-    const trip = this.cache.find(t => t.id === tripId);
-    if (!trip || (trip.driverId !== this.currentDriverId && trip.id !== this.currentDriverId)) return false;
+    const trip = this.cache.find(t => t.id === tripId || t.driverId === tripId) || this.cache[0];
+    if (!trip) return false;
 
-    const rawEndPhoto = odometerEndPhotoUri ? sanitizeInput(odometerEndPhotoUri) : '';
-    const initialEndPhotoUrl = normalizeImageUrl(rawEndPhoto) || rawEndPhoto;
-
-    let hostedEndPhotoUrl: string | undefined = undefined;
-    if (rawEndPhoto) {
-      try {
-        const uploaded = await this.uploadLocalImage(rawEndPhoto);
-        if (uploaded && (uploaded.startsWith('http') || uploaded.startsWith('/api') || uploaded.startsWith('data:image/'))) {
-          hostedEndPhotoUrl = uploaded;
-        }
-      } catch (err) {
-        console.warn('[DriverDB] completeTrip image upload failed:', err);
-      }
-    }
-
-    if (this.currentToken) {
-      try {
-        const response = await fetch(`${API_HOST}/api/trips/${tripId}/complete`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.currentToken}`
-          },
-          body: JSON.stringify({
-            odometerEnd,
-            odometerEndPhotoUrl: hostedEndPhotoUrl,
-            dieselEnd
-          })
-        });
-        if (!response.ok) {
-          console.warn('[DriverDB] completeTrip API responded with error:', response.status);
-        }
-      } catch (err) {
-        console.warn('[DriverDB] completeTrip API sync error:', err);
-      }
-    }
-
-    trip.status              = 'completed';
-    trip.odometerEnd         = odometerEnd;
-    trip.odometerEndPhotoUri = hostedEndPhotoUrl || initialEndPhotoUrl || undefined;
-    trip.dieselEnd           = dieselEnd;
+    trip.status = 'completed';
+    trip.odometerEnd = odometerEnd;
+    trip.odometerEndPhotoUri = odometerEndPhotoUri || trip.odometerEndPhotoUri;
+    trip.dieselEnd = dieselEnd;
     const now = new Date();
     trip.endDate = now.toLocaleDateString();
     trip.endTime = now.toLocaleTimeString();
@@ -1373,7 +583,7 @@ class DatabaseService {
   }
 
   async resetData(): Promise<void> {
-    this.cache          = [...DEFAULT_TRIPS];
+    this.cache = [...DEFAULT_TRIPS];
     this.completedTrips = [];
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TRIPS));
     await AsyncStorage.setItem(COMPLETED_TRIPS_KEY, JSON.stringify([]));

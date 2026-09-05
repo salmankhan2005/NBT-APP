@@ -80,34 +80,7 @@ export interface LocationDetails {
  * Reverse geocodes coordinates to a human-readable city & address using Nominatim
  */
 export async function reverseGeocodeLocation(lat: number, lng: number): Promise<LocationDetails | null> {
-  // 1. Try backend proxy (which now uses Nominatim internally)
-  try {
-    const proxyUrl = `${PROXY_BASE}/geocode?latlng=${lat},${lng}`;
-    const res = await fetch(proxyUrl);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.results?.length) {
-        const first = data.results[0];
-        let city = 'In Transit';
-        for (const comp of first.address_components || []) {
-          if (comp.types.includes('locality') || comp.types.includes('administrative_area_level_2')) {
-            city = comp.long_name;
-            break;
-          }
-        }
-        return {
-          formattedAddress: first.formatted_address || '',
-          city,
-          latitude: lat,
-          longitude: lng,
-        };
-      }
-    }
-  } catch (proxyErr) {
-    console.warn('[DriverMaps] Proxy geocode failed:', proxyErr);
-  }
-
-  // 2. Direct Nominatim fallback
+  // Direct Nominatim geocoding
   try {
     const url = `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`;
     const res = await fetch(url, {
@@ -129,7 +102,12 @@ export async function reverseGeocodeLocation(lat: number, lng: number): Promise<
   } catch (err) {
     console.warn('[DriverMaps] Nominatim reverse geocode failed:', err);
   }
-  return null;
+  return {
+    formattedAddress: `Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+    city: 'In Transit',
+    latitude: lat,
+    longitude: lng,
+  };
 }
 
 /**
@@ -137,107 +115,79 @@ export async function reverseGeocodeLocation(lat: number, lng: number): Promise<
  * Uses OSRM (Open Source Routing Machine)
  */
 export async function getLiveRouteDetails(origin: string, destination: string): Promise<RouteInfo | null> {
-  // 1. Try backend proxy (which now uses OSRM internally)
+  // Direct OSRM routing
   try {
-    const proxyUrl = `${PROXY_BASE}/directions?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
-    const res = await fetch(proxyUrl);
-    if (res.ok) {
+    let startCoords = await geocodePlaceName(origin);
+    let endCoords = await geocodePlaceName(destination);
+
+    if (!startCoords) startCoords = getKnownLocationCoords(origin);
+    if (!endCoords) endCoords = getKnownLocationCoords(destination);
+
+    if (startCoords && endCoords) {
+      const url = `${OSRM_BASE}/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=polyline`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT },
+      });
       const data = await res.json();
-      if (data.routes?.length) {
-        const leg = data.routes[0].legs[0];
-        const distMeters = leg.distance?.value || 0;
-        const durationSecs = leg.duration?.value || 0;
+
+      if (data.code === 'Ok' && data.routes?.length > 0) {
+        const route = data.routes[0];
+        const distMeters = Math.round(route.distance);
+        const durationSecs = Math.round(route.duration);
+        const distKm = Math.round(distMeters / 1000);
+        const durMins = Math.round(durationSecs / 60);
+
+        let durationText: string;
+        if (durMins >= 60) {
+          const hrs = Math.floor(durMins / 60);
+          const mins = durMins % 60;
+          durationText = mins > 0 ? `${hrs} hr ${mins} mins` : `${hrs} hr`;
+        } else {
+          durationText = `${durMins} mins`;
+        }
 
         return {
-          distanceKm: Math.round(distMeters / 1000),
-          distanceText: leg.distance?.text || `${Math.round(distMeters / 1000)} km`,
-          durationText: leg.duration?.text || `${Math.round(durationSecs / 60)} mins`,
-          durationMinutes: Math.round(durationSecs / 60),
-          startAddress: leg.start_address || origin,
-          endAddress: leg.end_address || destination,
-          polylinePoints: data.routes[0].overview_polyline?.points,
+          distanceKm: distKm,
+          distanceText: `${distKm} km`,
+          durationText,
+          durationMinutes: durMins,
+          startAddress: origin,
+          endAddress: destination,
+          polylinePoints: route.geometry,
         };
       }
-    }
-  } catch (proxyErr) {
-    console.warn('[DriverMaps] Proxy directions failed:', proxyErr);
-  }
-
-  // 2. Direct OSRM fallback — first geocode origin/destination to coordinates
-  try {
-    let originCoords = await geocodePlace(origin);
-    let destCoords = await geocodePlace(destination);
-
-    if (!originCoords) originCoords = resolveKnownPlaceCoordinates(origin);
-    if (!destCoords) destCoords = resolveKnownPlaceCoordinates(destination);
-
-    if (!originCoords || !destCoords) return null;
-
-    // OSRM expects lng,lat
-    const url = `${OSRM_BASE}/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&geometries=polyline`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
-    });
-    const data = await res.json();
-
-    if (data.code === 'Ok' && data.routes?.length > 0) {
-      const route = data.routes[0];
-      const distMeters = Math.round(route.distance);
-      const durationSecs = Math.round(route.duration);
-      const distanceKm = Math.round(distMeters / 1000);
-      const durationMins = Math.round(durationSecs / 60);
-
-      let durationText: string;
-      if (durationMins >= 60) {
-        const hrs = Math.floor(durationMins / 60);
-        const mins = durationMins % 60;
-        durationText = mins > 0 ? `${hrs} hr ${mins} mins` : `${hrs} hr`;
-      } else {
-        durationText = `${durationMins} mins`;
-      }
-
-      return {
-        distanceKm,
-        distanceText: `${distanceKm} km`,
-        durationText,
-        durationMinutes: durationMins,
-        startAddress: origin,
-        endAddress: destination,
-        polylinePoints: route.geometry,
-      };
     }
   } catch (err) {
     console.warn('[DriverMaps] OSRM directions failed:', err);
   }
 
-  const fallbackOrigin = resolveKnownPlaceCoordinates(origin) || { lat: 11.6643, lng: 78.146 };
-  const fallbackDestination = resolveKnownPlaceCoordinates(destination) || { lat: 12.9716, lng: 77.5946 };
-  const R = 6371;
-  const dLat = ((fallbackDestination.lat - fallbackOrigin.lat) * Math.PI) / 180;
-  const dLon = ((fallbackDestination.lng - fallbackOrigin.lng) * Math.PI) / 180;
+  // Fallback Haversine estimation
+  const startCoords = getKnownLocationCoords(origin) || { lat: 11.6643, lng: 78.1460 };
+  const endCoords = getKnownLocationCoords(destination) || { lat: 12.9716, lng: 77.5946 };
+  const dLat = (endCoords.lat - startCoords.lat) * Math.PI / 180;
+  const dLon = (endCoords.lng - startCoords.lng) * Math.PI / 180;
   const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((fallbackOrigin.lat * Math.PI) / 180) *
-      Math.cos((fallbackDestination.lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(startCoords.lat * Math.PI / 180) * Math.cos(endCoords.lat * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const approximateKm = Math.max(Math.round(R * c), 5);
-  const durationMins = Math.max(Math.round((approximateKm / 45) * 60), 30);
-  const hours = Math.floor(durationMins / 60);
-  const mins = durationMins % 60;
+  const distKm = Math.max(Math.round(6371 * c), 5);
+  const durMins = Math.max(Math.round((distKm / 45) * 60), 30);
+  const hrs = Math.floor(durMins / 60);
+  const mins = durMins % 60;
 
   return {
-    distanceKm: approximateKm,
-    distanceText: `${approximateKm} km`,
-    durationText: hours > 0 ? `${hours} hr ${mins} mins` : `${durationMins} mins`,
-    durationMinutes: durationMins,
+    distanceKm: distKm,
+    distanceText: `${distKm} km`,
+    durationText: hrs > 0 ? `${hrs} hr ${mins} mins` : `${durMins} mins`,
+    durationMinutes: durMins,
     startAddress: origin,
     endAddress: destination,
   };
 }
 
 /**
- * Generates a static map image URL centered at (lat, lng) using OpenStreetMap
+ * Generates a static map image preview using SVG Data URI
  */
 export function getStaticMapPreviewUrl(
   lat: number,
@@ -246,7 +196,12 @@ export function getStaticMapPreviewUrl(
   width: number = 600,
   height: number = 340
 ): string {
-  return `${PROXY_BASE}/staticmap?lat=${lat}&lng=${lng}&zoom=${zoom}&width=${width}&height=${height}&color=red`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="100%" height="100%" fill="#1e293b"/>
+    <circle cx="${width/2}" cy="${height/2}" r="8" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>
+    <text x="${width/2}" y="${height/2 + 24}" font-family="sans-serif" font-size="12" fill="#f8fafc" text-anchor="middle">GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 /**

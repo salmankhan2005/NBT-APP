@@ -89,28 +89,13 @@ export default function DashboardScreen({ onCreateTripPress, onNavigateToTrips }
         daysLeft: alert.daysLeft,
       })));
 
-      // Fetch today's lorry booking profit + recent entries
+      // Load today's lorry booking profit + recent entries from local simulation db
       try {
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-        const token = db.getToken();
-        if (token) {
-          const [profitRes, entriesRes] = await Promise.all([
-            fetch(`${API_HOST}/api/lorry-booking/profit?fromDate=${today}&toDate=${today}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            fetch(`${API_HOST}/api/lorry-booking/entries?limit=5`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-          ]);
-          if (profitRes.ok) {
-            const data = await profitRes.json();
-            if (data.success) setLorryBookingProfit(Number(data.totalProfit || 0));
-          }
-          if (entriesRes.ok) {
-            const data = await entriesRes.json();
-            if (data.success) setLorryBookingEntries(data.entries || []);
-          }
-        }
+        const profitData = await db.getLorryBookingProfit(today, today);
+        setLorryBookingProfit(Number(profitData.totalProfit || 0));
+        const entriesData = await db.getLorryBookingEntries(5);
+        setLorryBookingEntries(entriesData || []);
       } catch {}
     } catch (e) {
       console.error('Error fetching admin dashboard data:', e);

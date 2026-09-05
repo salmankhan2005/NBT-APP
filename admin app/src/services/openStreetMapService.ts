@@ -775,7 +775,13 @@ export function buildStaticMapUrl(
   width: number = 600,
   height: number = 200
 ): string {
-  return `${PROXY_BASE}/staticmap?lat=${lat}&lng=${lng}&zoom=${zoom}&width=${width}&height=${height}&color=${pinColor}&format=svg`;
+  const colorHex = pinColor === 'green' ? '#10b981' : pinColor === 'blue' ? '#3b82f6' : '#ef4444';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="100%" height="100%" fill="#1e293b"/>
+    <circle cx="${width/2}" cy="${height/2}" r="8" fill="${colorHex}" stroke="#ffffff" stroke-width="2"/>
+    <text x="${width/2}" y="${height/2 + 24}" font-family="sans-serif" font-size="12" fill="#f8fafc" text-anchor="middle">GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 // ─── SESSION TOKEN GENERATOR ──────────────────────────────────────────────────

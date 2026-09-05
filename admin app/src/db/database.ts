@@ -147,6 +147,24 @@ export interface Expense {
   timestamp: string;
 }
 
+export interface LorryBookingEntry {
+  id: string;
+  profit_date: string;
+  name?: string;
+  vehicle_number?: string;
+  from_point: string;
+  destination_point: string;
+  load_freight: number;
+  lorry_freight: number;
+  gross_freight: number;
+  coolie: number;
+  commission_freight: number;
+  total_freight: number;
+  expenses: number;
+  profit: number;
+  created_at: string;
+}
+
 export interface TollPlazaDetail {
   name: string;
   cost: number;
@@ -614,6 +632,43 @@ const INITIAL_SEED_FLEET_VEHICLES: FleetVehicle[] = [
   },
 ];
 
+const INITIAL_SEED_LORRY_BOOKINGS: LorryBookingEntry[] = [
+  {
+    id: 'LB-101',
+    profit_date: new Date().toISOString().split('T')[0],
+    name: 'Salem Steel Consignment',
+    vehicle_number: 'TN 38 AB 1234',
+    from_point: 'Salem Depot',
+    destination_point: 'Bengaluru Tech Park',
+    load_freight: 45000,
+    lorry_freight: 38000,
+    gross_freight: 7000,
+    coolie: 1500,
+    commission_freight: 2000,
+    total_freight: 10500,
+    expenses: 1200,
+    profit: 9300,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'LB-102',
+    profit_date: new Date().toISOString().split('T')[0],
+    name: 'Chennai Cargo Express',
+    vehicle_number: 'TN 37 CB 5678',
+    from_point: 'Chennai Port',
+    destination_point: 'Coimbatore Hub',
+    load_freight: 52000,
+    lorry_freight: 42000,
+    gross_freight: 10000,
+    coolie: 2000,
+    commission_freight: 2500,
+    total_freight: 14500,
+    expenses: 1800,
+    profit: 12700,
+    created_at: new Date().toISOString(),
+  },
+];
+
 const INITIAL_SEED_TRIPS: Trip[] = [
   {
     id: 'DRV-5566',
@@ -827,6 +882,7 @@ class AdminDatabase {
 
   private mockActivityLogs: ActivityLog[] = [];
   private mockExpenses: Expense[] = [];
+  private mockLorryBookings: LorryBookingEntry[] = INITIAL_SEED_LORRY_BOOKINGS;
 
   // In-flight request caching & deduplication to eliminate thundering herd requests
   private _inFlightTrips: Promise<Trip[]> | null = null;
@@ -913,6 +969,12 @@ class AdminDatabase {
       if (savedExpenses) {
         const parsed = JSON.parse(savedExpenses);
         if (Array.isArray(parsed)) this.mockExpenses = parsed;
+      }
+
+      const savedLorryBookings = await AsyncStorage.getItem('nbt_lorry_bookings');
+      if (savedLorryBookings) {
+        const parsed = JSON.parse(savedLorryBookings);
+        if (Array.isArray(parsed) && parsed.length > 0) this.mockLorryBookings = parsed;
       }
     } catch (e) {
       console.warn('Failed to load local cached storage', e);
@@ -2907,6 +2969,125 @@ class AdminDatabase {
         lorryBookings,
       },
     };
+  }
+
+  // ── Lorry Booking simulation methods ───────────────────────────────────────
+
+  private async saveLorryBookings() {
+    try {
+      await AsyncStorage.setItem('nbt_lorry_bookings', JSON.stringify(this.mockLorryBookings));
+    } catch (e) {
+      console.warn('Failed to save lorry bookings', e);
+    }
+  }
+
+  async getLorryBookingEntries(limit = 50): Promise<LorryBookingEntry[]> {
+    return [...this.mockLorryBookings].slice(0, limit);
+  }
+
+  async saveLorryBookingEntry(entry: {
+    id?: string;
+    name?: string;
+    vehicleNumber?: string;
+    fromPoint: string;
+    destinationPoint: string;
+    loadFreight: number;
+    lorryFreight: number;
+    coolie: number;
+    commissionFreight: number;
+    expenses: number;
+  }): Promise<{ booking: LorryBookingEntry; bookingProfit: number; dailyProfit: number }> {
+    const gross_freight = entry.loadFreight - entry.lorryFreight;
+    const total_freight = gross_freight + entry.coolie + entry.commissionFreight;
+    const profit = total_freight - entry.expenses;
+    const today = new Date().toISOString().split('T')[0];
+
+    let booking: LorryBookingEntry;
+    if (entry.id) {
+      const idx = this.mockLorryBookings.findIndex((b) => b.id === entry.id);
+      if (idx !== -1) {
+        booking = {
+          ...this.mockLorryBookings[idx],
+          name: entry.name,
+          vehicle_number: entry.vehicleNumber,
+          from_point: entry.fromPoint,
+          destination_point: entry.destinationPoint,
+          load_freight: entry.loadFreight,
+          lorry_freight: entry.lorryFreight,
+          gross_freight,
+          coolie: entry.coolie,
+          commission_freight: entry.commissionFreight,
+          total_freight,
+          expenses: entry.expenses,
+          profit,
+        };
+        this.mockLorryBookings[idx] = booking;
+      } else {
+        booking = {
+          id: `LB-${Date.now()}`,
+          profit_date: today,
+          name: entry.name,
+          vehicle_number: entry.vehicleNumber,
+          from_point: entry.fromPoint,
+          destination_point: entry.destinationPoint,
+          load_freight: entry.loadFreight,
+          lorry_freight: entry.lorryFreight,
+          gross_freight,
+          coolie: entry.coolie,
+          commission_freight: entry.commissionFreight,
+          total_freight,
+          expenses: entry.expenses,
+          profit,
+          created_at: new Date().toISOString(),
+        };
+        this.mockLorryBookings.unshift(booking);
+      }
+    } else {
+      booking = {
+        id: `LB-${Date.now()}`,
+        profit_date: today,
+        name: entry.name,
+        vehicle_number: entry.vehicleNumber,
+        from_point: entry.fromPoint,
+        destination_point: entry.destinationPoint,
+        load_freight: entry.loadFreight,
+        lorry_freight: entry.lorryFreight,
+        gross_freight,
+        coolie: entry.coolie,
+        commission_freight: entry.commissionFreight,
+        total_freight,
+        expenses: entry.expenses,
+        profit,
+        created_at: new Date().toISOString(),
+      };
+      this.mockLorryBookings.unshift(booking);
+    }
+
+    await this.saveLorryBookings();
+    this.notify();
+
+    const dailyProfit = this.mockLorryBookings
+      .filter((b) => b.profit_date === today)
+      .reduce((sum, b) => sum + b.profit, 0);
+
+    return { booking, bookingProfit: profit, dailyProfit };
+  }
+
+  async deleteLorryBookingEntry(id: string): Promise<{ success: boolean; dailyProfit: number }> {
+    this.mockLorryBookings = this.mockLorryBookings.filter((b) => b.id !== id);
+    await this.saveLorryBookings();
+    this.notify();
+    const today = new Date().toISOString().split('T')[0];
+    const dailyProfit = this.mockLorryBookings
+      .filter((b) => b.profit_date === today)
+      .reduce((sum, b) => sum + b.profit, 0);
+    return { success: true, dailyProfit };
+  }
+
+  async getLorryBookingProfit(fromDate: string, toDate: string): Promise<{ fromDate: string; toDate: string; totalProfit: number }> {
+    const filtered = this.mockLorryBookings.filter((b) => b.profit_date >= fromDate && b.profit_date <= toDate);
+    const totalProfit = filtered.reduce((sum, b) => sum + b.profit, 0);
+    return { fromDate, toDate, totalProfit };
   }
 }
 

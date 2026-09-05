@@ -158,14 +158,8 @@ export default function LorryBookingScreen() {
   const loadEntries = useCallback(async () => {
     setLoadingEntries(true);
     try {
-      const token = getAdminToken();
-      const res = await fetch(`${API_HOST}/api/lorry-booking/entries?limit=50`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) setEntries(data.entries || []);
-      }
+      const data = await db.getLorryBookingEntries(50);
+      setEntries(data || []);
     } catch {}
     finally { setLoadingEntries(false); }
   }, []);
@@ -186,20 +180,7 @@ export default function LorryBookingScreen() {
     setProfitSummaryError(null);
 
     try {
-      const token = getAdminToken();
-      const response = await fetch(`${API_HOST}/api/lorry-booking/profit?fromDate=${fromDate}&toDate=${toDate}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        throw new Error('Unable to load profit.');
-      }
-
-      const data = await response.json().catch(() => null);
-      if (!data?.success) {
-        throw new Error('Unable to load profit.');
-      }
-
+      const data = await db.getLorryBookingProfit(fromDate, toDate);
       setProfitSummary({
         fromDate: data.fromDate,
         toDate: data.toDate,
@@ -249,45 +230,22 @@ export default function LorryBookingScreen() {
     setIsSaving(true);
 
     try {
-      const token = getAdminToken();
       const isEditing = editingBookingId !== null;
-      const url = isEditing
-        ? `${API_HOST}/api/lorry-booking/${editingBookingId}`
-        : `${API_HOST}/api/lorry-booking`;
-      const method = isEditing ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          vehicleNumber: form.vehicleNumber.trim().toUpperCase(),
-          fromPoint: form.fromPoint.trim(),
-          destinationPoint: form.destinationPoint.trim(),
-          loadFreight: parseAmount(form.loadFreight),
-          lorryFreight: parseAmount(form.lorryFreight),
-          coolie: parseAmount(form.coolie),
-          commissionFreight: parseAmount(form.commissionFreight),
-          expenses: parseAmount(form.expenses),
-        }),
+      const result = await db.saveLorryBookingEntry({
+        id: isEditing ? editingBookingId : undefined,
+        name: form.name.trim(),
+        vehicleNumber: form.vehicleNumber.trim().toUpperCase(),
+        fromPoint: form.fromPoint.trim(),
+        destinationPoint: form.destinationPoint.trim(),
+        loadFreight: parseAmount(form.loadFreight),
+        lorryFreight: parseAmount(form.lorryFreight),
+        coolie: parseAmount(form.coolie),
+        commissionFreight: parseAmount(form.commissionFreight),
+        expenses: parseAmount(form.expenses),
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error || `Unable to ${isEditing ? 'update' : 'save'} booking. Please try again.`);
-      }
-
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.error || `Unable to ${isEditing ? 'update' : 'save'} booking. Please try again.`);
-      }
-
-      const bookingProfit = Number(data.bookingProfit ?? 0);
-      setTodayProfit(Number(data.dailyProfit ?? 0));
-      setMessage(isEditing ? 'Booking updated successfully.' : `Booking Profit: ${formatCurrency(bookingProfit)}`);
+      setTodayProfit(result.dailyProfit);
+      setMessage(isEditing ? 'Booking updated successfully.' : `Booking Profit: ${formatCurrency(result.bookingProfit)}`);
       setForm(createEmptyForm());
       setEditingBookingId(null);
       void loadEntries();
@@ -338,31 +296,14 @@ export default function LorryBookingScreen() {
 
   const executeDelete = async (id: string) => {
     try {
-      const token = getAdminToken();
-      const response = await fetch(`${API_HOST}/api/lorry-booking/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error || 'Unable to delete booking.');
+      const result = await db.deleteLorryBookingEntry(id);
+      if (editingBookingId === id) {
+        setEditingBookingId(null);
+        setForm(createEmptyForm());
       }
-
-      const data = await response.json().catch(() => null);
-      if (data?.success) {
-        if (editingBookingId === id) {
-          setEditingBookingId(null);
-          setForm(createEmptyForm());
-        }
-        setMessage('Booking deleted successfully.');
-        void loadEntries();
-        if (data.dailyProfit !== undefined) {
-          setTodayProfit(Number(data.dailyProfit || 0));
-        }
-      }
+      setMessage('Booking deleted successfully.');
+      void loadEntries();
+      setTodayProfit(result.dailyProfit);
     } catch (err: any) {
       setError(err.message || 'Failed to delete booking.');
     }
