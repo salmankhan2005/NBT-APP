@@ -8,6 +8,7 @@ import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import staticFiles from '@fastify/static';
 import path from 'path';
+import fs from 'fs';
 import 'dotenv/config';
 
 import { pingDatabase, sql } from './db/client';
@@ -378,6 +379,38 @@ async function bootstrap() {
   // ── Lorry Booking Agency routes ─────────────────────────────────────────
   app.register(lorryBookingRoutes, { prefix: '/api/lorry-booking' });
 
+  // ── Static Web App: Admin Portal (/admin) ──────────────────────────────
+  const adminWebDist = path.join(process.cwd(), 'public', 'admin');
+  if (fs.existsSync(adminWebDist)) {
+    await app.register(staticFiles, {
+      root: adminWebDist,
+      prefix: '/admin/',
+      decorateReply: false,
+    });
+    app.get('/admin', async (_req, reply) => {
+      return reply.sendFile('index.html', adminWebDist);
+    });
+    app.get('/admin/*', async (_req, reply) => {
+      return reply.sendFile('index.html', adminWebDist);
+    });
+  }
+
+  // ── Static Web App: Driver App (/driver) ───────────────────────────────
+  const driverWebDist = path.join(process.cwd(), 'public', 'driver');
+  if (fs.existsSync(driverWebDist)) {
+    await app.register(staticFiles, {
+      root: driverWebDist,
+      prefix: '/driver/',
+      decorateReply: false,
+    });
+    app.get('/driver', async (_req, reply) => {
+      return reply.sendFile('index.html', driverWebDist);
+    });
+    app.get('/driver/*', async (_req, reply) => {
+      return reply.sendFile('index.html', driverWebDist);
+    });
+  }
+
   // ── Root Landing & System Portal (Prevents 404 on root domain) ─────────
   app.get('/', async (req, reply) => {
     const acceptsHtml = req.headers.accept?.includes('text/html');
@@ -397,6 +430,10 @@ async function bootstrap() {
         version: '2.5.0',
         environment: process.env.NODE_ENV || 'production',
         database: dbStatus,
+        apps: {
+          adminPortal: '/admin',
+          driverApp: '/driver',
+        },
         endpoints: {
           health: '/health',
           auth: '/api/auth',
@@ -448,7 +485,7 @@ async function bootstrap() {
       backdrop-filter: blur(16px);
       border: 1px solid var(--border);
       border-radius: 20px;
-      padding: 40px;
+      padding: 36px;
       max-width: 680px;
       width: 100%;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -457,7 +494,7 @@ async function bootstrap() {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .status-pill {
       display: inline-flex;
@@ -481,23 +518,63 @@ async function bootstrap() {
     }
     h1 {
       font-family: 'Outfit', sans-serif;
-      font-size: 32px;
+      font-size: 30px;
       font-weight: 900;
       letter-spacing: -0.5px;
       color: #ffffff;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     p.sub {
       color: var(--muted);
       font-size: 14px;
-      line-height: 1.6;
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
       margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 13px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      letter-spacing: 0.5px;
+    }
+    .btn-admin {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.4);
+    }
+    .btn-admin:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(249, 115, 22, 0.6);
+    }
+    .btn-driver {
+      background: linear-gradient(135deg, #1e3a5f, #0f172a);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    }
+    .btn-driver:hover {
+      transform: translateY(-2px);
+      border-color: #38bdf8;
     }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 12px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
     .item {
       background: rgba(15, 23, 42, 0.6);
@@ -529,7 +606,7 @@ async function bootstrap() {
       font-size: 12px;
       color: #cbd5e1;
       margin-bottom: 20px;
-      line-height: 1.9;
+      line-height: 1.8;
     }
     .endpoints-box a {
       color: #38bdf8;
@@ -556,7 +633,16 @@ async function bootstrap() {
       </div>
     </div>
     <h1>NBT Logistics Enterprise Cloud</h1>
-    <p class="sub">Production Backend API Gateway & Telematics Engine for New Balaji Transports.</p>
+    <p class="sub">Production Backend API Gateway & Web Application Portal for New Balaji Transports.</p>
+
+    <div class="btn-row">
+      <a href="/admin" class="btn btn-admin">
+        🏢 OPEN ADMIN APP ↗
+      </a>
+      <a href="/driver" class="btn btn-driver">
+        🚚 OPEN DRIVER APP ↗
+      </a>
+    </div>
     
     <div class="grid">
       <div class="item">
