@@ -378,6 +378,244 @@ async function bootstrap() {
   // ── Lorry Booking Agency routes ─────────────────────────────────────────
   app.register(lorryBookingRoutes, { prefix: '/api/lorry-booking' });
 
+  // ── Root Landing & System Portal (Prevents 404 on root domain) ─────────
+  app.get('/', async (req, reply) => {
+    const acceptsHtml = req.headers.accept?.includes('text/html');
+    let dbStatus = 'CONNECTED';
+    let dbPing = true;
+    try {
+      await pingDatabase();
+    } catch {
+      dbStatus = 'DISCONNECTED';
+      dbPing = false;
+    }
+
+    if (!acceptsHtml) {
+      return reply.code(200).send({
+        status: dbPing ? 'ok' : 'degraded',
+        service: 'NBT Logistics Enterprise Cloud API',
+        version: '2.5.0',
+        environment: process.env.NODE_ENV || 'production',
+        database: dbStatus,
+        endpoints: {
+          health: '/health',
+          auth: '/api/auth',
+          trips: '/api/trips',
+          admin: '/api/admin',
+          gc: '/api/gc',
+          memos: '/api/memos',
+          maps: '/api/maps',
+          uploads: '/api/upload',
+          lorryBooking: '/api/lorry-booking',
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBT Logistics — Enterprise Cloud Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1e3a5f;
+      --accent: #f97316;
+      --success: #16a34a;
+      --bg: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.75);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at top right, #1e293b, #0f172a 70%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 680px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .badge-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(22, 163, 74, 0.15);
+      border: 1px solid rgba(22, 163, 74, 0.4);
+      color: #4ade80;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: #4ade80;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #4ade80;
+    }
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    p.sub {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .item-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .item-val {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .endpoints-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #cbd5e1;
+      margin-bottom: 20px;
+      line-height: 1.9;
+    }
+    .endpoints-box a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+    .endpoints-box a:hover {
+      text-decoration: underline;
+    }
+    .footer {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge-bar">
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        LIVE & OPERATIONAL
+      </div>
+    </div>
+    <h1>NBT Logistics Enterprise Cloud</h1>
+    <p class="sub">Production Backend API Gateway & Telematics Engine for New Balaji Transports.</p>
+    
+    <div class="grid">
+      <div class="item">
+        <span class="item-label">Database Status</span>
+        <span class="item-val" style="color: ${dbPing ? '#4ade80' : '#f87171'}">${dbStatus} (Neon PostgreSQL)</span>
+      </div>
+      <div class="item">
+        <span class="item-label">Cloud Storage</span>
+        <span class="item-val">Supabase Storage + DB Blob</span>
+      </div>
+      <div class="item">
+        <span class="item-label">Environment</span>
+        <span class="item-val">Production (Render Cloud)</span>
+      </div>
+      <div class="item">
+        <span class="item-label">API Version</span>
+        <span class="item-val">v2.5.0 Enterprise</span>
+      </div>
+    </div>
+
+    <div class="endpoints-box">
+      <strong>Active Endpoints:</strong><br/>
+      • <a href="/health">/health</a> — Real-time health & DB latency check<br/>
+      • <a href="/api/trips">/api/trips</a> — Driver live dispatch & GPS sync<br/>
+      • <a href="/api/admin/trips">/api/admin/trips</a> — Trip registry & management<br/>
+      • <a href="/api/gc">/api/gc</a> — Goods Consignment Notes API<br/>
+      • <a href="/api/memos">/api/memos</a> — Lorry Hire Memos API<br/>
+      • <a href="/api/upload">/api/upload</a> — Document & receipt vault
+    </div>
+
+    <div class="footer">
+      © 2026 New Balaji Transports (NBT-ARS). All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`;
+
+    reply.type('text/html').send(html);
+  });
+
+  app.get('/api', async (_req, reply) => {
+    return reply.code(200).send({
+      status: 'ok',
+      service: 'NBT Logistics Enterprise Cloud API',
+      version: '2.5.0',
+      routes: [
+        '/health',
+        '/api/auth',
+        '/api/trips',
+        '/api/admin',
+        '/api/gc',
+        '/api/memos',
+        '/api/maps',
+        '/api/upload',
+        '/api/lorry-booking',
+      ],
+    });
+  });
+
   // ── Health check ──────────────────────────────────────────────────────────
   app.get('/health', async (_req, reply) => {
     try {
