@@ -1,3 +1,4 @@
+// NBT-ARS Enterprise Production Backend v2.5.0 (Live Release)
 import Fastify from 'fastify';
 import compress from '@fastify/compress';
 import cors from '@fastify/cors';
