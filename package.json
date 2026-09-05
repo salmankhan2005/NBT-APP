@@ -4,8 +4,9 @@
   "description": "Zero-Database Interactive Client Demo Suite for NBT Logistics Admin and Driver Applications",
   "scripts": {
     "build": "node scripts/build-demo.js",
-    "build:admin": "npm --prefix \"admin app\" run build",
-    "build:driver": "npm --prefix \"DRIVER APP\" run build",
+    "build:admin": "node scripts/build-admin-standalone.js",
+    "build:driver": "node scripts/build-driver-standalone.js",
+    "build:demo": "node scripts/build-demo.js",
     "preview": "npx --yes serve dist -p 3000",
     "deploy:vercel": "npx vercel --prod",
     "deploy:netlify": "npx netlify-cli deploy --prod --dir=dist",

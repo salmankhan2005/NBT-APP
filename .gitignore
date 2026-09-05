@@ -3,6 +3,8 @@
 
 # Build outputs
 **/dist/
+**/dist-admin/
+**/dist-driver/
 **/web-dist/
 **/.expo/
 **/.next/

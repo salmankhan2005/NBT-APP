@@ -809,18 +809,19 @@ class AdminDatabase {
   private mockVehicles: Vehicle[] = [];
 
   // Managed Vehicles — default seeded
-  private managedVehicles: ManagedVehicle[] = [];
+  private managedVehicles: ManagedVehicle[] = INITIAL_SEED_MANAGED_VEHICLES;
 
   // Vehicle Documents — starts empty
   private vehicleDocuments: VehicleDocument[] = [];
 
-  private mockFleetVehicles: FleetVehicle[] = [];
+  private mockFleetVehicles: FleetVehicle[] = INITIAL_SEED_FLEET_VEHICLES;
 
   // Trips Database
-  private mockTrips: Trip[] = [];
+  private mockTrips: Trip[] = INITIAL_SEED_TRIPS;
 
-  private mockGcNotes: GcNote[] = [];
-  private mockMemoDocuments: MemoDocument[] = [];
+  private mockGcNotes: GcNote[] = INITIAL_SEED_GC_NOTES;
+  private mockMemoDocuments: MemoDocument[] = INITIAL_SEED_MEMOS;
+  private mockDrivers: Driver[] = INITIAL_SEED_DRIVERS;
   private readonly gcStorageKey = 'nbt_gc_notes';
   private readonly memoStorageKey = 'nbt_memo_documents';
 
