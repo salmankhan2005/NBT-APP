@@ -7,7 +7,7 @@ const ADMIN_DIR = path.join(ROOT_DIR, 'admin app');
 const DRIVER_DIR = path.join(ROOT_DIR, 'DRIVER APP');
 const OUTPUT_DIR = path.join(ROOT_DIR, 'dist');
 
-console.log('🚀 [Build Demo] Starting Unified NBT Logistics Demo Suite Build...\n');
+console.log('🚀 [Build Suite] Starting NBT Logistics Combined Production Build...\n');
 
 // Ensure sub-app dependencies are installed
 if (!fs.existsSync(path.join(ADMIN_DIR, 'node_modules'))) {
@@ -21,15 +21,15 @@ if (!fs.existsSync(path.join(DRIVER_DIR, 'node_modules'))) {
 }
 
 // 1. Build Admin App
-console.log('📦 [1/4] Exporting Admin App (Expo Web with baseUrl /admin)...');
+console.log('📦 [1/3] Exporting Admin App (Expo Web with baseUrl /admin)...');
 execSync('npx expo export --platform web', { stdio: 'inherit', cwd: ADMIN_DIR });
 
 // 2. Build Driver App
-console.log('\n📦 [2/4] Exporting Driver App (Expo Web with baseUrl /driver)...');
+console.log('\n📦 [2/3] Exporting Driver App (Expo Web with baseUrl /driver)...');
 execSync('npx expo export --platform web', { stdio: 'inherit', cwd: DRIVER_DIR });
 
 // 3. Assemble root dist folder
-console.log('\n📁 [3/4] Assembling unified distribution directory: dist/...');
+console.log('\n📁 [3/3] Assembling unified distribution directory: dist/...');
 if (fs.existsSync(OUTPUT_DIR)) {
   fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
 }
@@ -41,31 +41,25 @@ fs.cpSync(path.join(ADMIN_DIR, 'dist'), path.join(OUTPUT_DIR, 'admin'), { recurs
 // Copy DRIVER APP/dist -> dist/driver
 fs.cpSync(path.join(DRIVER_DIR, 'dist'), path.join(OUTPUT_DIR, 'driver'), { recursive: true });
 
-// 4. Adapt demo-suite.html -> dist/index.html
-console.log('✨ [4/4] Generating production demo showcase: dist/index.html...');
-let demoSuiteHtml = fs.readFileSync(path.join(ROOT_DIR, 'demo-suite.html'), 'utf8');
-
-// Replace localhost default URLs with relative web URLs
-demoSuiteHtml = demoSuiteHtml.replace(
-  'src="http://localhost:8081"',
-  'src="/admin/"'
-);
-demoSuiteHtml = demoSuiteHtml.replace(
-  'value="http://localhost:8081"',
-  'value="/admin"'
-);
-demoSuiteHtml = demoSuiteHtml.replace(
-  'src="http://localhost:8082"',
-  'src="/driver/"'
-);
-
-fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), demoSuiteHtml, 'utf8');
+// Default index.html redirects to /admin/
+const indexHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>NBT Logistics Applications</title>
+  <meta http-equiv="refresh" content="0; url=/admin/">
+  <script>window.location.href = "/admin/";</script>
+</head>
+<body>
+  <p>Redirecting to <a href="/admin/">NBT Admin Portal</a>...</p>
+</body>
+</html>`;
+fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), indexHtml, 'utf8');
 
 // Copy redirect configuration for SPAs
-const redirectsContent = `/admin/*  /admin/index.html  200\n/driver/*  /driver/index.html  200\n`;
+const redirectsContent = `/admin/*  /admin/index.html  200\n/driver/*  /driver/index.html  200\n/*  /admin/index.html  200\n`;
 fs.writeFileSync(path.join(OUTPUT_DIR, '_redirects'), redirectsContent, 'utf8');
 
-console.log('\n✅ [Build Demo] Unified demo suite compiled successfully to dist/ !');
-console.log('   - Interactive Presentation Suite: /');
-console.log('   - Admin Command Console:          /admin');
-console.log('   - Driver Mobile Console:          /driver');
+console.log('\n✅ [Build Suite] Unified distribution compiled successfully to dist/ !');
+console.log('   - Admin Command Console: /admin/');
+console.log('   - Driver Mobile Console:  /driver/');
