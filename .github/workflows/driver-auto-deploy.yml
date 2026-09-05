@@ -1,0 +1,41 @@
+name: Auto Deploy & Build Driver App
+
+on:
+  push:
+    branches:
+      - main
+      - salman
+    paths:
+      - 'DRIVER APP/**'
+      - '.github/workflows/driver-auto-deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'DRIVER APP/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: 'DRIVER APP'
+        run: npm ci
+
+      - name: Build Driver Web App
+        working-directory: 'DRIVER APP'
+        env:
+          EXPO_PUBLIC_API_URL: https://nbt-app.onrender.com
+        run: npx expo export --platform web
+
+      - name: Upload Web Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: driver-web-dist
+          path: DRIVER APP/dist
