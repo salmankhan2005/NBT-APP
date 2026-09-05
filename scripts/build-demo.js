@@ -9,13 +9,24 @@ const OUTPUT_DIR = path.join(ROOT_DIR, 'dist');
 
 console.log('🚀 [Build Demo] Starting Unified NBT Logistics Demo Suite Build...\n');
 
-// 1. Build Admin App if dist doesn't exist or forced
-console.log('📦 [1/4] Exporting Admin App (Expo Web with baseUrl /admin)...');
-execSync('npm --prefix "admin app" run build', { stdio: 'inherit', cwd: ROOT_DIR });
+// Ensure sub-app dependencies are installed
+if (!fs.existsSync(path.join(ADMIN_DIR, 'node_modules'))) {
+  console.log('📦 [Admin App] node_modules missing. Installing dependencies...');
+  execSync('npm install --prefer-offline --no-audit', { stdio: 'inherit', cwd: ADMIN_DIR });
+}
 
-// 2. Build Driver App if dist doesn't exist or forced
+if (!fs.existsSync(path.join(DRIVER_DIR, 'node_modules'))) {
+  console.log('📦 [Driver App] node_modules missing. Installing dependencies...');
+  execSync('npm install --prefer-offline --no-audit', { stdio: 'inherit', cwd: DRIVER_DIR });
+}
+
+// 1. Build Admin App
+console.log('📦 [1/4] Exporting Admin App (Expo Web with baseUrl /admin)...');
+execSync('npx expo export --platform web', { stdio: 'inherit', cwd: ADMIN_DIR });
+
+// 2. Build Driver App
 console.log('\n📦 [2/4] Exporting Driver App (Expo Web with baseUrl /driver)...');
-execSync('npm --prefix "DRIVER APP" run build', { stdio: 'inherit', cwd: ROOT_DIR });
+execSync('npx expo export --platform web', { stdio: 'inherit', cwd: DRIVER_DIR });
 
 // 3. Assemble root dist folder
 console.log('\n📁 [3/4] Assembling unified distribution directory: dist/...');
