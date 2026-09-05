@@ -1,15 +1,7 @@
 [build]
-  publish = "public"
-
-[[redirects]]
-  from = "/admin/*"
-  to = "/admin/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/driver/*"
-  to = "/driver/index.html"
-  status = 200
+  base = "admin app"
+  command = "npm install && npx expo export --platform web"
+  publish = "dist"
 
 [[redirects]]
   from = "/*"
