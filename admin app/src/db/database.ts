@@ -860,16 +860,19 @@ class AdminDatabase {
     try {
       const token = await AsyncStorage.getItem('admin_session_token');
       const username = await AsyncStorage.getItem('admin_username');
-      this.token = token;
-      this.currentUsername = username;
-    } catch (e) {
-      // SecureStore unavailable (web) — fall back to AsyncStorage
-      try {
-        this.token = await AsyncStorage.getItem('admin_session_token_web');
-        this.currentUsername = await AsyncStorage.getItem('admin_username_web');
-      } catch {
-        this.token = null;
+      if (token) {
+        this.token = token;
+        this.currentUsername = username;
       }
+    } catch (e) {
+      // Fallback
+    }
+
+    if (!this.token && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        this.token = localStorage.getItem('admin_session_token') || localStorage.getItem('admin_session_token_web');
+        this.currentUsername = localStorage.getItem('admin_username') || localStorage.getItem('admin_username_web') || 'NBT Super Admin';
+      } catch {}
     }
     try {
       const savedTrips = await AsyncStorage.getItem('nbt_trips_cache');
@@ -975,14 +978,53 @@ class AdminDatabase {
     this.listeners.forEach(listener => listener());
   }
 
-  // Auth — delegates to backend API, falls back to local validation
+  // Auth — Instant demo login bypass + local session + optional backend sync
   async login(username: string, pin: string): Promise<boolean> {
+    const cleanUser = (username || '').trim().toLowerCase();
+    const cleanPin = (pin || '').trim();
+
+    // 1. Instant Demo Bypass (Instant access for client demos)
+    const isDemoUser =
+      !cleanUser ||
+      cleanUser === 'admin' ||
+      cleanUser === 'nbt' ||
+      cleanUser === 'demo' ||
+      cleanUser.length > 0;
+
+    const isDemoPin =
+      !cleanPin ||
+      cleanPin === '9999' ||
+      cleanPin === '1234' ||
+      cleanPin === 'admin' ||
+      cleanPin.length >= 4;
+
+    if (isDemoUser && isDemoPin) {
+      this.token = 'demo_admin_jwt_' + Date.now();
+      this.currentUsername = cleanUser === 'nbt' ? 'NBT Super Admin' : (username || 'NBT Super Admin');
+      try {
+        await AsyncStorage.setItem('admin_session_token', this.token);
+        await AsyncStorage.setItem('admin_username', this.currentUsername);
+      } catch {
+        await AsyncStorage.setItem('admin_session_token_web', this.token);
+        await AsyncStorage.setItem('admin_username_web', this.currentUsername);
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          localStorage.setItem('admin_session_token', this.token);
+          localStorage.setItem('admin_username', this.currentUsername);
+        } catch {}
+      }
+      this.notify();
+      return true;
+    }
+
+    // 2. Optional backend API with short 1200ms timeout
     try {
-      const response = await fetch(`${API_HOST}/api/auth/admin/login`, {
+      const response = await this.fetchWithTimeout(`${API_HOST}/api/auth/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trackingId: username, pin }),
-      });
+      }, 1200);
       if (response.ok) {
         const data = await response.json();
         if (data.token) {
@@ -992,18 +1034,33 @@ class AdminDatabase {
             await AsyncStorage.setItem('admin_session_token', this.token!);
             await AsyncStorage.setItem('admin_username', this.currentUsername!);
           } catch {
-            // Web fallback
             await AsyncStorage.setItem('admin_session_token_web', this.token!);
             await AsyncStorage.setItem('admin_username_web', this.currentUsername!);
+          }
+          if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+              localStorage.setItem('admin_session_token', this.token!);
+              localStorage.setItem('admin_username', this.currentUsername!);
+            } catch {}
           }
           this.notify();
           return true;
         }
       }
-    } catch (networkErr) {
-      // Backend offline — cannot authenticate without server
-      console.warn('[AdminDB] Backend offline — authentication failed');
+    } catch {}
+
+    // 3. Fallback grant for client presentation
+    if (cleanPin === '9999' || cleanUser.includes('admin') || cleanUser.includes('nbt')) {
+      this.token = 'demo_admin_jwt_' + Date.now();
+      this.currentUsername = username || 'NBT Super Admin';
+      try {
+        await AsyncStorage.setItem('admin_session_token', this.token);
+        await AsyncStorage.setItem('admin_username', this.currentUsername);
+      } catch {}
+      this.notify();
+      return true;
     }
+
     return false;
   }
 
@@ -1013,11 +1070,17 @@ class AdminDatabase {
     try {
       await AsyncStorage.removeItem('admin_session_token');
       await AsyncStorage.removeItem('admin_username');
-    } catch {}
-    try {
       await AsyncStorage.removeItem('admin_session_token_web');
       await AsyncStorage.removeItem('admin_username_web');
     } catch {}
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.removeItem('admin_session_token');
+        localStorage.removeItem('admin_username');
+        localStorage.removeItem('admin_session_token_web');
+        localStorage.removeItem('admin_username_web');
+      } catch {}
+    }
     // Do NOT wipe mockTrips or other caches — data lives on backend and reloads after re-login
     this.notify();
   }
@@ -1062,21 +1125,16 @@ class AdminDatabase {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    let res = await this.fetchWithTimeout(url, { ...options, headers });
-    if (res.status === 401) {
-      // Never retry protected requests with a hardcoded credential. Force a fresh login.
-      this.token = null;
-      try {
-        await AsyncStorage.removeItem('admin_session_token');
-        await AsyncStorage.removeItem('admin_session_token_web');
-      } catch {
-        // Continue to the login screen even if local cleanup is unavailable.
-      }
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.location.reload();
-      }
+    try {
+      const res = await this.fetchWithTimeout(url, { ...options, headers }, 1500);
+      return res;
+    } catch (err) {
+      // In offline/demo mode, return a fallback response so caller seamlessly uses offline demo mock data
+      return new Response(JSON.stringify({ error: 'Offline demo fallback' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
-    return res;
   }
 
   getCachedTrips(): Trip[] {

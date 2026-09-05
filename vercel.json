@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "framework": null,
+  "rewrites": [
+    { "source": "/admin/_expo/:match*", "destination": "/admin/_expo/:match*" },
+    { "source": "/admin/assets/:match*", "destination": "/admin/assets/:match*" },
+    { "source": "/admin/favicon.ico", "destination": "/admin/favicon.ico" },
+    { "source": "/admin", "destination": "/admin/index.html" },
+    { "source": "/admin/:path*", "destination": "/admin/index.html" },
+
+    { "source": "/driver/_expo/:match*", "destination": "/driver/_expo/:match*" },
+    { "source": "/driver/assets/:match*", "destination": "/driver/assets/:match*" },
+    { "source": "/driver/favicon.ico", "destination": "/driver/favicon.ico" },
+    { "source": "/driver", "destination": "/driver/index.html" },
+    { "source": "/driver/:path*", "destination": "/driver/index.html" },
+
+    { "source": "/", "destination": "/index.html" }
+  ]
+}

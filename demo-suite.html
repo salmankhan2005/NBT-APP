@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBT Logistics — Interactive Client Demo Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0B1120;
+      --card-bg: rgba(17, 24, 39, 0.85);
+      --border: rgba(255, 255, 255, 0.1);
+      --primary: #38BDF8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --secondary: #FEA619;
+      --success: #10B981;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --header-h: 72px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: radial-gradient(circle at 50% 0%, #1E293B 0%, #0B1120 100%);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Top Header ───────────────────────────────────────────── */
+    header {
+      height: var(--header-h);
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #0284C7, #0369A1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      color: #fff;
+      box-shadow: 0 0 16px var(--primary-glow);
+    }
+
+    .brand-info h1 {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .demo-pill {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #F59E0B, #EF4444);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ── Toolbar Simulation Actions ───────────────────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34D399;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+    }
+
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.1); }
+      100% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    .action-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: #F1F5F9;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, #0284C7, #0369A1);
+      border-color: #38BDF8;
+      color: #fff;
+    }
+
+    .action-btn.primary:hover {
+      box-shadow: 0 0 16px var(--primary-glow);
+    }
+
+    .action-btn.warning {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #F87171;
+    }
+
+    .action-btn.warning:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    /* ── Main Showcase Area ───────────────────────────────────── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 430px;
+      gap: 20px;
+      padding: 20px;
+      height: calc(100vh - var(--header-h));
+      overflow: hidden;
+    }
+
+    /* ── Desktop Admin Window ─────────────────────────────────── */
+    .admin-viewport {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .window-header {
+      background: #0F172A;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
+    .dot.red { background: #EF4444; }
+    .dot.yellow { background: #F59E0B; }
+    .dot.green { background: #10B981; }
+
+    .window-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .window-url-bar {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #94A3B8;
+      font-family: 'JetBrains Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .window-url-bar input {
+      background: transparent;
+      border: none;
+      color: #F8FAFC;
+      font-family: inherit;
+      font-size: 12px;
+      outline: none;
+      width: 170px;
+    }
+
+    .iframe-container {
+      flex: 1;
+      position: relative;
+      background: #0B1120;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #FFFFFF;
+    }
+
+    /* ── Mobile Driver Mockup Frame ───────────────────────────── */
+    .driver-viewport {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .phone-mockup {
+      width: 380px;
+      height: 98%;
+      max-height: 820px;
+      background: #020617;
+      border: 8px solid #1E293B;
+      border-radius: 46px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Phone Notch */
+    .phone-notch {
+      height: 28px;
+      background: #020617;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 20;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .notch-camera {
+      width: 70px;
+      height: 16px;
+      background: #000;
+      border-radius: 10px;
+      margin: 0 auto;
+    }
+
+    .phone-screen {
+      flex: 1;
+      position: relative;
+      background: #F4F6F9;
+      overflow: hidden;
+    }
+
+    /* ── Cheat Sheet Floating Drawer / Modal ───────────────────── */
+    .credentials-bar {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 200;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      font-size: 12px;
+    }
+
+    .cred-tag {
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .cred-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cred-code {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #38BDF8;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 86px;
+      right: 24px;
+      background: #0369A1;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      display: none;
+      z-index: 300;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(50px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">NBT</div>
+      <div class="brand-info">
+        <h1>NBT Logistics Suite <span class="demo-pill">Client Demo Mode</span></h1>
+        <p>Zero-DB Standalone Interactive Pitch Presentation</p>
+      </div>
+    </div>
+
+    <!-- Central Interactive Simulator Controls -->
+    <div class="controls">
+      <div class="sync-status">
+        <div class="sync-dot"></div>
+        <span id="syncText">Dual-App Live Sync Active</span>
+      </div>
+
+      <button class="action-btn primary" onclick="triggerSimAction('START_TRIP')">
+        🚀 Simulate Start Trip
+      </button>
+
+      <button class="action-btn" onclick="triggerSimAction('ADD_EXPENSE')">
+        ⛽ Add Fuel (₹4,500)
+      </button>
+
+      <button class="action-btn" onclick="triggerSimAction('REACH_DESTINATION')">
+        📍 Reached Dest
+      </button>
+
+      <button class="action-btn" onclick="triggerSimAction('UPLOAD_POD')">
+        ✍️ Sign & Upload POD
+      </button>
+
+      <button class="action-btn warning" onclick="resetAllDemoData()">
+        🔄 Reset State
+      </button>
+    </div>
+  </header>
+
+  <!-- Showcase Area -->
+  <main>
+    <!-- Left: Admin Enterprise Web Portal -->
+    <div class="admin-viewport">
+      <div class="window-header">
+        <div class="window-dots">
+          <div class="dot red"></div>
+          <div class="dot yellow"></div>
+          <div class="dot green"></div>
+        </div>
+        <div class="window-title">
+          <span>🖥️ Admin Logistics Dispatch & Fleet Control Portal</span>
+        </div>
+        <div class="window-url-bar">
+          <span>PORT:</span>
+          <input type="text" id="adminPortInput" value="http://localhost:8081" onchange="updateAdminUrl(this.value)">
+          <button onclick="reloadFrame('adminFrame')" style="background:none;border:none;color:#38BDF8;cursor:pointer;">↻</button>
+        </div>
+      </div>
+      <div class="iframe-container">
+        <iframe id="adminFrame" src="http://localhost:8081" title="Admin Portal"></iframe>
+      </div>
+    </div>
+
+    <!-- Right: Driver Mobile App Mockup -->
+    <div class="driver-viewport">
+      <div class="phone-mockup">
+        <div class="phone-notch">
+          <span>09:41</span>
+          <div class="notch-camera"></div>
+          <span>5G 100%</span>
+        </div>
+        <div class="phone-screen">
+          <iframe id="driverFrame" src="http://localhost:8082" title="Driver Mobile Console"></iframe>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Credentials Helper Drawer -->
+  <div class="credentials-bar">
+    <span class="cred-tag">🔑 Demo Logins:</span>
+    <div class="cred-item">
+      <span>Admin:</span>
+      <span class="cred-code">NBT / 9999</span>
+    </div>
+    <div class="cred-item">
+      <span>Driver 1 (Active):</span>
+      <span class="cred-code">DRV-5566 / 123456</span>
+    </div>
+    <div class="cred-item">
+      <span>Driver 2 (New):</span>
+      <span class="cred-code">DRV-3310 / 112233</span>
+    </div>
+    <div class="cred-item">
+      <span>Driver 3 (POD Done):</span>
+      <span class="cred-code">DRV-4421 / 654321</span>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast">Simulation event broadcasted!</div>
+
+  <script>
+    const SYNC_CHANNEL_NAME = 'NBT_LOGISTICS_DEMO_SYNC';
+    let demoChannel = null;
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        demoChannel = new BroadcastChannel(SYNC_CHANNEL_NAME);
+        demoChannel.onmessage = (event) => {
+          if (event && event.data) {
+            showToast(`⚡ Live Event: ${event.data.type}`);
+          }
+        };
+      }
+    } catch (e) {
+      console.log('BroadcastChannel not supported in this frame context');
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => {
+        t.style.display = 'none';
+      }, 3000);
+    }
+
+    function broadcastEvent(type, data = {}) {
+      const payload = {
+        type,
+        data,
+        timestamp: new Date().toISOString(),
+        source: 'DEMO_SUITE'
+      };
+
+      if (demoChannel) {
+        demoChannel.postMessage(payload);
+      }
+
+      try {
+        localStorage.setItem('nbt_demo_sync_event', JSON.stringify(payload));
+      } catch (e) {}
+
+      showToast(`Broadcasted: ${type}`);
+    }
+
+    function triggerSimAction(action) {
+      const tripId = 'DRV-5566';
+      if (action === 'START_TRIP') {
+        broadcastEvent('TRIP_STARTED', {
+          tripId,
+          driverName: 'Senthil Rajesh',
+          odometer: 12450,
+          gps: { latitude: 11.6643, longitude: 78.1460, city: 'Salem', address: 'NH544 Salem Bypass' }
+        });
+      } else if (action === 'ADD_EXPENSE') {
+        broadcastEvent('EXPENSE_ADDED', {
+          tripId,
+          expense: {
+            id: 'EXP-' + Date.now(),
+            category: 'FUEL',
+            amount: 4500,
+            liters: 48,
+            reason: 'HP Auto Fuel, Dharmapuri Bypass',
+            timestamp: new Date().toLocaleTimeString(),
+            receiptUri: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=800&auto=format&fit=crop'
+          }
+        });
+      } else if (action === 'REACH_DESTINATION') {
+        broadcastEvent('DESTINATION_REACHED', {
+          tripId,
+          gps: { latitude: 12.9716, longitude: 77.5946, city: 'Bengaluru', address: 'Lumen Tech Tech Park, Electronic City' }
+        });
+      } else if (action === 'UPLOAD_POD') {
+        broadcastEvent('POD_UPLOADED', {
+          tripId,
+          podPhotoUrl: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=800&auto=format&fit=crop',
+          podSignature: 'Signed by Warehouse Manager',
+          podNotes: 'Consignment intact without shortage.',
+          gps: { latitude: 12.9716, longitude: 77.5946, city: 'Bengaluru', address: 'Lumen Tech Delivery Gate' }
+        });
+      }
+    }
+
+    function resetAllDemoData() {
+      broadcastEvent('RESET_DATA', {});
+      showToast('Restored Pristine Demo Seed State');
+      setTimeout(() => {
+        reloadFrame('adminFrame');
+        reloadFrame('driverFrame');
+      }, 500);
+    }
+
+    function updateAdminUrl(url) {
+      document.getElementById('adminFrame').src = url;
+    }
+
+    function reloadFrame(id) {
+      const f = document.getElementById(id);
+      if (f) f.src = f.src;
+    }
+  </script>
+</body>
+</html>
