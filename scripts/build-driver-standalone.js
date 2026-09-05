@@ -7,11 +7,11 @@ const DRIVER_DIR = path.join(ROOT_DIR, 'DRIVER APP');
 const OUTPUT_DIR = path.join(ROOT_DIR, 'dist-driver');
 const APP_JSON_PATH = path.join(DRIVER_DIR, 'app.json');
 
-console.log('🚀 [Build Driver App] Starting Dedicated Standalone Driver Application Build...\n');
+console.log('🚀 [Build Driver App] Exporting Standalone Production-Grade Driver Application...\n');
 
 // 1. Ensure dependencies in DRIVER APP
 if (!fs.existsSync(path.join(DRIVER_DIR, 'node_modules'))) {
-  console.log('📦 [Driver App] node_modules missing. Installing dependencies...');
+  console.log('📦 [Driver App] Installing node_modules...');
   execSync('npm install --prefer-offline --no-audit', { stdio: 'inherit', cwd: DRIVER_DIR });
 }
 
@@ -24,14 +24,15 @@ if (fs.existsSync(OUTPUT_DIR)) {
 const originalAppJsonStr = fs.readFileSync(APP_JSON_PATH, 'utf8');
 
 try {
-  // Ensure baseUrl is set to /driver for iframe routing within showcase
+  // Strip baseUrl so Driver App runs directly at the root / URL (production style)
   const appJson = JSON.parse(originalAppJsonStr);
-  if (!appJson.expo.experiments) appJson.expo.experiments = {};
-  appJson.expo.experiments.baseUrl = '/driver';
+  if (appJson.expo && appJson.expo.experiments) {
+    delete appJson.expo.experiments.baseUrl;
+  }
   fs.writeFileSync(APP_JSON_PATH, JSON.stringify(appJson, null, 2), 'utf8');
 
   // 3. Export Expo Web for Driver App
-  console.log('🔨 [Driver App] Exporting Standalone Driver Expo Web bundle...');
+  console.log('🔨 Exporting Driver App (Expo Web static bundle)...');
   execSync('npx expo export --platform web', {
     stdio: 'inherit',
     cwd: DRIVER_DIR,
@@ -41,24 +42,16 @@ try {
     }
   });
 
-  // 4. Copy dist -> dist-driver/driver
-  fs.mkdirSync(path.join(OUTPUT_DIR, 'driver'), { recursive: true });
+  // 4. Copy dist directly to root dist-driver/
   if (fs.existsSync(path.join(DRIVER_DIR, 'dist'))) {
-    fs.cpSync(path.join(DRIVER_DIR, 'dist'), path.join(OUTPUT_DIR, 'driver'), { recursive: true });
-    // Also copy to root for direct access
     fs.cpSync(path.join(DRIVER_DIR, 'dist'), OUTPUT_DIR, { recursive: true });
   }
 
-  // 5. Copy driver-demo.html as root showcase entry point
-  let driverDemoHtml = fs.readFileSync(path.join(ROOT_DIR, 'driver-demo.html'), 'utf8');
-  fs.writeFileSync(path.join(OUTPUT_DIR, 'index.html'), driverDemoHtml, 'utf8');
+  // 5. Add SPA redirect rules
+  fs.writeFileSync(path.join(OUTPUT_DIR, '_redirects'), '/*  /index.html  200\n', 'utf8');
 
-  // 6. Add SPA redirect rules
-  const redirectsContent = `/driver/*  /driver/index.html  200\n/*  /index.html  200\n`;
-  fs.writeFileSync(path.join(OUTPUT_DIR, '_redirects'), redirectsContent, 'utf8');
-
-  console.log('\n✅ [Build Driver App] Dedicated Standalone Driver App compiled successfully to dist-driver/ !');
+  console.log('\n✅ [Build Driver App] Standalone Driver App compiled directly to dist-driver/ !');
 } finally {
-  // Always restore original app.json
+  // Restore original app.json
   fs.writeFileSync(APP_JSON_PATH, originalAppJsonStr, 'utf8');
 }

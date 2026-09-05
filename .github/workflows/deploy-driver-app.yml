@@ -1,0 +1,38 @@
+name: 🚀 Deploy Standalone Driver Application
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy-driver:
+    runs-on: ubuntu-latest
+    name: Build & Deploy Standalone Driver App
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install Driver App Dependencies
+        working-directory: 'DRIVER APP'
+        run: npm ci
+
+      - name: 🔨 Build Standalone Driver App
+        run: node scripts/build-driver-standalone.js
+
+      - name: 🌐 Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: dist-driver
+          production-branch: main
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "🚀 Deploy Standalone Driver App"
+          enable-pull-request-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_DRIVER_SITE_ID || secrets.NETLIFY_SITE_ID }}

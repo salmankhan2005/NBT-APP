@@ -1,0 +1,38 @@
+name: 🚀 Deploy Standalone Admin Application
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy-admin:
+    runs-on: ubuntu-latest
+    name: Build & Deploy Standalone Admin App
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install Admin App Dependencies
+        working-directory: 'admin app'
+        run: npm ci
+
+      - name: 🔨 Build Standalone Admin App
+        run: node scripts/build-admin-standalone.js
+
+      - name: 🌐 Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: dist-admin
+          production-branch: main
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "🚀 Deploy Standalone Admin App"
+          enable-pull-request-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_ADMIN_SITE_ID || secrets.NETLIFY_SITE_ID }}
