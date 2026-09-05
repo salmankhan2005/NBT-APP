@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const RENDER_API = 'https://nbt-app.onrender.com';
+const RENDER_API = 'http://localhost:3001';
 
 export const getApiHost = (): string => {
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {

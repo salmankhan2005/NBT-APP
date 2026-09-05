@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-const API = 'https://nbt-app.onrender.com';
+const API = 'http://localhost:3001';
 
 async function main() {
   const loginRes = await fetch(`${API}/api/auth/admin/login`, {

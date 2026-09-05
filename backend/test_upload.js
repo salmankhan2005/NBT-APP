@@ -11,7 +11,7 @@ dummy_image_data\r
 --${boundary}--`;
 
   try {
-    const res = await fetch('https://nbt-app.onrender.com/api/upload', {
+    const res = await fetch('http://localhost:3001/api/upload', {
       method: 'POST',
       headers: {
         'Content-Type': `multipart/form-data; boundary=${boundary}`,

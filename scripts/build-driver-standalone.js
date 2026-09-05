@@ -29,7 +29,7 @@ execSync('npx expo export --platform web --clear', {
   cwd: DRIVER_DIR,
   env: {
     ...process.env,
-    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://nbt-app.onrender.com',
+    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001',
   }
 });
 

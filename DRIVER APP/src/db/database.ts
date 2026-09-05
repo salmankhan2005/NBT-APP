@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { SHA256 } from 'crypto-js';
 
-export const API_HOST = 'https://nbt-app.onrender.com';
+export const API_HOST = 'http://localhost:3001';
 
 const sha256 = (str: string): string => {
   return SHA256(str).toString();

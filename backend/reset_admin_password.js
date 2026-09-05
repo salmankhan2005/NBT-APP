@@ -23,7 +23,7 @@ async function main() {
   // Test live API
   try {
     const fetch = require('node-fetch');
-    const res = await fetch('https://nbt-app.onrender.com/api/auth/admin/login', {
+    const res = await fetch('http://localhost:3001/api/auth/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ trackingId: 'admin', pin: '9999' })

@@ -49,7 +49,7 @@ services:
         destination: /index.html
     envVars:
       - key: EXPO_PUBLIC_API_URL
-        value: https://nbt-app.onrender.com
+        value: http://localhost:3001
 
   - type: static
     name: nbt-ars-driver
@@ -64,5 +64,5 @@ services:
         destination: /index.html
     envVars:
       - key: EXPO_PUBLIC_API_URL
-        value: https://nbt-app.onrender.com
+        value: http://localhost:3001
 
