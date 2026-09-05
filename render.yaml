@@ -35,3 +35,34 @@ services:
         value: "20"
       - key: AUTH_RATE_LIMIT_WINDOW_MS
         value: "60000"
+
+  - type: static
+    name: nbt-ars-admin
+    region: singapore
+    plan: free
+    rootDir: admin app
+    buildCommand: npm install && npx expo export --platform web
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: EXPO_PUBLIC_API_URL
+        value: https://nbt-app.onrender.com
+
+  - type: static
+    name: nbt-ars-driver
+    region: singapore
+    plan: free
+    rootDir: DRIVER APP
+    buildCommand: npm install && npx expo export --platform web
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: EXPO_PUBLIC_API_URL
+        value: https://nbt-app.onrender.com
+

@@ -1,3 +1,4 @@
+// NBT-ARS Enterprise Production Backend v2.5.0 (Live Release)
 import Fastify from 'fastify';
 import compress from '@fastify/compress';
 import cors from '@fastify/cors';
@@ -7,6 +8,7 @@ import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import staticFiles from '@fastify/static';
 import path from 'path';
+import fs from 'fs';
 import 'dotenv/config';
 
 import { pingDatabase, sql } from './db/client';
@@ -376,6 +378,82 @@ async function bootstrap() {
 
   // ── Lorry Booking Agency routes ─────────────────────────────────────────
   app.register(lorryBookingRoutes, { prefix: '/api/lorry-booking' });
+
+  // ── Static Web App: Admin Portal (/admin) ──────────────────────────────
+  const adminWebDist = path.join(process.cwd(), 'public', 'admin');
+  if (fs.existsSync(adminWebDist)) {
+    await app.register(staticFiles, {
+      root: adminWebDist,
+      prefix: '/admin/',
+      decorateReply: false,
+    });
+    app.get('/admin', async (_req, reply) => {
+      return reply.sendFile('index.html', adminWebDist);
+    });
+    app.get('/admin/*', async (_req, reply) => {
+      return reply.sendFile('index.html', adminWebDist);
+    });
+  }
+
+  // ── Static Web App: Driver App (/driver) ───────────────────────────────
+  const driverWebDist = path.join(process.cwd(), 'public', 'driver');
+  if (fs.existsSync(driverWebDist)) {
+    await app.register(staticFiles, {
+      root: driverWebDist,
+      prefix: '/driver/',
+      decorateReply: false,
+    });
+    app.get('/driver', async (_req, reply) => {
+      return reply.sendFile('index.html', driverWebDist);
+    });
+    app.get('/driver/*', async (_req, reply) => {
+      return reply.sendFile('index.html', driverWebDist);
+    });
+  }
+
+  // ── Root API Status & App Entry ──────────────────────────────────────────
+  app.get('/', async (_req, reply) => {
+    let dbStatus = 'CONNECTED';
+    let dbPing = true;
+    try {
+      await pingDatabase();
+    } catch {
+      dbStatus = 'DISCONNECTED';
+      dbPing = false;
+    }
+
+    if (fs.existsSync(path.join(adminWebDist, 'index.html'))) {
+      return reply.sendFile('index.html', adminWebDist);
+    }
+
+    return reply.code(200).send({
+      status: dbPing ? 'ok' : 'degraded',
+      service: 'NBT Logistics Enterprise Cloud API',
+      version: '2.5.0',
+      database: dbStatus,
+      environment: process.env.NODE_ENV || 'production',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  app.get('/api', async (_req, reply) => {
+    return reply.code(200).send({
+      status: 'ok',
+      service: 'NBT Logistics Enterprise Cloud API',
+      version: '2.5.0',
+      routes: [
+        '/health',
+        '/api/auth',
+        '/api/trips',
+        '/api/admin',
+        '/api/gc',
+        '/api/memos',
+        '/api/maps',
+        '/api/upload',
+        '/api/lorry-booking',
+      ],
+    });
+  });
 
   // ── Health check ──────────────────────────────────────────────────────────
   app.get('/health', async (_req, reply) => {
