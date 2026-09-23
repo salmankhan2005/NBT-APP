@@ -858,6 +858,58 @@ export default function VehiclesScreen() {
               <Text style={styles.cardActionBtnText} numberOfLines={1}>DETAILS & DOCS</Text>
             </TouchableOpacity>
 
+            {/* ── STATUS TOGGLE PILL ── */}
+            {(item.status === 'AVAILABLE' || item.status === 'UNDER MAINTENANCE') ? (
+              <TouchableOpacity
+                style={[
+                  styles.statusTogglePill,
+                  item.status === 'AVAILABLE'
+                    ? styles.statusTogglePillAvailable
+                    : styles.statusTogglePillMaintenance,
+                ]}
+                onPress={async () => {
+                  const next: ManagedVehicleStatus =
+                    item.status === 'AVAILABLE' ? 'UNDER MAINTENANCE' : 'AVAILABLE';
+                  await db.setVehicleStatus(item.vehicle_id, next);
+                  fetchVehicles(false);
+                }}
+                activeOpacity={0.78}
+                accessibilityLabel="Toggle vehicle availability status"
+              >
+                {/* Sliding knob */}
+                <View
+                  style={[
+                    styles.statusToggleKnob,
+                    item.status === 'AVAILABLE'
+                      ? styles.statusToggleKnobLeft
+                      : styles.statusToggleKnobRight,
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.statusTogglePillText,
+                    item.status === 'AVAILABLE'
+                      ? { color: '#15803d' }
+                      : { color: '#92400e' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.status === 'AVAILABLE' ? '● Available' : '● Maintenance'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.statusTogglePillLocked}>
+                <MaterialIcons
+                  name={item.status === 'ON TRIP' ? 'local-shipping' : 'block'}
+                  size={11}
+                  color="#64748b"
+                />
+                <Text style={styles.statusTogglePillLockedText} numberOfLines={1}>
+                  {item.status}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.cardActionsRight}>
               <TouchableOpacity
                 onPress={async () => {
@@ -1965,6 +2017,64 @@ const styles = StyleSheet.create({
   },
   cardActionBtnDanger: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
   cardActionBtnTextDanger: { fontSize: 11, color: '#dc2626', fontWeight: 'bold' },
+
+  /* ── STATUS TOGGLE PILL (on vehicle card) ── */
+  statusTogglePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    flexShrink: 1,
+    minWidth: 110,
+    justifyContent: 'center',
+  },
+  statusTogglePillAvailable: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#86efac',
+  },
+  statusTogglePillMaintenance: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fcd34d',
+  },
+  statusToggleKnob: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  statusToggleKnobLeft: {
+    backgroundColor: '#16a34a',
+  },
+  statusToggleKnobRight: {
+    backgroundColor: '#d97706',
+  },
+  statusTogglePillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  statusTogglePillLocked: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
+    minWidth: 80,
+    justifyContent: 'center',
+  },
+  statusTogglePillLockedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+    flexShrink: 1,
+  },
 
   /* ── MODALS ── */
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
