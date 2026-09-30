@@ -199,14 +199,18 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'System',
     fontWeight: 'bold',
-    fontSize: 32,
+    fontSize: 26,
     color: COLORS.primary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: COLORS.textMuted,
     marginTop: 4,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
   form: {
     width: '100%',
