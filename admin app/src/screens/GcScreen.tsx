@@ -34,7 +34,7 @@ export default function GcScreen() {
   const [notes, setNotes] = useState<GcNote[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingGcId, setEditingGcId] = useState<string | null>(null);
-  
+
   // Create GC Form Fields
   const [noteNumber, setNoteNumber] = useState('');
   const [gcDate, setGcDate] = useState(new Date().toISOString().split('T')[0]);
@@ -51,7 +51,7 @@ export default function GcScreen() {
   const [paymentType, setPaymentType] = useState<'TBB' | 'TO_PAY' | 'PAID' | ''>('');
   const [bankAccountName, setBankAccountName] = useState('New Balaji Transport');
   const [bankAccountNumber, setBankAccountNumber] = useState('1187115000014102');
-  const [bankIfsc, setBankIfsc] = useState('KVBLO001187');
+  const [bankIfsc, setBankIfsc] = useState('KVBL0001187');
   const [bankName, setBankName] = useState('Karur Vysya Bank');
   const [bankBranch, setBankBranch] = useState('Salem - 636 002');
   const [addressLine1, setAddressLine1] = useState('3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,');
@@ -135,7 +135,7 @@ export default function GcScreen() {
 
   // Selected Archive Month — default to current month
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
     const now = new Date();
     return `${MONTHS[now.getMonth()]}-${String(now.getFullYear()).slice(-2)}`;
   });
@@ -378,7 +378,7 @@ export default function GcScreen() {
     setLorryOwner('');
     setBankAccountName('New Balaji Transport');
     setBankAccountNumber('1187115000014102');
-    setBankIfsc('KVBLO001187');
+    setBankIfsc('KVBL0001187');
     setBankName('Karur Vysya Bank');
     setBankBranch('Salem - 636 002');
     setAddressLine1('3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,');
@@ -610,8 +610,8 @@ export default function GcScreen() {
     const numericValues = safeItems.map(item => Number(item?.value)).filter(n => !isNaN(n) && n > 0);
     const sumNumericValue = numericValues.reduce((sum, n) => sum + n, 0);
     const nonNumericValues = safeItems.map(item => String(item?.value || '').trim()).filter(s => s !== '' && isNaN(Number(s)));
-    const totalValueDisplay = sumNumericValue > 0 
-      ? sumNumericValue.toFixed(2) 
+    const totalValueDisplay = sumNumericValue > 0
+      ? sumNumericValue.toFixed(2)
       : (nonNumericValues.length > 0 ? nonNumericValues.join(', ') : '');
     const taxPayeeLower = (note.taxPayee || (note as any).gstPayee || '').toLowerCase();
     const paymentTypeUpper = (note.paymentType || '').toUpperCase();
@@ -1166,7 +1166,7 @@ export default function GcScreen() {
                   <div class="bank-grid">
                     <div class="bank-row"><strong>A/C Name:</strong> <span>${note.bankAccountName || 'New Balaji Transport'}</span></div>
                     <div class="bank-row"><strong>A/C No.:</strong> <span>${note.bankAccountNumber || '1187115000014102'}</span></div>
-                    <div class="bank-row"><strong>IFSC Code:</strong> <span>${note.bankIfsc || 'KVBLO001187'}</span></div>
+                    <div class="bank-row"><strong>IFSC Code:</strong> <span>${note.bankIfsc || 'KVBL0001187'}</span></div>
                     <div class="bank-row"><strong>Bank:</strong> <span>${note.bankName || 'Karur Vysya Bank'}</span></div>
                     <div class="bank-row" style="grid-column: span 2;"><strong>Branch:</strong> <span>${note.bankBranch || 'Salem - 636 002'}</span></div>
                   </div>
@@ -1361,7 +1361,7 @@ export default function GcScreen() {
 
     setFreight(n.freight ? n.freight.toString() : '');
     setLessAdvance(n.lessAdvance !== undefined && n.lessAdvance !== null ? n.lessAdvance.toString() : '0');
-    
+
     const f = Number(n.freight) || 0;
     const cgstP = f && n.cgst ? Math.round((n.cgst / f) * 100 * 100) / 100 : 0;
     const sgstP = f && n.sgst ? Math.round((n.sgst / f) * 100 * 100) / 100 : 0;
@@ -1382,7 +1382,7 @@ export default function GcScreen() {
     setLorryOwner(n.lorryOwner || '');
     setBankAccountName(n.bankAccountName || 'New Balaji Transport');
     setBankAccountNumber(n.bankAccountNumber || '1187115000014102');
-    setBankIfsc(n.bankIfsc || 'KVBLO001187');
+    setBankIfsc(n.bankIfsc || 'KVBL0001187');
     setBankName(n.bankName || 'Karur Vysya Bank');
     setBankBranch(n.bankBranch || 'Salem - 636 002');
     setAddressLine1(n.addressLine1 || '3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,');
@@ -1446,7 +1446,7 @@ export default function GcScreen() {
     setPhone2((n as any).phone2 || phone2);
     setPhone3((n as any).phone3 || phone3);
     setBankDetails(n.bankDetails);
-    
+
     setActiveTab('CREATE');
     Alert.alert('Duplicated', `Consignment form autofilled with template values from note ${n.id}.`);
   };
@@ -1638,7 +1638,7 @@ export default function GcScreen() {
                 </View>
               </View>
 
-              <View style={styles.gcSectionRow}> 
+              <View style={styles.gcSectionRow}>
                 <View style={[styles.gcFieldBlock, styles.gcFieldBlockWide]}>
                   <Text style={styles.fieldLabel}>To</Text>
                   <TextInput style={styles.fieldInput} value={to} onChangeText={setTo} placeholder="To" />
@@ -2070,12 +2070,12 @@ export default function GcScreen() {
               <MaterialIcons
                 name={
                   confirmModal.type === 'danger' ? 'delete-forever' :
-                  confirmModal.type === 'success' ? 'check-circle' : 'info'
+                    confirmModal.type === 'success' ? 'check-circle' : 'info'
                 }
                 size={36}
                 color={
                   confirmModal.type === 'danger' ? '#dc2626' :
-                  confirmModal.type === 'success' ? '#059669' : '#0284c7'
+                    confirmModal.type === 'success' ? '#059669' : '#0284c7'
                 }
               />
             </View>
