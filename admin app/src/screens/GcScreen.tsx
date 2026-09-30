@@ -50,7 +50,7 @@ export default function GcScreen() {
   const [panNumber, setPanNumber] = useState('AMTPR8487P');
   const [paymentType, setPaymentType] = useState<'TBB' | 'TO_PAY' | 'PAID' | ''>('');
   const [bankAccountName, setBankAccountName] = useState('New Balaji Transport');
-  const [bankAccountNumber, setBankAccountNumber] = useState('118715000014102');
+  const [bankAccountNumber, setBankAccountNumber] = useState('1187115000014102');
   const [bankIfsc, setBankIfsc] = useState('KVBLO001187');
   const [bankName, setBankName] = useState('Karur Vysya Bank');
   const [bankBranch, setBankBranch] = useState('Salem - 636 002');
@@ -377,7 +377,7 @@ export default function GcScreen() {
     setDlNumber('');
     setLorryOwner('');
     setBankAccountName('New Balaji Transport');
-    setBankAccountNumber('118715000014102');
+    setBankAccountNumber('1187115000014102');
     setBankIfsc('KVBLO001187');
     setBankName('Karur Vysya Bank');
     setBankBranch('Salem - 636 002');
@@ -1165,7 +1165,7 @@ export default function GcScreen() {
                   <div class="bank-box-title">BANK DETAILS</div>
                   <div class="bank-grid">
                     <div class="bank-row"><strong>A/C Name:</strong> <span>${note.bankAccountName || 'New Balaji Transport'}</span></div>
-                    <div class="bank-row"><strong>A/C No.:</strong> <span>${note.bankAccountNumber || '118715000014102'}</span></div>
+                    <div class="bank-row"><strong>A/C No.:</strong> <span>${note.bankAccountNumber || '1187115000014102'}</span></div>
                     <div class="bank-row"><strong>IFSC Code:</strong> <span>${note.bankIfsc || 'KVBLO001187'}</span></div>
                     <div class="bank-row"><strong>Bank:</strong> <span>${note.bankName || 'Karur Vysya Bank'}</span></div>
                     <div class="bank-row" style="grid-column: span 2;"><strong>Branch:</strong> <span>${note.bankBranch || 'Salem - 636 002'}</span></div>
@@ -1381,7 +1381,7 @@ export default function GcScreen() {
     setDlNumber(n.dlNumber || '');
     setLorryOwner(n.lorryOwner || '');
     setBankAccountName(n.bankAccountName || 'New Balaji Transport');
-    setBankAccountNumber(n.bankAccountNumber || '118715000014102');
+    setBankAccountNumber(n.bankAccountNumber || '1187115000014102');
     setBankIfsc(n.bankIfsc || 'KVBLO001187');
     setBankName(n.bankName || 'Karur Vysya Bank');
     setBankBranch(n.bankBranch || 'Salem - 636 002');
