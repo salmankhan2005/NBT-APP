@@ -127,7 +127,7 @@ export default function SplashScreen({ onAnimationEnd }: SplashScreenProps) {
             alignItems: 'center',
           }}
         >
-          <Text style={styles.title}>NEW BALAJI TRANSPORT</Text>
+          <Text style={styles.title}>NEW BALAJI TRANSPORTS</Text>
           <Text style={styles.subtitle}>(NBT)</Text>
           <Text style={styles.tagline}>Precision Logistics Console</Text>
         </Animated.View>

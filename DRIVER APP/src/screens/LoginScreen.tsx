@@ -77,7 +77,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.title}>New Balaji Transport</Text>
+            <Text style={styles.title}>New Balaji Transports</Text>
             <Text style={styles.subtitle}>Driver Console</Text>
           </View>
 

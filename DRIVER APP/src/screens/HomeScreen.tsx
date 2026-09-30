@@ -80,7 +80,7 @@ export default function HomeScreen({
             />
           </View>
           <View>
-            <Text style={styles.headerBrandTitle}>New Balaji Transport</Text>
+            <Text style={styles.headerBrandTitle}>New Balaji Transports</Text>
             <Text style={styles.headerSubtitle}>DRIVER CONSOLE</Text>
           </View>
         </View>

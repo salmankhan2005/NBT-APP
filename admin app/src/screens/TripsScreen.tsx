@@ -315,7 +315,7 @@ export default function TripsScreen() {
 
 <div class="page-header">
   <div>
-    <div class="brand">NEW BALAJI TRANSPORT</div>
+    <div class="brand">NEW BALAJI TRANSPORTS</div>
     <div class="brand-sub">Trip Settlement Report</div>
   </div>
   <div class="report-meta">
@@ -403,7 +403,7 @@ ${(trip.podSubmitted || trip.podPhotoUri || trip.podSignature || trip.podNotes) 
 </div>` : ''}
 
 <div class="footer">
-  <span>New Balaji Transport — NBT-ARS System</span>
+  <span>New Balaji Transports — NBT-ARS System</span>
   <span>Trip ${trip.id} | Printed ${new Date().toLocaleDateString('en-IN')}</span>
 </div>
 

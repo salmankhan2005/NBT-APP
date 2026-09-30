@@ -257,7 +257,7 @@ export async function authRoutes(app: FastifyInstance) {
         html: `
           <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
             <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:24px;text-align:center">
-              <h2 style="color:#fff;margin:0;font-size:20px;letter-spacing:1px">NEW BALAJI TRANSPORT</h2>
+              <h2 style="color:#fff;margin:0;font-size:20px;letter-spacing:1px">NEW BALAJI TRANSPORTS</h2>
               <p style="color:#bfdbfe;margin:4px 0 0;font-size:12px">ADMIN COMMAND CONSOLE</p>
             </div>
             <div style="padding:28px 32px">
@@ -270,7 +270,7 @@ export async function authRoutes(app: FastifyInstance) {
               <p style="color:#94a3b8;font-size:12px;margin:0">If you did not request this, please ignore this email. Do not share this code with anyone.</p>
             </div>
             <div style="background:#f1f5f9;padding:14px 32px;text-align:center">
-              <p style="margin:0;font-size:11px;color:#94a3b8">New Balaji Transport • Admin Security System</p>
+              <p style="margin:0;font-size:11px;color:#94a3b8">New Balaji Transports • Admin Security System</p>
             </div>
           </div>
         `,

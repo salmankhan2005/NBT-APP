@@ -173,7 +173,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       <View style={styles.logoWrap}>
         <Image source={require('../../assets/logo.png')} style={styles.logoImg} resizeMode="contain" />
       </View>
-      <Text style={styles.brandName}>New Balaji Transport</Text>
+      <Text style={styles.brandName}>New Balaji Transports</Text>
       <Text style={styles.brandTagline}>ADMIN COMMAND CONSOLE</Text>
     </View>
   );

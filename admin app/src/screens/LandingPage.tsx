@@ -140,7 +140,7 @@ export default function LandingPage({ onEnterDashboard }: LandingPageProps) {
                 />
               </View>
               <View style={styles.brandTextWrap}>
-                <Text style={styles.brandTitleLine1}>NEW BALAJI TRANSPORT</Text>
+                <Text style={styles.brandTitleLine1}>NEW BALAJI TRANSPORTS</Text>
                 <Text style={styles.brandTitleLine2}>LOGISTICS COMMAND</Text>
               </View>
             </TouchableOpacity>
@@ -375,11 +375,11 @@ export default function LandingPage({ onEnterDashboard }: LandingPageProps) {
                   />
                 </View>
                 <View>
-                  <Text style={styles.footerBrandName}>NEW BALAJI TRANSPORT</Text>
+                  <Text style={styles.footerBrandName}>NEW BALAJI TRANSPORTS</Text>
                   <Text style={styles.footerBrandSubtitle}>LOGISTICS COMMAND</Text>
                 </View>
               </View>
-              <Text style={styles.footerCopyright}>© 2026 New Balaji Transport & Logistics Command.</Text>
+              <Text style={styles.footerCopyright}>© 2026 New Balaji Transports & Logistics Command.</Text>
               <Text style={styles.footerCopyright}>All rights reserved.</Text>
             </View>
 

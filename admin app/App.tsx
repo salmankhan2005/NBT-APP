@@ -337,7 +337,7 @@ function AppContent() {
 
               {!sidebarCollapsed && (
                 <View style={styles.sidebarBrandTextCol}>
-                  <Text style={styles.sidebarBrandTitle}>New Balaji Transport</Text>
+                  <Text style={styles.sidebarBrandTitle}>New Balaji Transports</Text>
                   <Text style={styles.sidebarBrandSubtitle}>FLEET TRANSIT PORTAL</Text>
                 </View>
               )}
@@ -480,7 +480,7 @@ function AppContent() {
                   />
                 </View>
                 <View style={styles.mobileBrandInfo}>
-                  <Text style={styles.mobileBrandName}>New Balaji Transport</Text>
+                  <Text style={styles.mobileBrandName}>New Balaji Transports</Text>
                   <Text style={styles.mobileBrandTagline}>ADMIN COMMAND PORTAL</Text>
                 </View>
               </View>
@@ -636,7 +636,7 @@ function AppContent() {
                   />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.drawerTitle}>New Balaji Transport</Text>
+                  <Text style={styles.drawerTitle}>New Balaji Transports</Text>
                   <Text style={styles.drawerSubtitle}>Logistics Admin Command Menu</Text>
                 </View>
                 <TouchableOpacity onPress={() => setMobileDrawerOpen(false)}>

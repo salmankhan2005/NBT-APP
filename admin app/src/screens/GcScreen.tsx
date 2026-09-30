@@ -49,7 +49,7 @@ export default function GcScreen() {
   const [gstinNumber, setGstinNumber] = useState('33AMTPR8487P2ZM');
   const [panNumber, setPanNumber] = useState('AMTPR8487P');
   const [paymentType, setPaymentType] = useState<'TBB' | 'TO_PAY' | 'PAID' | ''>('');
-  const [bankAccountName, setBankAccountName] = useState('New Balaji Transport');
+  const [bankAccountName, setBankAccountName] = useState('New Balaji Transports');
   const [bankAccountNumber, setBankAccountNumber] = useState('1187115000014102');
   const [bankIfsc, setBankIfsc] = useState('KVBL0001187');
   const [bankName, setBankName] = useState('Karur Vysya Bank');
@@ -376,7 +376,7 @@ export default function GcScreen() {
     setDriverSignature('');
     setDlNumber('');
     setLorryOwner('');
-    setBankAccountName('New Balaji Transport');
+    setBankAccountName('New Balaji Transports');
     setBankAccountNumber('1187115000014102');
     setBankIfsc('KVBL0001187');
     setBankName('Karur Vysya Bank');
@@ -1070,7 +1070,7 @@ export default function GcScreen() {
               </div>
               <div class="header-title">
                 <div class="top-name">Sri Ramajayam</div>
-                <div class="main-title">NEW BALAJI TRANSPORT</div>
+                <div class="main-title">NEW BALAJI TRANSPORTS</div>
                 <div class="subtitle">(LORRY SUPPLIERS & COMMISSION AGENT)</div>
                 <div class="badge">GOODS CONSIGNMENT / CONSIGNEE COPY</div>
               </div>
@@ -1164,7 +1164,7 @@ export default function GcScreen() {
                 <div class="bank-box">
                   <div class="bank-box-title">BANK DETAILS</div>
                   <div class="bank-grid">
-                    <div class="bank-row"><strong>A/C Name:</strong> <span>${note.bankAccountName || 'New Balaji Transport'}</span></div>
+                    <div class="bank-row"><strong>A/C Name:</strong> <span>${note.bankAccountName || 'New Balaji Transports'}</span></div>
                     <div class="bank-row"><strong>A/C No.:</strong> <span>${note.bankAccountNumber || '1187115000014102'}</span></div>
                     <div class="bank-row"><strong>IFSC Code:</strong> <span>${note.bankIfsc || 'KVBL0001187'}</span></div>
                     <div class="bank-row"><strong>Bank:</strong> <span>${note.bankName || 'Karur Vysya Bank'}</span></div>
@@ -1263,7 +1263,7 @@ export default function GcScreen() {
               </div>
 
               <div class="authorise-row">
-                <div class="authorise-text">For NEW BALAJI TRANSPORT</div>
+                <div class="authorise-text">For NEW BALAJI TRANSPORTS</div>
                 <img class="authorise-signature" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
                 <div class="authorise-label">Authorised Signatory</div>
               </div>
@@ -1380,7 +1380,7 @@ export default function GcScreen() {
     setDriverSignature(n.driverSignature || '');
     setDlNumber(n.dlNumber || '');
     setLorryOwner(n.lorryOwner || '');
-    setBankAccountName(n.bankAccountName || 'New Balaji Transport');
+    setBankAccountName(n.bankAccountName || 'New Balaji Transports');
     setBankAccountNumber(n.bankAccountNumber || '1187115000014102');
     setBankIfsc(n.bankIfsc || 'KVBL0001187');
     setBankName(n.bankName || 'Karur Vysya Bank');
@@ -1556,12 +1556,12 @@ export default function GcScreen() {
                   <View style={styles.logoCircle}>
                     <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
                   </View>
-                  <Text style={styles.brandTitle}>NEW BALAJI TRANSPORT</Text>
+                  <Text style={styles.brandTitle}>NEW BALAJI TRANSPORTS</Text>
                   <Text style={styles.brandSubtitle}>(LORRY SUPPLIERS & COMMISSION AGENT)</Text>
                 </View>
                 <View style={[styles.gcHeaderTitle, !isDesktop && { minWidth: '100%', alignItems: 'center', marginVertical: 12 }]}>
                   <Text style={styles.gcHeaderTitleTop}>Sri Ramajayam</Text>
-                  <Text style={[styles.gcHeaderMain, !isDesktop && { fontSize: 22, letterSpacing: 1 }]}>NEW BALAJI TRANSPORT</Text>
+                  <Text style={[styles.gcHeaderMain, !isDesktop && { fontSize: 22, letterSpacing: 1 }]}>NEW BALAJI TRANSPORTS</Text>
                   <Text style={styles.gcHeaderSub}>(LORRY SUPPLIERS & COMMISSION AGENT)</Text>
                   <View style={styles.gcBadge}>
                     <Text style={styles.gcBadgeText}>GOODS CONSIGNMENT / CONSIGNEE COPY</Text>
@@ -1835,7 +1835,7 @@ export default function GcScreen() {
                   </View>
 
                   <View style={[styles.rightFooterNote, !isDesktop && { paddingLeft: 0, alignItems: 'center', marginTop: 12 }]}>
-                    <Text style={styles.rightFooterTitle}>For NEW BALAJI TRANSPORT</Text>
+                    <Text style={styles.rightFooterTitle}>For NEW BALAJI TRANSPORTS</Text>
                     <View style={styles.authorisedRow}>
                       <Image
                         source={require('../../assets/signatures/nbt-authorised-signature.png')}

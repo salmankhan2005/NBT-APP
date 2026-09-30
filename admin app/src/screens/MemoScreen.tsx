@@ -327,14 +327,14 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
           ${nbtLogoBase64 ? `<img src="${nbtLogoBase64}" style="width: 78px; height: 78px; object-fit: contain;" />` : `
             <div class="logo-circle" style="width: 78px; height: 78px;">
               <div class="logo-mark" style="font-size: 24px;">NBT</div>
-              <div class="logo-text" style="font-size: 6px;">NEW BALAJI TRANSPORT</div>
+              <div class="logo-text" style="font-size: 6px;">NEW BALAJI TRANSPORTS</div>
             </div>
           `}
           <img src="${nbtBalajiBase64}" style="width: 78px; height: 78px; object-fit: contain; filter: grayscale(1) contrast(1.4) brightness(0.9);" />
         </div>
         <div class="header-center">
           <div class="signed-by">Sri Ramajayam</div>
-          <div class="company-name">NEW BALAJI TRANSPORT</div>
+          <div class="company-name">NEW BALAJI TRANSPORTS</div>
           <div class="company-subtitle">(LORRY SUPPLIERS & COMMISSION AGENT)</div>
           <div class="address">
             3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,<br />
@@ -372,7 +372,7 @@ const buildMemoDocumentHtml = (date: string, contentHtml: string, editorMode = f
 
     <div class="footer">
       <div class="signature-block">
-        <div class="signature-caption">For NEW BALAJI TRANSPORT</div>
+        <div class="signature-caption">For NEW BALAJI TRANSPORTS</div>
         <img class="signature-img" src="${nbtAuthorisedSignatureBase64}" alt="Authorised Signature" />
         <div class="signatory-text">Authorised Signatory</div>
       </div>
@@ -1004,7 +1004,7 @@ const MemoScreen = () => {
                   </View>
                   <View style={styles.headerCenter}>
                     <Text style={styles.signedBy}>Sri Ramajayam</Text>
-                    <Text style={[styles.companyName, !isDesktop && { fontSize: 20, letterSpacing: 1 }]}>NEW BALAJI TRANSPORT</Text>
+                    <Text style={[styles.companyName, !isDesktop && { fontSize: 20, letterSpacing: 1 }]}>NEW BALAJI TRANSPORTS</Text>
                     <Text style={styles.companySubtitle}>(LORRY SUPPLIERS & COMMISSION AGENT)</Text>
                     <Text style={styles.address}>
                       3/131, V.K.V. Complex, 1st Floor, Bangalore Bye Pass Road,{'\n'}
@@ -1127,7 +1127,7 @@ const MemoScreen = () => {
                   )}
                   <View style={styles.footer}>
                     <View style={styles.signatureBlock}>
-                      <Text style={styles.signatureCaption}>For NEW BALAJI TRANSPORT</Text>
+                      <Text style={styles.signatureCaption}>For NEW BALAJI TRANSPORTS</Text>
                       <Image source={{ uri: nbtAuthorisedSignatureBase64 }} style={styles.signatureImgWeb} resizeMode="contain" />
                       <Text style={styles.signatureText}>Authorised Signatory</Text>
                     </View>
