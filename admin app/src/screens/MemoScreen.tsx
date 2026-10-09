@@ -1221,95 +1221,96 @@ const MemoScreen = () => {
             </View>
           </View>
 
-          <ScrollView contentContainerStyle={styles.archiveContent}>
-            {isLoading ? (
-              <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
-            ) : (
-              <FlatList
-                data={filteredMemos}
-                keyExtractor={(item) => item.memoId}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
-                  <View style={styles.memoCard}>
-                    <View style={[styles.memoCardRow, !isDesktop && { flexDirection: 'column', gap: 10 }]}>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <Text style={styles.memoCardId}>{item.memoId}</Text>
-                          {item.isPinned && (
-                            <View style={styles.pinnedBadge}>
-                              <Text style={styles.pinnedBadgeText}>📌 PINNED</Text>
-                            </View>
-                          )}
-                          <Text style={styles.memoCardDate}>{item.date}</Text>
-                        </View>
-                        <Text style={styles.memoCardMeta}>
-                          Created by: <Text style={{ fontWeight: '600', color: COLORS.textDark }}>{item.createdBy || 'Admin'}</Text>
-                          {item.updatedAt ? `  •  Updated: ${new Date(item.updatedAt).toLocaleDateString()}` : ''}
-                        </Text>
+          {isLoading ? (
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <FlatList
+              style={styles.archiveList}
+              contentContainerStyle={styles.archiveContent}
+              data={filteredMemos}
+              keyExtractor={(item) => item.memoId || item.id}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <View style={styles.memoCard}>
+                  <View style={[styles.memoCardRow, !isDesktop && { flexDirection: 'column', gap: 10 }]}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <Text style={styles.memoCardId}>{item.memoId}</Text>
+                        {item.isPinned && (
+                          <View style={styles.pinnedBadge}>
+                            <Text style={styles.pinnedBadgeText}>📌 PINNED</Text>
+                          </View>
+                        )}
+                        <Text style={styles.memoCardDate}>{item.date}</Text>
                       </View>
-
-                      {/* Action buttons */}
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity
-                          style={styles.cardActionBtn}
-                          onPress={async () => { await db.togglePinMemo(item.id); loadMemoDocuments(); }}
-                        >
-                          <MaterialIcons name="push-pin" size={16} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
-                          <Text style={[styles.cardActionBtnText, { color: item.isPinned ? '#d97706' : COLORS.textMuted }]}>
-                            {item.isPinned ? 'UNPIN' : 'PIN'}
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.cardActionBtn, { borderColor: '#bfdbfe', backgroundColor: '#eff6ff' }]}
-                          onPress={() => openMemoForEdit(item)}
-                        >
-                          <MaterialIcons name="edit" size={16} color="#2563eb" />
-                          <Text style={[styles.cardActionBtnText, { color: '#2563eb' }]}>EDIT</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.cardActionBtn}
-                          onPress={() => downloadExistingMemo(item)}
-                        >
-                          <MaterialIcons name="file-download" size={16} color="#0e7490" />
-                          <Text style={[styles.cardActionBtnText, { color: '#0e7490' }]}>PDF</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.cardActionBtn}
-                          onPress={() => printExistingMemo(item)}
-                        >
-                          <MaterialIcons name="print" size={16} color={COLORS.secondary} />
-                          <Text style={[styles.cardActionBtnText, { color: COLORS.secondary }]}>PRINT</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.cardActionBtn}
-                          onPress={() => deleteMemo(item)}
-                        >
-                          <MaterialIcons name="delete-outline" size={16} color="#ef4444" />
-                          <Text style={[styles.cardActionBtnText, { color: '#ef4444' }]}>DELETE</Text>
-                        </TouchableOpacity>
-                      </View>
+                      <Text style={styles.memoCardMeta}>
+                        Created by: <Text style={{ fontWeight: '600', color: COLORS.textDark }}>{item.createdBy || 'Admin'}</Text>
+                        {item.updatedAt ? `  •  Updated: ${new Date(item.updatedAt).toLocaleDateString()}` : ''}
+                      </Text>
                     </View>
 
-                    <Text style={styles.memoCardPreview} numberOfLines={2}>
-                      {formatMemoPreview(item.contentHtml) || 'No text content.'}
-                    </Text>
+                    {/* Action buttons */}
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        style={styles.cardActionBtn}
+                        onPress={async () => { await db.togglePinMemo(item.id); loadMemoDocuments(); }}
+                      >
+                        <MaterialIcons name="push-pin" size={16} color={item.isPinned ? '#d97706' : COLORS.textMuted} />
+                        <Text style={[styles.cardActionBtnText, { color: item.isPinned ? '#d97706' : COLORS.textMuted }]}>
+                          {item.isPinned ? 'UNPIN' : 'PIN'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.cardActionBtn, { borderColor: '#bfdbfe', backgroundColor: '#eff6ff' }]}
+                        onPress={() => openMemoForEdit(item)}
+                      >
+                        <MaterialIcons name="edit" size={16} color="#2563eb" />
+                        <Text style={[styles.cardActionBtnText, { color: '#2563eb' }]}>EDIT</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.cardActionBtn}
+                        onPress={() => downloadExistingMemo(item)}
+                      >
+                        <MaterialIcons name="file-download" size={16} color="#0e7490" />
+                        <Text style={[styles.cardActionBtnText, { color: '#0e7490' }]}>PDF</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.cardActionBtn}
+                        onPress={() => printExistingMemo(item)}
+                      >
+                        <MaterialIcons name="print" size={16} color={COLORS.secondary} />
+                        <Text style={[styles.cardActionBtnText, { color: COLORS.secondary }]}>PRINT</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.cardActionBtn}
+                        onPress={() => deleteMemo(item)}
+                      >
+                        <MaterialIcons name="delete-outline" size={16} color="#ef4444" />
+                        <Text style={[styles.cardActionBtnText, { color: '#ef4444' }]}>DELETE</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                )}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <MaterialIcons name="description" size={48} color="#cbd5e1" />
-                    <Text style={styles.emptyText}>
-                      {searchQuery ? 'No memos match your search.' : 'No saved memos yet. Create one in the editor!'}
-                    </Text>
-                  </View>
-                }
-              />
-            )}
-          </ScrollView>
+
+                  <Text style={styles.memoCardPreview} numberOfLines={2}>
+                    {formatMemoPreview(item.contentHtml) || 'No text content.'}
+                  </Text>
+                </View>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <MaterialIcons name="description" size={48} color="#cbd5e1" />
+                  <Text style={styles.emptyText}>
+                    {searchQuery ? 'No memos match your search.' : 'No saved memos yet. Create one in the editor!'}
+                  </Text>
+                </View>
+              }
+            />
+          )}
         </View>
       )}
 
@@ -1427,7 +1428,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   editorContent: { alignItems: 'center', padding: SPACING.gutter, paddingBottom: 60 },
-  archiveContent: { padding: SPACING.gutter, paddingBottom: 60 },
+  archiveList: { flex: 1, width: '100%' },
+  archiveContent: { padding: SPACING.gutter, paddingBottom: 100 },
   searchContainer: {
     paddingHorizontal: SPACING.gutter,
     paddingTop: SPACING.gutter,
