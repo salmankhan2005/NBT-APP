@@ -1380,6 +1380,9 @@ export default function GcScreen() {
             <div class="legal-disclaimer">
               These Goods are Booked at Owners risk and Insured by Consignor / Consignee. Subject to Salem Jurisdiction only.
             </div>
+            <div class="legal-disclaimer" style="margin-top:4px;">
+              Certified that the service provided is by a Goods Transport Agency (GTA). GST on this service is payable by the Recipient (Consignee) under Reverse Charge Mechanism (RCM) pursuant to Notification No. 13/2017-Central Tax (Rate), and no tax has been charged by the transporter.
+            </div>
 
             <!-- Driver & Lorry Owner Signatures Row -->
             <div class="signatures-row">
@@ -2090,6 +2093,9 @@ export default function GcScreen() {
               {/* Disclaimer */}
               <Text style={styles.disclaimerText}>
                 These Goods are Booked at Owners risk and Insured by Consignor / Consignee. Subject to Salem Jurisdiction only.
+              </Text>
+              <Text style={[styles.disclaimerText, { marginTop: 4 }]}>
+                Certified that the service provided is by a Goods Transport Agency (GTA). GST on this service is payable by the Recipient (Consignee) under Reverse Charge Mechanism (RCM) pursuant to Notification No. 13/2017-Central Tax (Rate), and no tax has been charged by the transporter.
               </Text>
 
               {/* Driver & Lorry Owner Signatures Row */}
