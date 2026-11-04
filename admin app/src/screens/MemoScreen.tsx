@@ -551,28 +551,47 @@ const MemoScreen = () => {
   const pageWidth = Math.min(Math.max(width - 24, 280), 760);
   const pageHeight = pageWidth / A4_RATIO;
 
-  const loadMemoDocuments = async () => {
+  const loadMemoDocuments = async (): Promise<MemoDocument[]> => {
     setIsLoading(true);
     try {
       const docs = await db.getMemoDocuments();
       setMemoDocuments(docs);
+      return docs;
     } catch (error) {
       console.warn('Failed to load memo documents', error);
+      return [];
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadMemoDocuments();
-    createNewMemo();
+    let isActive = true;
+    const initializeMemoId = async () => {
+      const docs = await loadMemoDocuments();
+      if (isActive) {
+        setMemoId(generateMemoId(docs));
+      }
+    };
+    void initializeMemoId();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
-  const generateMemoId = () => {
-    const next = memoDocuments.length + 1;
-    const candidate = `MEM-${String(next).padStart(4, '0')}`;
-    if (memoDocuments.some((doc) => doc.memoId === candidate)) {
-      return `MEM-${String(memoDocuments.length + 1).padStart(4, '0')}`;
+  const generateMemoId = (documents: MemoDocument[] = memoDocuments) => {
+    const existingIds = new Set(documents.map((doc) => doc.memoId));
+    const highestSequence = documents.reduce((highest, doc) => {
+      const match = /^MEM-(\d+)$/i.exec(doc.memoId);
+      return match ? Math.max(highest, Number(match[1])) : highest;
+    }, 0);
+
+    let nextSequence = highestSequence + 1;
+    let candidate = `MEM-${String(nextSequence).padStart(4, '0')}`;
+    while (existingIds.has(candidate)) {
+      nextSequence += 1;
+      candidate = `MEM-${String(nextSequence).padStart(4, '0')}`;
     }
     return candidate;
   };
