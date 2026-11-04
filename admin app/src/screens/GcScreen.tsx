@@ -1032,6 +1032,25 @@ export default function GcScreen() {
             color: #0b2c6d;
             letter-spacing: 0.3px;
             margin-right: 10px;
+            text-align: center;
+            border: 1px solid #0b2c6d;
+            border-radius: 3px;
+            padding: 3px 6px;
+            flex-shrink: 0;
+          }
+          .for-company-signature {
+            display: block;
+            width: 64px;
+            height: 34px;
+            object-fit: contain;
+            margin: 0 auto;
+          }
+          .for-company-signatory {
+            display: block;
+            font-size: 9px;
+            font-weight: 800;
+            color: #0b2c6d;
+            letter-spacing: 0;
           }
 
           /* Bank & GST Details Card */
@@ -1351,6 +1370,8 @@ export default function GcScreen() {
                 </div>
                 <div class="for-company-right">
                   For NEW BALAJI TRANSPORTS
+                  <img src="${nbtAuthorisedSignatureBase64}" class="for-company-signature" alt="Authorised signature" />
+                  <span class="for-company-signatory">Authorised Signatory</span>
                 </div>
               </div>
             </div>
@@ -2055,6 +2076,13 @@ export default function GcScreen() {
 
                 <View style={styles.forCompanyTitleBox}>
                   <Text style={styles.forCompanyTitle}>For NEW BALAJI TRANSPORTS</Text>
+                  <Image
+                    source={{ uri: nbtAuthorisedSignatureBase64 }}
+                    style={styles.forCompanySignature}
+                    resizeMode="contain"
+                    accessibilityLabel="Authorised signature"
+                  />
+                  <Text style={styles.forCompanySignatory}>Authorised Signatory</Text>
                 </View>
               </View>
 
@@ -2865,10 +2893,26 @@ const styles = StyleSheet.create({
   },
   forCompanyTitleBox: {
     marginRight: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#0b2c6d',
+    borderRadius: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    flexShrink: 0,
   },
   forCompanyTitle: {
     fontSize: 12,
     fontWeight: '900',
+    color: '#0b2c6d',
+  },
+  forCompanySignature: {
+    width: 64,
+    height: 34,
+  },
+  forCompanySignatory: {
+    fontSize: 9,
+    fontWeight: '800',
     color: '#0b2c6d',
   },
 
